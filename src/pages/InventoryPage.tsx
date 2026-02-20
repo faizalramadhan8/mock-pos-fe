@@ -211,11 +211,6 @@ export function InventoryPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className={`text-[22px] font-black tracking-tight ${th.tx}`}>{t.inventory}</h1>
-        {!canWrite && (
-          <span className={`text-[10px] font-bold px-2.5 py-1 rounded-lg ${th.elev} ${th.txm}`}>
-            {t.readOnly}
-          </span>
-        )}
       </div>
 
       {/* Tab bar */}

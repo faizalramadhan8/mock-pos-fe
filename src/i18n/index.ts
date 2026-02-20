@@ -42,7 +42,7 @@ export const translations = {
     taxSettings: "Tax (PPN)", ppnRate: "PPN Rate (%)", ppn: "PPN",
     signOut: "Sign out",
     // Roles
-    roles: { superadmin: "Owner", admin: "Manager", cashier: "Cashier", user: "Staff" },
+    roles: { superadmin: "Super Admin", admin: "Owner", cashier: "Cashier", staff: "Staff", user: "User" },
     // Categories
     cats: { c1: "Flour & Starch", c2: "Sugar", c3: "Dairy & Eggs", c4: "Chocolate", c5: "Leavening", c6: "Nuts & Fruits", c7: "Fats & Oils", c8: "Flavors" },
     // Toast / feedback
@@ -110,7 +110,7 @@ export const translations = {
     storeInfo: "Detail toko", storeName: "Nama toko", storeAddress: "Alamat", storePhone: "Telepon",
     taxSettings: "Pajak (PPN)", ppnRate: "Tarif PPN (%)", ppn: "PPN",
     signOut: "Keluar",
-    roles: { superadmin: "Pemilik", admin: "Manajer", cashier: "Kasir", user: "Staf" },
+    roles: { superadmin: "Super Admin", admin: "Pemilik", cashier: "Kasir", staff: "Staf", user: "Pengguna" },
     cats: { c1: "Tepung & Pati", c2: "Gula", c3: "Susu & Telur", c4: "Cokelat", c5: "Pengembang", c6: "Kacang & Buah", c7: "Lemak & Minyak", c8: "Perasa" },
     // Toast / feedback
     noResults: "Produk tidak ditemukan",

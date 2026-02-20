@@ -58,7 +58,7 @@ export function LoginPage() {
           <div className={`pt-4 border-t ${th.bdr}`}>
             <p className={`text-[10px] text-center mb-3 uppercase tracking-widest font-medium ${th.txf}`}>{t.quickAccess}</p>
             <div className="grid grid-cols-2 gap-2">
-              {MOCK_USERS.map(u => (
+              {MOCK_USERS.filter(u => u.role !== "superadmin" && u.role !== "user").map(u => (
                 <button key={u.id} onClick={() => loginDirect(u)}
                   className={`flex items-center gap-2.5 p-3 rounded-2xl border text-left transition-all active:scale-[0.97] ${th.card2} ${th.bdr} hover:border-[#A0673C]/40`}>
                   <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-[10px] font-extrabold ${th.accBg} ${th.acc}`}>{u.initials}</div>

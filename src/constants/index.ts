@@ -4,10 +4,11 @@ export const ROLE_PERMISSIONS: Record<Role, PageId[]> = {
   superadmin: ["dashboard", "pos", "inventory", "orders", "settings"],
   admin: ["dashboard", "pos", "inventory", "orders", "settings"],
   cashier: ["pos", "inventory", "orders"],
+  staff: ["dashboard", "inventory", "orders", "settings"],
   user: ["dashboard", "orders", "settings"],
 };
 
-export const INVENTORY_WRITE_ROLES: Role[] = ["superadmin", "admin"];
+export const INVENTORY_WRITE_ROLES: Role[] = ["superadmin", "admin", "staff"];
 
 export const CATEGORIES: Category[] = [
   { id: "c1", name: "Flour & Starch", nameId: "Tepung & Pati", icon: "flour", color: "#C4884A" },
@@ -24,6 +25,7 @@ export const MOCK_USERS: User[] = [
   { id: "u1", name: "Rina Wijaya", email: "rina@bakeshop.id", password: "admin", role: "superadmin", initials: "RW" },
   { id: "u2", name: "Andi Pratama", email: "andi@bakeshop.id", password: "admin", role: "admin", initials: "AP" },
   { id: "u3", name: "Siti Nurhaliza", email: "siti@bakeshop.id", password: "admin", role: "cashier", initials: "SN" },
+  { id: "u5", name: "Dewi Lestari", email: "dewi@bakeshop.id", password: "admin", role: "staff", initials: "DL" },
   { id: "u4", name: "Budi Santoso", email: "budi@bakeshop.id", password: "admin", role: "user", initials: "BS" },
 ];
 
