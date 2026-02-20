@@ -3,9 +3,11 @@ import type { User, Category, Product, Order, StockMovement, StockBatch, Role, P
 export const ROLE_PERMISSIONS: Record<Role, PageId[]> = {
   superadmin: ["dashboard", "pos", "inventory", "orders", "settings"],
   admin: ["dashboard", "pos", "inventory", "orders", "settings"],
-  cashier: ["pos", "orders"],
+  cashier: ["pos", "inventory", "orders"],
   user: ["dashboard", "orders", "settings"],
 };
+
+export const INVENTORY_WRITE_ROLES: Role[] = ["superadmin", "admin"];
 
 export const CATEGORIES: Category[] = [
   { id: "c1", name: "Flour & Starch", nameId: "Tepung & Pati", icon: "flour", color: "#C4884A" },
@@ -53,10 +55,10 @@ export const MOCK_PRODUCTS: Product[] = [
 ];
 
 export const MOCK_ORDERS: Order[] = [
-  { id:"ORD-001",items:[{productId:"p1",name:"All-Purpose Flour",quantity:5,unitType:"individual",unitPrice:15000},{productId:"p5",name:"Granulated Sugar",quantity:2,unitType:"box",unitPrice:140000}],total:355000,payment:"cash",status:"completed",customer:"Walk-in",createdAt:"2025-02-19T08:15:00",createdBy:"u3" },
-  { id:"ORD-002",items:[{productId:"p10",name:"Unsalted Butter",quantity:3,unitType:"individual",unitPrice:35000},{productId:"p14",name:"Cocoa Powder",quantity:1,unitType:"individual",unitPrice:35000}],total:140000,payment:"card",status:"completed",customer:"Toko Jaya",createdAt:"2025-02-19T09:30:00",createdBy:"u3" },
-  { id:"ORD-003",items:[{productId:"p13",name:"Dark Chocolate 70%",quantity:2,unitType:"box",unitPrice:420000}],total:840000,payment:"transfer",status:"completed",customer:"Cake House",createdAt:"2025-02-19T10:45:00",createdBy:"u2" },
-  { id:"ORD-004",items:[{productId:"p23",name:"Vanilla Extract",quantity:4,unitType:"individual",unitPrice:60000},{productId:"p3",name:"Cake Flour",quantity:1,unitType:"box",unitPrice:250000}],total:490000,payment:"cash",status:"pending",customer:"Walk-in",createdAt:"2025-02-19T11:20:00",createdBy:"u3" },
+  { id:"ORD-001",items:[{productId:"p1",name:"All-Purpose Flour",quantity:5,unitType:"individual",unitPrice:15000},{productId:"p5",name:"Granulated Sugar",quantity:2,unitType:"box",unitPrice:140000}],subtotal:355000,ppnRate:0,ppn:0,total:355000,payment:"cash",status:"completed",customer:"Walk-in",createdAt:"2025-02-19T08:15:00",createdBy:"u3" },
+  { id:"ORD-002",items:[{productId:"p10",name:"Unsalted Butter",quantity:3,unitType:"individual",unitPrice:35000},{productId:"p14",name:"Cocoa Powder",quantity:1,unitType:"individual",unitPrice:35000}],subtotal:140000,ppnRate:0,ppn:0,total:140000,payment:"card",status:"completed",customer:"Toko Jaya",createdAt:"2025-02-19T09:30:00",createdBy:"u3" },
+  { id:"ORD-003",items:[{productId:"p13",name:"Dark Chocolate 70%",quantity:2,unitType:"box",unitPrice:420000}],subtotal:840000,ppnRate:0,ppn:0,total:840000,payment:"transfer",status:"completed",customer:"Cake House",createdAt:"2025-02-19T10:45:00",createdBy:"u2" },
+  { id:"ORD-004",items:[{productId:"p23",name:"Vanilla Extract",quantity:4,unitType:"individual",unitPrice:60000},{productId:"p3",name:"Cake Flour",quantity:1,unitType:"box",unitPrice:250000}],subtotal:490000,ppnRate:0,ppn:0,total:490000,payment:"cash",status:"pending",customer:"Walk-in",createdAt:"2025-02-19T11:20:00",createdBy:"u3" },
 ];
 
 export const MOCK_MOVEMENTS: StockMovement[] = [
@@ -67,12 +69,15 @@ export const MOCK_MOVEMENTS: StockMovement[] = [
 ];
 
 export const MOCK_BATCHES: StockBatch[] = [
-  { id:"b1",productId:"p1",quantity:120,expiryDate:"2025-12-01",receivedAt:"2025-01-10T10:00:00",note:"Initial stock" },
-  { id:"b2",productId:"p1",quantity:120,expiryDate:"2025-08-15",receivedAt:"2025-02-18T08:00:00",note:"PT Bogasari delivery" },
-  { id:"b3",productId:"p5",quantity:240,expiryDate:"2026-01-20",receivedAt:"2025-01-05T09:00:00",note:"Initial stock" },
-  { id:"b4",productId:"p5",quantity:60,expiryDate:"2025-09-30",receivedAt:"2025-02-18T09:00:00",note:"Sugar Co shipment" },
-  { id:"b5",productId:"p10",quantity:96,expiryDate:"2025-05-20",receivedAt:"2025-01-15T08:00:00",note:"Initial stock" },
-  { id:"b6",productId:"p10",quantity:48,expiryDate:"2025-07-10",receivedAt:"2025-02-17T10:00:00",note:"Weekly butter restock" },
-  { id:"b7",productId:"p13",quantity:91,expiryDate:"2025-11-15",receivedAt:"2025-01-20T08:00:00",note:"Initial stock" },
-  { id:"b8",productId:"p9",quantity:80,expiryDate:"2025-04-01",receivedAt:"2025-02-01T08:00:00",note:"Farm delivery" },
+  { id:"b1",productId:"p1",quantity:120,expiryDate:"2026-06-01",receivedAt:"2026-01-10T10:00:00",note:"Initial stock" },
+  { id:"b2",productId:"p1",quantity:120,expiryDate:"2026-09-15",receivedAt:"2026-02-18T08:00:00",note:"PT Bogasari delivery" },
+  { id:"b3",productId:"p5",quantity:240,expiryDate:"2026-08-20",receivedAt:"2026-01-05T09:00:00",note:"Initial stock" },
+  { id:"b4",productId:"p5",quantity:60,expiryDate:"2026-07-30",receivedAt:"2026-02-18T09:00:00",note:"Sugar Co shipment" },
+  { id:"b5",productId:"p10",quantity:96,expiryDate:"2026-03-20",receivedAt:"2026-01-15T08:00:00",note:"Initial stock" },
+  { id:"b6",productId:"p10",quantity:48,expiryDate:"2026-04-10",receivedAt:"2026-02-17T10:00:00",note:"Weekly butter restock" },
+  { id:"b7",productId:"p13",quantity:91,expiryDate:"2026-11-15",receivedAt:"2026-01-20T08:00:00",note:"Initial stock" },
+  { id:"b8",productId:"p9",quantity:80,expiryDate:"2026-03-05",receivedAt:"2026-02-01T08:00:00",note:"Farm delivery" },
+  { id:"b9",productId:"p12",quantity:5,expiryDate:"2026-03-15",receivedAt:"2026-01-10T08:00:00",note:"Cream cheese delivery" },
+  { id:"b10",productId:"p24",quantity:8,expiryDate:"2026-04-01",receivedAt:"2026-02-01T08:00:00",note:"Lemon zest restock" },
+  { id:"b11",productId:"p11",quantity:20,expiryDate:"2026-03-01",receivedAt:"2026-01-20T08:00:00",note:"Cream delivery" },
 ];

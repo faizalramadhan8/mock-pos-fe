@@ -48,6 +48,7 @@ interface ProductState {
   products: Product[];
   addProduct: (product: Product) => void;
   adjustStock: (id: string, delta: number) => void;
+  toggleActive: (id: string) => void;
   getLowStock: () => Product[];
 }
 export const useProductStore = create<ProductState>((set, get) => ({
@@ -55,6 +56,9 @@ export const useProductStore = create<ProductState>((set, get) => ({
   addProduct: (product) => set(s => ({ products: [product, ...s.products] })),
   adjustStock: (id, delta) => set(s => ({
     products: s.products.map(p => p.id === id ? { ...p, stock: Math.max(0, p.stock + delta) } : p),
+  })),
+  toggleActive: (id) => set(s => ({
+    products: s.products.map(p => p.id === id ? { ...p, isActive: !p.isActive } : p),
   })),
   getLowStock: () => get().products.filter(p => p.stock <= p.minStock),
 }));
@@ -145,6 +149,7 @@ interface BatchState {
   addBatch: (batch: StockBatch) => void;
   consumeFIFO: (productId: string, qty: number) => void;
   getNearestExpiry: (productId: string) => string | null;
+  getExpiringBatches: (withinDays: number) => StockBatch[];
 }
 export const useBatchStore = create<BatchState>((set, get) => ({
   batches: MOCK_BATCHES,
@@ -166,6 +171,13 @@ export const useBatchStore = create<BatchState>((set, get) => ({
       .filter(b => b.productId === productId && b.quantity > 0 && b.expiryDate)
       .sort((a, b) => new Date(a.expiryDate).getTime() - new Date(b.expiryDate).getTime())[0];
     return batch?.expiryDate || null;
+  },
+  getExpiringBatches: (withinDays) => {
+    const now = new Date();
+    const threshold = new Date(now.getTime() + withinDays * 24 * 60 * 60 * 1000);
+    return get().batches
+      .filter(b => b.quantity > 0 && b.expiryDate && new Date(b.expiryDate) <= threshold)
+      .sort((a, b) => new Date(a.expiryDate).getTime() - new Date(b.expiryDate).getTime());
   },
 }));
 
@@ -218,7 +230,8 @@ interface SettingsState {
   storeName: string;
   storeAddress: string;
   storePhone: string;
-  update: (data: Partial<Pick<SettingsState, "storeName" | "storeAddress" | "storePhone">>) => void;
+  ppnRate: number;
+  update: (data: Partial<Pick<SettingsState, "storeName" | "storeAddress" | "storePhone" | "ppnRate">>) => void;
 }
 export const useSettingsStore = create<SettingsState>()(
   persist(
@@ -226,6 +239,7 @@ export const useSettingsStore = create<SettingsState>()(
       storeName: "BakeShop",
       storeAddress: "Jl. Sudirman No. 123, Jakarta",
       storePhone: "+62 812-3456-7890",
+      ppnRate: 11,
       update: (data) => set(s => ({ ...s, ...data })),
     }),
     { name: "bakeshop-settings" }

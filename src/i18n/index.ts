@@ -39,6 +39,7 @@ export const translations = {
     // Settings
     theme: "Appearance", language: "Language", light: "Light", dark: "Dark",
     storeInfo: "Store details", storeName: "Store name", storeAddress: "Address", storePhone: "Phone",
+    taxSettings: "Tax (PPN)", ppnRate: "PPN Rate (%)", ppn: "PPN",
     signOut: "Sign out",
     // Roles
     roles: { superadmin: "Owner", admin: "Manager", cashier: "Cashier", user: "Staff" },
@@ -53,12 +54,29 @@ export const translations = {
     cartCleared: "Cart cleared",
     settingsSaved: "Settings saved",
     printReceipt: "Print Receipt",
+    printLabel: "Print Label",
     receipt: "Receipt",
     thankyou: "Thank you!",
     loadMore: "Show more",
     insufficientStock: "Not enough stock",
     today: "Today",
     yesterday: "Yesterday",
+    // Inventory tabs
+    invOverview: "Overview", invStockIn: "Stock In", invStockOut: "Stock Out",
+    invExpiry: "Expiry", invHistory: "History",
+    // Overview
+    product: "Product", currentStock: "Current Stock", status: "Status", actions: "Actions",
+    lowStock: "Low Stock", outOfStock: "Out of Stock", normalStock: "Normal",
+    showInPOS: "Show in POS", hideFromPOS: "Hide from POS",
+    productShown: "Product visible in POS", productHidden: "Product hidden from POS",
+    active: "Active", inactive: "Inactive",
+    // Expiry
+    expiryAlerts: "Expiry Alerts", expiringIn: "Expiring in",
+    days: "days", alreadyExpired: "Already expired", noExpiryAlerts: "No expiry alerts",
+    // Barcode scanner
+    scannerReady: "Scanner ready", productScanned: "Product scanned", skuNotFound: "SKU not found",
+    // RBAC
+    readOnly: "Read only",
   },
   id: {
     appName: "BakeShop",
@@ -90,6 +108,7 @@ export const translations = {
     allOrders: "Semua", completed: "Selesai", pending: "Tertunda",
     theme: "Tampilan", language: "Bahasa", light: "Terang", dark: "Gelap",
     storeInfo: "Detail toko", storeName: "Nama toko", storeAddress: "Alamat", storePhone: "Telepon",
+    taxSettings: "Pajak (PPN)", ppnRate: "Tarif PPN (%)", ppn: "PPN",
     signOut: "Keluar",
     roles: { superadmin: "Pemilik", admin: "Manajer", cashier: "Kasir", user: "Staf" },
     cats: { c1: "Tepung & Pati", c2: "Gula", c3: "Susu & Telur", c4: "Cokelat", c5: "Pengembang", c6: "Kacang & Buah", c7: "Lemak & Minyak", c8: "Perasa" },
@@ -102,12 +121,29 @@ export const translations = {
     cartCleared: "Keranjang dikosongkan",
     settingsSaved: "Pengaturan disimpan",
     printReceipt: "Cetak Struk",
+    printLabel: "Cetak Label",
     receipt: "Struk",
     thankyou: "Terima kasih!",
     loadMore: "Tampilkan lagi",
     insufficientStock: "Stok tidak cukup",
     today: "Hari ini",
     yesterday: "Kemarin",
+    // Inventory tabs
+    invOverview: "Ringkasan", invStockIn: "Masuk", invStockOut: "Keluar",
+    invExpiry: "Kedaluwarsa", invHistory: "Riwayat",
+    // Overview
+    product: "Produk", currentStock: "Stok Saat Ini", status: "Status", actions: "Aksi",
+    lowStock: "Stok Rendah", outOfStock: "Stok Habis", normalStock: "Normal",
+    showInPOS: "Tampilkan di POS", hideFromPOS: "Sembunyikan dari POS",
+    productShown: "Produk terlihat di POS", productHidden: "Produk tersembunyi dari POS",
+    active: "Aktif", inactive: "Nonaktif",
+    // Expiry
+    expiryAlerts: "Peringatan Kedaluwarsa", expiringIn: "Kedaluwarsa dalam",
+    days: "hari", alreadyExpired: "Sudah kedaluwarsa", noExpiryAlerts: "Tidak ada peringatan",
+    // Barcode scanner
+    scannerReady: "Scanner siap", productScanned: "Produk dipindai", skuNotFound: "SKU tidak ditemukan",
+    // RBAC
+    readOnly: "Hanya baca",
   },
 } as const;
 

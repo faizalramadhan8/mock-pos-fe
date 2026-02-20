@@ -56,6 +56,9 @@ export interface CartItem {
 export interface Order {
   id: string;
   items: OrderItem[];
+  subtotal: number;
+  ppnRate: number;
+  ppn: number;
   total: number;
   payment: PaymentMethod;
   status: OrderStatus;

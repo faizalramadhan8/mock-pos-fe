@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useLangStore, useThemeStore, useSettingsStore } from "@/stores";
+import { useAuthStore, useLangStore, useThemeStore, useSettingsStore } from "@/stores";
 import { useThemeClasses } from "@/hooks/useThemeClasses";
 import { Sun, Moon } from "lucide-react";
 import toast from "react-hot-toast";
@@ -9,13 +9,18 @@ export function SettingsPage() {
   const { t, lang, setLang } = useLangStore();
   const { dark, toggle } = useThemeStore();
   const settings = useSettingsStore();
+  const user = useAuthStore(s => s.user);
+  const isAdmin = user?.role === "superadmin" || user?.role === "admin";
 
   const [storeName, setStoreName] = useState(settings.storeName);
   const [storeAddress, setStoreAddress] = useState(settings.storeAddress);
   const [storePhone, setStorePhone] = useState(settings.storePhone);
+  const [ppnRate, setPpnRate] = useState(String(settings.ppnRate));
 
   const handleSave = () => {
-    settings.update({ storeName, storeAddress, storePhone });
+    const rate = Math.max(0, Math.min(100, parseFloat(ppnRate) || 0));
+    settings.update({ storeName, storeAddress, storePhone, ppnRate: rate });
+    setPpnRate(String(rate));
     toast.success(t.settingsSaved as string);
   };
 
@@ -56,10 +61,28 @@ export function SettingsPage() {
             className={`w-full px-4 py-3 text-sm rounded-2xl border ${th.inp}`} placeholder={t.storeAddress as string} />
           <input value={storePhone} onChange={e => setStorePhone(e.target.value)}
             className={`w-full px-4 py-3 text-sm rounded-2xl border ${th.inp}`} placeholder={t.storePhone as string} />
-          <button onClick={handleSave}
-            className="w-full py-3 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-[#E8B088] to-[#A0673C] mt-1">{t.save}</button>
         </div>
       </div>
+
+      {isAdmin && (
+        <div className={`rounded-[22px] border p-5 ${th.card} ${th.bdr}`}>
+          <p className={`text-sm font-extrabold mb-3 ${th.tx}`}>{t.taxSettings}</p>
+          <div className="flex flex-col gap-2">
+            <div className="relative">
+              <input type="number" value={ppnRate} onChange={e => setPpnRate(e.target.value)}
+                min="0" max="100" step="0.5"
+                className={`w-full px-4 py-3 text-sm rounded-2xl border pr-10 ${th.inp}`} placeholder={t.ppnRate as string} />
+              <span className={`absolute right-4 top-1/2 -translate-y-1/2 text-sm font-bold ${th.txm}`}>%</span>
+            </div>
+            <p className={`text-[11px] ${th.txf}`}>
+              {lang === "id" ? "Pajak akan ditambahkan ke setiap pesanan" : "Tax will be added to every order"}
+            </p>
+          </div>
+        </div>
+      )}
+
+      <button onClick={handleSave}
+        className="w-full py-3 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-[#E8B088] to-[#A0673C]">{t.save}</button>
     </div>
   );
 }

@@ -1,16 +1,18 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
-import { useCategoryStore, useProductStore, useCartStore, useOrderStore, useAuthStore, useBatchStore, useLangStore } from "@/stores";
+import { useCategoryStore, useProductStore, useCartStore, useOrderStore, useAuthStore, useBatchStore, useLangStore, useSettingsStore } from "@/stores";
 import { Modal } from "@/components/Modal";
 import { ProductImage } from "@/components/ProductImage";
 import { ProductCard } from "@/components/ProductCard";
 import { CategoryIconMap } from "@/components/icons";
 import { useThemeClasses } from "@/hooks/useThemeClasses";
 import { useDebounce } from "@/hooks/useDebounce";
+import { useBarcodeScanner } from "@/hooks/useBarcodeScanner";
 import { formatCurrency as $, printReceipt } from "@/utils";
+import Barcode from "react-barcode";
 import type { PaymentMethod, UnitType, Product, Order } from "@/types";
 import toast from "react-hot-toast";
 import {
-  Search, ShoppingBag, Minus, Plus, Trash2,
+  Search, ScanLine, ShoppingBag, Minus, Plus, Trash2,
 } from "lucide-react";
 
 export function POSPage() {
@@ -31,6 +33,7 @@ export function POSPage() {
   const addOrder = useOrderStore(s => s.addOrder);
   const consumeFIFO = useBatchStore(s => s.consumeFIFO);
   const user = useAuthStore(s => s.user)!;
+  const ppnRate = useSettingsStore(s => s.ppnRate);
 
   const [query, setQuery] = useState("");
   const debouncedQuery = useDebounce(query, 150);
@@ -53,7 +56,9 @@ export function POSPage() {
     return () => window.removeEventListener("keydown", handle);
   }, []);
 
-  const cartTotal = useMemo(() => cartItems.reduce((s, i) => s + i.unitPrice * i.quantity, 0), [cartItems]);
+  const cartSubtotal = useMemo(() => cartItems.reduce((s, i) => s + i.unitPrice * i.quantity, 0), [cartItems]);
+  const ppnAmount = useMemo(() => Math.round(cartSubtotal * ppnRate / 100), [cartSubtotal, ppnRate]);
+  const cartTotal = cartSubtotal + ppnAmount;
   const cartCount = useMemo(() => cartItems.reduce((s, i) => s + i.quantity, 0), [cartItems]);
 
   const filtered = useMemo(() => products.filter(p => {
@@ -76,6 +81,20 @@ export function POSPage() {
     addItem(product, unitType, lang);
   }, [addItem, lang, t.insufficientStock]);
 
+  // Barcode scanner: auto-add product by SKU
+  const handleBarcodeScan = useCallback((scannedCode: string) => {
+    const product = products.find(p => p.sku.toUpperCase() === scannedCode.toUpperCase() && p.isActive);
+    if (product) {
+      handleAddToCart(product, "individual");
+      toast.success(`${t.productScanned}: ${lang === "id" ? product.nameId : product.name}`);
+      setQuery("");
+    } else {
+      toast.error(`${t.skuNotFound}: ${scannedCode}`);
+    }
+  }, [products, handleAddToCart, lang, t.productScanned, t.skuNotFound]);
+
+  useBarcodeScanner({ onScan: handleBarcodeScan });
+
   const handleQtyUpdate = useCallback((itemId: string, delta: number) => {
     if (delta > 0) {
       const item = cartItems.find(i => i.id === itemId);
@@ -97,10 +116,11 @@ export function POSPage() {
   }, [cartItems, products, updateQty, t.insufficientStock]);
 
   const doCheckout = () => {
-    const order = {
+    const order: Order = {
       id: `ORD-${Date.now().toString(36).toUpperCase()}`,
       items: cartItems.map(ci => ({ productId: ci.productId, name: ci.name, quantity: ci.quantity, unitType: ci.unitType, unitPrice: ci.unitPrice })),
-      total: cartTotal, payment, status: "completed" as const,
+      subtotal: cartSubtotal, ppnRate, ppn: ppnAmount, total: cartTotal,
+      payment, status: "completed" as const,
       customer: customer || (t.walkIn as string),
       createdAt: new Date().toISOString(), createdBy: user.id,
     };
@@ -161,7 +181,10 @@ export function POSPage() {
 
       {cartItems.length > 0 && <>
         <div className={`p-4 rounded-[18px] ${th.elev}`}>
-          <div className="flex justify-between text-sm"><span className={th.txm}>{t.subtotal}</span><span className={`font-semibold ${th.tx}`}>{$(cartTotal)}</span></div>
+          <div className="flex justify-between text-sm"><span className={th.txm}>{t.subtotal}</span><span className={`font-semibold ${th.tx}`}>{$(cartSubtotal)}</span></div>
+          {ppnRate > 0 && (
+            <div className="flex justify-between text-sm mt-1"><span className={th.txm}>{t.ppn} ({ppnRate}%)</span><span className={`font-semibold ${th.tx}`}>{$(ppnAmount)}</span></div>
+          )}
           <div className={`flex justify-between text-base pt-3 mt-3 border-t ${th.bdr}`}>
             <span className={`font-extrabold ${th.tx}`}>{t.total}</span>
             <span className={`font-black text-xl ${th.acc}`}>{$(cartTotal)}</span>
@@ -194,7 +217,18 @@ export function POSPage() {
         <div className="relative mb-4">
           <Search size={16} className={`absolute left-3.5 top-1/2 -translate-y-1/2 ${th.txf}`} />
           <input ref={searchRef} value={query} onChange={e => setQuery(e.target.value)} placeholder={`${t.search}  ( / )`}
-            className={`w-full pl-10 pr-4 py-3 text-sm rounded-2xl border focus:outline-none focus:ring-2 focus:ring-[#A0673C]/20 font-medium ${th.inp}`} />
+            onKeyDown={e => {
+              if (e.key === "Enter" && query.trim()) {
+                const product = products.find(p => p.sku.toUpperCase() === query.trim().toUpperCase() && p.isActive);
+                if (product) {
+                  handleAddToCart(product, "individual");
+                  toast.success(`${t.productScanned}: ${lang === "id" ? product.nameId : product.name}`);
+                  setQuery("");
+                }
+              }
+            }}
+            className={`w-full pl-10 pr-12 py-3 text-sm rounded-2xl border focus:outline-none focus:ring-2 focus:ring-[#A0673C]/20 font-medium ${th.inp}`} />
+          <ScanLine size={16} className={`absolute right-3.5 top-1/2 -translate-y-1/2 ${th.txf}`} />
         </div>
 
         {/* Category pills with fade gradient */}
@@ -279,6 +313,11 @@ export function POSPage() {
           <div className={`rounded-[20px] p-6 text-center ${th.accBg}`}>
             <p className={`text-xs font-semibold ${th.acc}`}>{t.totalAmount}</p>
             <p className={`text-[32px] font-black tracking-tight mt-1 ${th.acc}`}>{$(cartTotal)}</p>
+            {ppnRate > 0 && (
+              <p className={`text-[11px] mt-1 ${th.acc} opacity-70`}>
+                {t.subtotal}: {$(cartSubtotal)} + {t.ppn} {ppnRate}%: {$(ppnAmount)}
+              </p>
+            )}
           </div>
           {payment === "cash" && (
             <div>
@@ -317,10 +356,24 @@ export function POSPage() {
                   <span className={`text-sm font-bold ${th.tx}`}>{$(item.unitPrice * item.quantity)}</span>
                 </div>
               ))}
-              <div className={`flex justify-between pt-2 mt-2 border-t ${th.bdr}`}>
+              {lastOrder.ppnRate > 0 && (<>
+                <div className={`flex justify-between pt-2 mt-2 border-t ${th.bdr}`}>
+                  <span className={`text-sm ${th.txm}`}>{t.subtotal}</span>
+                  <span className={`text-sm font-semibold ${th.tx}`}>{$(lastOrder.subtotal)}</span>
+                </div>
+                <div className="flex justify-between py-0.5">
+                  <span className={`text-sm ${th.txm}`}>{t.ppn} ({lastOrder.ppnRate}%)</span>
+                  <span className={`text-sm font-semibold ${th.tx}`}>{$(lastOrder.ppn)}</span>
+                </div>
+              </>)}
+              <div className={`flex justify-between pt-2 ${lastOrder.ppnRate === 0 ? `mt-2 border-t ${th.bdr}` : ""}`}>
                 <span className={`font-extrabold ${th.tx}`}>{t.total}</span>
                 <span className={`font-black text-lg ${th.acc}`}>{$(lastOrder.total)}</span>
               </div>
+            </div>
+            <div className="flex justify-center">
+              <Barcode value={lastOrder.id} format="CODE128" width={1.5} height={40} displayValue={true}
+                fontSize={11} font="DM Sans" background="transparent" margin={0} />
             </div>
             <button onClick={() => { printReceipt(lastOrder); }}
               className={`w-full py-3 rounded-2xl text-sm font-bold border-2 ${th.bdr} ${th.tx}`}>
