@@ -77,6 +77,12 @@ export const translations = {
     scannerReady: "Scanner ready", productScanned: "Product scanned", skuNotFound: "SKU not found",
     // RBAC
     readOnly: "Read only",
+    // User registration
+    registerStaff: "Register Staff", fullName: "Full name", nik: "NIK (National ID)",
+    msisdn: "Phone number", dateOfBirth: "Date of birth", selectRole: "Select role",
+    defaultPassword: "Default password", userRegistered: "User registered successfully",
+    emailExists: "Email already registered", staffList: "Staff List",
+    noStaff: "No staff registered yet", registered: "Registered",
   },
   id: {
     appName: "BakeShop",
@@ -144,6 +150,12 @@ export const translations = {
     scannerReady: "Scanner siap", productScanned: "Produk dipindai", skuNotFound: "SKU tidak ditemukan",
     // RBAC
     readOnly: "Hanya baca",
+    // User registration
+    registerStaff: "Daftar Staf", fullName: "Nama lengkap", nik: "NIK (KTP)",
+    msisdn: "Nomor telepon", dateOfBirth: "Tanggal lahir", selectRole: "Pilih peran",
+    defaultPassword: "Password default", userRegistered: "Pengguna berhasil didaftarkan",
+    emailExists: "Email sudah terdaftar", staffList: "Daftar Staf",
+    noStaff: "Belum ada staf terdaftar", registered: "Terdaftar",
   },
 } as const;
 

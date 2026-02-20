@@ -8,16 +8,19 @@ import { genId } from "@/utils";
 // ─── Auth ───
 interface AuthState {
   user: User | null;
+  users: User[];
   login: (email: string, pw: string) => boolean;
   loginDirect: (user: User) => void;
   logout: () => void;
   hasPerm: (page: PageId) => boolean;
   defaultPage: () => PageId;
+  addUser: (user: User) => void;
 }
 export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
+  users: [...MOCK_USERS],
   login: (email, pw) => {
-    const u = MOCK_USERS.find(u => u.email === email && u.password === pw);
+    const u = get().users.find(u => u.email === email && u.password === pw);
     if (u) { set({ user: u }); return true; }
     return false;
   },
@@ -31,6 +34,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     const u = get().user;
     return u ? (ROLE_PERMISSIONS[u.role]?.[0] || "dashboard") : "dashboard";
   },
+  addUser: (user) => set(s => ({ users: [...s.users, user] })),
 }));
 
 // ─── Categories ───

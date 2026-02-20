@@ -14,6 +14,9 @@ export interface User {
   password: string;
   role: Role;
   initials: string;
+  nik?: string;
+  phone?: string;
+  dateOfBirth?: string;
 }
 
 export interface Category {
