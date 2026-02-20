@@ -1,0 +1,28 @@
+@import "tailwindcss";
+
+body {
+  font-family: 'DM Sans', 'Segoe UI', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
+  margin: 0;
+}
+
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+.pb-safe { padding-bottom: env(safe-area-inset-bottom, 0px); }
+
+@keyframes slideUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes spin { to { transform: rotate(360deg); } }
+.animate-slide-up { animation: slideUp .25s ease-out; }
+.animate-fade-in { animation: fadeIn .2s ease-out; }
+.animate-spin { animation: spin 1s linear infinite; }
+
+@media (hover: none) {
+  button, a, [role="button"] { -webkit-tap-highlight-color: transparent; }
+}
+
+/* Print: hide app shell, only receipt popup prints */
+@media print {
+  body > * { display: none !important; }
+}

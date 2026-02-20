@@ -1,0 +1,116 @@
+export const translations = {
+  en: {
+    appName: "BakeShop",
+    // Auth
+    signIn: "Sign In", email: "Email address", password: "Password",
+    invalidCred: "Wrong email or password", quickAccess: "Quick demo login",
+    // Nav
+    dashboard: "Home", pos: "Cashier", inventory: "Stock", orders: "Orders", settings: "Settings",
+    // General
+    search: "Search ingredients...", all: "All", individual: "Pcs", box: "Box",
+    save: "Save", cancel: "Cancel", confirm: "Confirm", close: "Close", clear: "Clear",
+    // POS
+    cart: "Cart", emptyCart: "Nothing here yet", emptyCartHint: "Browse and add items to your order",
+    customer: "Customer name (optional)", subtotal: "Subtotal", total: "Total",
+    payNow: "Pay now", cash: "Cash", card: "Card", transfer: "Transfer",
+    checkout: "Complete Order", totalAmount: "Order Total", cashReceived: "Cash received",
+    change: "Change", walkIn: "Walk-in",
+    low: "Low", soldOut: "Sold out", each: "each", inStock: "in stock", left: "left",
+    addPcs: "+ Pcs", addBox: "Box",
+    // Dashboard
+    welcome: "Good morning", todayOverview: "Today's overview",
+    revenue: "Revenue", ordersCount: "Orders", productsCount: "Products", lowAlerts: "Low Stock",
+    recentOrders: "Latest transactions", lowStockItems: "Running low",
+    // Inventory
+    stockIn: "Stock In", stockOut: "Stock Out", totalIn: "Received", totalOut: "Dispatched",
+    netChange: "Net Flow", movementLog: "Movement log", noMovements: "No records yet",
+    selectProduct: "Choose product", quantity: "Quantity", unitType: "Unit type",
+    note: "Reason / notes", record: "Record", price: "Unit price (Rp)", boxEquals: "1 box",
+    // Add Product & Category
+    addProduct: "Add Product", productName: "Product name (EN)", productNameId: "Product name (ID)",
+    sku: "SKU", priceIndividual: "Price (Pcs)", priceBox: "Price (Box)",
+    qtyPerBox: "Qty per Box", unitLabel: "Unit", minStockLabel: "Min Stock", imageUrl: "Image URL",
+    addCategory: "Add Category", categoryName: "Category name (EN)", categoryNameId: "Category name (ID)",
+    categoryColor: "Color",
+    // FIFO
+    expiryDate: "Expiry date", expires: "Exp", expired: "Expired",
+    // Orders
+    allOrders: "All", completed: "Completed", pending: "Pending",
+    // Settings
+    theme: "Appearance", language: "Language", light: "Light", dark: "Dark",
+    storeInfo: "Store details", storeName: "Store name", storeAddress: "Address", storePhone: "Phone",
+    signOut: "Sign out",
+    // Roles
+    roles: { superadmin: "Owner", admin: "Manager", cashier: "Cashier", user: "Staff" },
+    // Categories
+    cats: { c1: "Flour & Starch", c2: "Sugar", c3: "Dairy & Eggs", c4: "Chocolate", c5: "Leavening", c6: "Nuts & Fruits", c7: "Fats & Oils", c8: "Flavors" },
+    // Toast / feedback
+    noResults: "No products found",
+    orderSuccess: "Order completed!",
+    stockRecorded: "Stock recorded",
+    productAdded: "Product added",
+    categoryAdded: "Category added",
+    cartCleared: "Cart cleared",
+    settingsSaved: "Settings saved",
+    printReceipt: "Print Receipt",
+    receipt: "Receipt",
+    thankyou: "Thank you!",
+    loadMore: "Show more",
+    insufficientStock: "Not enough stock",
+    today: "Today",
+    yesterday: "Yesterday",
+  },
+  id: {
+    appName: "BakeShop",
+    signIn: "Masuk", email: "Alamat email", password: "Kata sandi",
+    invalidCred: "Email atau sandi salah", quickAccess: "Login cepat (demo)",
+    dashboard: "Beranda", pos: "Kasir", inventory: "Stok", orders: "Pesanan", settings: "Pengaturan",
+    search: "Cari bahan...", all: "Semua", individual: "Satuan", box: "Dus",
+    save: "Simpan", cancel: "Batal", confirm: "Konfirmasi", close: "Tutup", clear: "Hapus",
+    cart: "Keranjang", emptyCart: "Belum ada isi", emptyCartHint: "Pilih bahan untuk ditambahkan",
+    customer: "Nama pelanggan (opsional)", subtotal: "Subtotal", total: "Total",
+    payNow: "Bayar", cash: "Tunai", card: "Kartu", transfer: "Transfer",
+    checkout: "Selesaikan Pesanan", totalAmount: "Total Bayar", cashReceived: "Uang diterima",
+    change: "Kembalian", walkIn: "Umum",
+    low: "Sedikit", soldOut: "Habis", each: "satuan", inStock: "stok", left: "sisa",
+    addPcs: "+ Satuan", addBox: "Dus",
+    welcome: "Selamat pagi", todayOverview: "Ringkasan hari ini",
+    revenue: "Pendapatan", ordersCount: "Pesanan", productsCount: "Produk", lowAlerts: "Stok Rendah",
+    recentOrders: "Transaksi terakhir", lowStockItems: "Stok menipis",
+    stockIn: "Masuk", stockOut: "Keluar", totalIn: "Diterima", totalOut: "Dikeluarkan",
+    netChange: "Arus Bersih", movementLog: "Riwayat stok", noMovements: "Belum ada catatan",
+    selectProduct: "Pilih produk", quantity: "Jumlah", unitType: "Tipe unit",
+    note: "Alasan / catatan", record: "Catat", price: "Harga satuan (Rp)", boxEquals: "1 dus",
+    addProduct: "Tambah Produk", productName: "Nama produk (EN)", productNameId: "Nama produk (ID)",
+    sku: "SKU", priceIndividual: "Harga (Satuan)", priceBox: "Harga (Dus)",
+    qtyPerBox: "Isi per Dus", unitLabel: "Satuan", minStockLabel: "Stok Minimum", imageUrl: "URL Gambar",
+    addCategory: "Tambah Kategori", categoryName: "Nama kategori (EN)", categoryNameId: "Nama kategori (ID)",
+    categoryColor: "Warna",
+    expiryDate: "Tanggal kedaluwarsa", expires: "Exp", expired: "Kedaluwarsa",
+    allOrders: "Semua", completed: "Selesai", pending: "Tertunda",
+    theme: "Tampilan", language: "Bahasa", light: "Terang", dark: "Gelap",
+    storeInfo: "Detail toko", storeName: "Nama toko", storeAddress: "Alamat", storePhone: "Telepon",
+    signOut: "Keluar",
+    roles: { superadmin: "Pemilik", admin: "Manajer", cashier: "Kasir", user: "Staf" },
+    cats: { c1: "Tepung & Pati", c2: "Gula", c3: "Susu & Telur", c4: "Cokelat", c5: "Pengembang", c6: "Kacang & Buah", c7: "Lemak & Minyak", c8: "Perasa" },
+    // Toast / feedback
+    noResults: "Produk tidak ditemukan",
+    orderSuccess: "Pesanan selesai!",
+    stockRecorded: "Stok tercatat",
+    productAdded: "Produk ditambahkan",
+    categoryAdded: "Kategori ditambahkan",
+    cartCleared: "Keranjang dikosongkan",
+    settingsSaved: "Pengaturan disimpan",
+    printReceipt: "Cetak Struk",
+    receipt: "Struk",
+    thankyou: "Terima kasih!",
+    loadMore: "Tampilkan lagi",
+    insufficientStock: "Stok tidak cukup",
+    today: "Hari ini",
+    yesterday: "Kemarin",
+  },
+} as const;
+
+export interface Translations {
+  [key: string]: string | Record<string, string>;
+}
