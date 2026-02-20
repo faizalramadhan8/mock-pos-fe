@@ -3,7 +3,7 @@ import type { User, Category, Product, Order, StockMovement, StockBatch, Role, P
 export const ROLE_PERMISSIONS: Record<Role, PageId[]> = {
   superadmin: ["dashboard", "pos", "inventory", "orders", "settings"],
   admin: ["dashboard", "pos", "inventory", "orders", "settings"],
-  cashier: ["pos", "inventory", "orders"],
+  cashier: ["dashboard", "pos", "inventory", "orders"],
   staff: ["dashboard", "inventory", "orders", "settings"],
   user: ["dashboard", "orders", "settings"],
 };

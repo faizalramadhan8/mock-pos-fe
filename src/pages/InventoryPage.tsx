@@ -448,7 +448,15 @@ export function InventoryPage() {
       <Modal open={!!stockModal} onClose={() => setStockModal(null)} title={(stockModal === "in" ? t.stockIn : t.stockOut) as string}>
         <div className="flex flex-col gap-3.5">
           <div className="relative">
-            <select value={form.prod} onChange={e => setForm({ ...form, prod: e.target.value })}
+            <select value={form.prod} onChange={e => {
+                const prodId = e.target.value;
+                if (stockModal === "out") {
+                  const sp = products.find(p => p.id === prodId);
+                  setForm({ ...form, prod: prodId, price: sp ? String(form.unit === "box" ? sp.priceBox : sp.priceIndividual) : "" });
+                } else {
+                  setForm({ ...form, prod: prodId });
+                }
+              }}
               className={`w-full px-4 py-3 text-sm rounded-2xl border appearance-none ${th.inp}`}>
               <option value="">{t.selectProduct}</option>
               {products.map(p => <option key={p.id} value={p.id}>{lang === "id" ? p.nameId : p.name} ({p.stock})</option>)}
@@ -460,7 +468,14 @@ export function InventoryPage() {
               <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>{t.unitType}</p>
               <div className="grid grid-cols-2 gap-1.5">
                 {(["individual", "box"] as UnitType[]).map(ut => (
-                  <button key={ut} onClick={() => setForm({ ...form, unit: ut })}
+                  <button key={ut} onClick={() => {
+                    if (stockModal === "out" && form.prod) {
+                      const sp = products.find(p => p.id === form.prod);
+                      setForm({ ...form, unit: ut, price: sp ? String(ut === "box" ? sp.priceBox : sp.priceIndividual) : "" });
+                    } else {
+                      setForm({ ...form, unit: ut });
+                    }
+                  }}
                     className={`py-2.5 rounded-xl text-xs font-bold ${
                       form.unit === ut ? "text-white bg-gradient-to-r from-[#E8B088] to-[#A0673C]" : `border ${th.bdr} ${th.txm}`
                     }`}>{ut === "individual" ? t.individual : (form.prod ? `${t.box} (${products.find(p => p.id === form.prod)?.qtyPerBox || "?"})` : t.box)}</button>
