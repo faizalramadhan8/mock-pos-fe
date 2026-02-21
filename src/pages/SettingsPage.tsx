@@ -133,7 +133,7 @@ export function SettingsPage() {
 
       {/* ─── Tab Bar (only show when multiple tabs) ─── */}
       {tabs.length > 1 && (
-        <div className="flex gap-2 overflow-x-auto scrollbar-hide -mx-1 px-1">
+        <div className="flex gap-2 overflow-x-auto scrollbar-hide">
           {tabs.map(tab => {
             const active = currentTab === tab.id;
             return (

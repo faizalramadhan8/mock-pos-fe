@@ -116,26 +116,26 @@ export function OrdersPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <h1 className={`text-[22px] font-black tracking-tight ${th.tx}`}>{t.orders}</h1>
-        <div className="flex gap-1.5">
+      <div className="flex items-center justify-between gap-2">
+        <h1 className={`text-[22px] font-black tracking-tight shrink-0 ${th.tx}`}>{t.orders}</h1>
+        <div className="flex gap-1.5 shrink-0">
           <button onClick={() => { exportOrders(dateFiltered, "csv"); toast.success(t.exportSuccess as string); }}
-            className={`flex items-center gap-1 px-2.5 py-2 rounded-xl text-[10px] font-bold ${th.elev} ${th.txm}`}>
+            className={`flex items-center gap-1 px-2 py-1.5 rounded-xl text-[10px] font-bold ${th.elev} ${th.txm}`}>
             <Download size={11} /> CSV
           </button>
           <button onClick={() => { exportOrders(dateFiltered, "xlsx"); toast.success(t.exportSuccess as string); }}
-            className={`flex items-center gap-1 px-2.5 py-2 rounded-xl text-[10px] font-bold ${th.elev} ${th.txm}`}>
+            className={`flex items-center gap-1 px-2 py-1.5 rounded-xl text-[10px] font-bold ${th.elev} ${th.txm}`}>
             <Download size={11} /> Excel
           </button>
           <button onClick={() => printReport(dateFiltered, dateRangeLabel(dateRange) as string)}
-            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold ${th.accBg} ${th.acc}`}>
-            <Printer size={13} /> {t.printReport}
+            className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-[10px] font-bold ${th.accBg} ${th.acc}`}>
+            <Printer size={12} /> {t.printReport}
           </button>
         </div>
       </div>
 
       {/* Date range pills */}
-      <div className="flex gap-2 overflow-x-auto scrollbar-hide -mx-1 px-1">
+      <div className="flex gap-2 overflow-x-auto scrollbar-hide">
         {(["today", "yesterday", "week", "month", "all"] as DateRange[]).map(r => (
           <button key={r} onClick={() => setDateRange(r)}
             className={`shrink-0 px-3.5 py-2 rounded-[14px] text-xs font-bold transition-all ${
@@ -170,10 +170,10 @@ export function OrdersPage() {
       </div>
 
       {/* Status filter pills */}
-      <div className="flex gap-2">
+      <div className="flex gap-2 overflow-x-auto scrollbar-hide">
         {["all", "completed", "pending", "cancelled", "refunded"].map(f => (
           <button key={f} onClick={() => setStatusFilter(f)}
-            className={`px-4 py-2 rounded-[14px] text-xs font-bold ${
+            className={`shrink-0 px-3.5 py-2 rounded-[14px] text-xs font-bold ${
               statusFilter === f ? "text-white bg-gradient-to-r from-[#E8B088] to-[#A0673C]" : `border ${th.card} ${th.bdr} ${th.txm}`
             }`}>{statusLabel(f)}</button>
         ))}

@@ -345,17 +345,17 @@ export function InventoryPage() {
   return (
     <div className="flex flex-col gap-4">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <h1 className={`text-[22px] font-black tracking-tight ${th.tx}`}>{t.inventory}</h1>
-        <div className="flex gap-1.5">
+      <div className="flex items-center justify-between gap-2">
+        <h1 className={`text-[22px] font-black tracking-tight shrink-0 ${th.tx}`}>{t.inventory}</h1>
+        <div className="flex gap-1.5 shrink-0">
           {activeTab === "overview" && (
             <>
               <button onClick={() => { exportProducts(products, "csv"); toast.success(t.exportSuccess as string); }}
-                className={`flex items-center gap-1 px-2.5 py-2 rounded-xl text-[10px] font-bold ${th.elev} ${th.txm}`}>
+                className={`flex items-center gap-1 px-2 py-1.5 rounded-xl text-[10px] font-bold ${th.elev} ${th.txm}`}>
                 <Download size={11} /> CSV
               </button>
               <button onClick={() => { exportProducts(products, "xlsx"); toast.success(t.exportSuccess as string); }}
-                className={`flex items-center gap-1 px-2.5 py-2 rounded-xl text-[10px] font-bold ${th.elev} ${th.txm}`}>
+                className={`flex items-center gap-1 px-2 py-1.5 rounded-xl text-[10px] font-bold ${th.elev} ${th.txm}`}>
                 <Download size={11} /> Excel
               </button>
             </>
@@ -363,11 +363,11 @@ export function InventoryPage() {
           {activeTab === "history" && (
             <>
               <button onClick={() => { exportInventory(movements, products, "csv"); toast.success(t.exportSuccess as string); }}
-                className={`flex items-center gap-1 px-2.5 py-2 rounded-xl text-[10px] font-bold ${th.elev} ${th.txm}`}>
+                className={`flex items-center gap-1 px-2 py-1.5 rounded-xl text-[10px] font-bold ${th.elev} ${th.txm}`}>
                 <Download size={11} /> CSV
               </button>
               <button onClick={() => { exportInventory(movements, products, "xlsx"); toast.success(t.exportSuccess as string); }}
-                className={`flex items-center gap-1 px-2.5 py-2 rounded-xl text-[10px] font-bold ${th.elev} ${th.txm}`}>
+                className={`flex items-center gap-1 px-2 py-1.5 rounded-xl text-[10px] font-bold ${th.elev} ${th.txm}`}>
                 <Download size={11} /> Excel
               </button>
             </>

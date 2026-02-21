@@ -452,8 +452,8 @@ export function POSPage() {
         </div>
         {canCloseRegister && (
           <button onClick={() => setCloseRegisterOpen(true)}
-            className={`shrink-0 flex items-center gap-1.5 px-3.5 py-3 rounded-2xl text-xs font-bold border ${th.bdr} ${th.txm}`}>
-            <DollarSign size={14} /> {t.closeRegister}
+            className={`shrink-0 flex items-center justify-center gap-1.5 w-11 sm:w-auto sm:px-3.5 py-3 rounded-2xl text-xs font-bold border ${th.bdr} ${th.txm}`}>
+            <DollarSign size={14} /> <span className="hidden sm:inline">{t.closeRegister}</span>
           </button>
         )}
         </div>
