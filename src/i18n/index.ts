@@ -63,6 +63,11 @@ export const translations = {
     receipt: "Receipt",
     thankyou: "Thank you!",
     loadMore: "Show more",
+    searchOrders: "Search orders...",
+    noOrdersFound: "No orders found",
+    searchProducts: "Search products...",
+    deleteSupplierConfirm: "Delete this supplier? This cannot be undone.",
+    removeBankConfirm: "Remove this bank account?",
     insufficientStock: "Not enough stock",
     today: "Today",
     yesterday: "Yesterday",
@@ -137,6 +142,30 @@ export const translations = {
     totalRevenue: "Revenue", avgOrder: "Avg Order",
     cancelledCount: "Cancelled", printReport: "Print Report",
     transactionReport: "Transaction Report", noOrdersInRange: "No orders in this period",
+    // Discounts
+    discount: "Discount", addDiscount: "Add Discount", discountPercent: "Percent (%)",
+    discountFixed: "Fixed (Rp)", discountAmount: "Discount", removeDiscount: "Remove",
+    itemDiscount: "Item Discount", orderDiscount: "Order Discount",
+    // Refunds
+    refund: "Refund", refundOrder: "Refund Order", refundItems: "Refund Items",
+    refundAmount: "Refund Amount", refundReason: "Reason for refund",
+    refundConfirm: "Confirm refund?", refundSuccess: "Refund processed",
+    refundAll: "Refund All", selectItemsToRefund: "Select items to refund",
+    refunded: "Refunded", totalRefunds: "Refunds", partialRefund: "Partial",
+    // EOD Cash
+    closeRegister: "Close Register", expectedCash: "Expected Cash",
+    actualCash: "Actual Cash", cashDifference: "Difference",
+    cashOver: "Over", cashShort: "Short", cashBalanced: "Balanced",
+    registerNotes: "Notes", registerClosed: "Register closed",
+    registerHistory: "Register History",
+    // Product edit
+    editProduct: "Edit Product", productUpdated: "Product updated",
+    // Audit log
+    activity: "Activity", activityDesc: "Activity history",
+    noActivity: "No activity yet",
+    // Data export
+    exportData: "Export", exportCSV: "Export CSV", exportExcel: "Export Excel",
+    exportSuccess: "Export downloaded",
   },
   id: {
     appName: "BakeShop",
@@ -190,6 +219,11 @@ export const translations = {
     receipt: "Struk",
     thankyou: "Terima kasih!",
     loadMore: "Tampilkan lagi",
+    searchOrders: "Cari pesanan...",
+    noOrdersFound: "Pesanan tidak ditemukan",
+    searchProducts: "Cari produk...",
+    deleteSupplierConfirm: "Hapus pemasok ini? Tidak dapat dibatalkan.",
+    removeBankConfirm: "Hapus rekening bank ini?",
     insufficientStock: "Stok tidak cukup",
     today: "Hari ini",
     yesterday: "Kemarin",
@@ -264,6 +298,30 @@ export const translations = {
     totalRevenue: "Pendapatan", avgOrder: "Rata-rata",
     cancelledCount: "Dibatalkan", printReport: "Cetak Laporan",
     transactionReport: "Laporan Transaksi", noOrdersInRange: "Tidak ada pesanan di periode ini",
+    // Discounts
+    discount: "Diskon", addDiscount: "Tambah Diskon", discountPercent: "Persen (%)",
+    discountFixed: "Nominal (Rp)", discountAmount: "Diskon", removeDiscount: "Hapus",
+    itemDiscount: "Diskon Item", orderDiscount: "Diskon Pesanan",
+    // Refunds
+    refund: "Refund", refundOrder: "Refund Pesanan", refundItems: "Item Refund",
+    refundAmount: "Jumlah Refund", refundReason: "Alasan refund",
+    refundConfirm: "Konfirmasi refund?", refundSuccess: "Refund berhasil",
+    refundAll: "Refund Semua", selectItemsToRefund: "Pilih item untuk refund",
+    refunded: "Direfund", totalRefunds: "Refund", partialRefund: "Sebagian",
+    // EOD Cash
+    closeRegister: "Tutup Kasir", expectedCash: "Kas Diharapkan",
+    actualCash: "Kas Aktual", cashDifference: "Selisih",
+    cashOver: "Lebih", cashShort: "Kurang", cashBalanced: "Seimbang",
+    registerNotes: "Catatan", registerClosed: "Kasir ditutup",
+    registerHistory: "Riwayat Kasir",
+    // Product edit
+    editProduct: "Edit Produk", productUpdated: "Produk diperbarui",
+    // Audit log
+    activity: "Aktivitas", activityDesc: "Riwayat aktivitas",
+    noActivity: "Belum ada aktivitas",
+    // Data export
+    exportData: "Ekspor", exportCSV: "Ekspor CSV", exportExcel: "Ekspor Excel",
+    exportSuccess: "Ekspor berhasil",
   },
 } as const;
 

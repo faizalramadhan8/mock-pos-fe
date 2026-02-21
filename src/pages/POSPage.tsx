@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
-import { useCategoryStore, useProductStore, useCartStore, useOrderStore, useAuthStore, useBatchStore, useLangStore, useSettingsStore, useMemberStore } from "@/stores";
+import { useCategoryStore, useProductStore, useCartStore, useOrderStore, useAuthStore, useBatchStore, useLangStore, useSettingsStore, useMemberStore, useAuditStore, useCashSessionStore } from "@/stores";
 import { Modal } from "@/components/Modal";
 import { ProductImage } from "@/components/ProductImage";
 import { ProductCard } from "@/components/ProductCard";
@@ -8,12 +8,12 @@ import { CategoryIconMap } from "@/components/icons";
 import { useThemeClasses } from "@/hooks/useThemeClasses";
 import { useDebounce } from "@/hooks/useDebounce";
 import { useBarcodeScanner } from "@/hooks/useBarcodeScanner";
-import { formatCurrency as $, printReceipt, compressImage, genId } from "@/utils";
+import { formatCurrency as $, printReceipt, compressImage, genId, formatTime } from "@/utils";
 import Barcode from "react-barcode";
-import type { PaymentMethod, UnitType, Product, Order } from "@/types";
+import type { PaymentMethod, UnitType, DiscountType, Product, Order } from "@/types";
 import toast from "react-hot-toast";
 import {
-  Search, ScanLine, ShoppingBag, Minus, Plus, Trash2, ImagePlus, X, UserPlus,
+  Search, ScanLine, ShoppingBag, Minus, Plus, Trash2, ImagePlus, X, UserPlus, Tag, Percent, DollarSign,
 } from "lucide-react";
 
 export function POSPage() {
@@ -38,8 +38,18 @@ export function POSPage() {
   const bankAccounts = useSettingsStore(s => s.bankAccounts);
   const members = useMemberStore(s => s.members);
   const addMember = useMemberStore(s => s.addMember);
+  const setItemDiscount = useCartStore(s => s.setItemDiscount);
+  const setOrderDiscount = useCartStore(s => s.setOrderDiscount);
+  const orderDiscountType = useCartStore(s => s.orderDiscountType);
+  const orderDiscountValue = useCartStore(s => s.orderDiscountValue);
 
   const [query, setQuery] = useState("");
+  const [discountItemId, setDiscountItemId] = useState<string | null>(null);
+  const [discountInput, setDiscountInput] = useState("");
+  const [discountMode, setDiscountMode] = useState<DiscountType>("percent");
+  const [showOrderDiscount, setShowOrderDiscount] = useState(false);
+  const [orderDiscInput, setOrderDiscInput] = useState("");
+  const [orderDiscMode, setOrderDiscMode] = useState<DiscountType>("percent");
   const [memberQuery, setMemberQuery] = useState("");
   const [showMemberDropdown, setShowMemberDropdown] = useState(false);
   const [showAddMember, setShowAddMember] = useState(false);
@@ -55,6 +65,12 @@ export function POSPage() {
   const [selectedBankId, setSelectedBankId] = useState("");
   const [lastOrder, setLastOrder] = useState<Order | null>(null);
   const [detailProductId, setDetailProductId] = useState<string | null>(null);
+  const [closeRegisterOpen, setCloseRegisterOpen] = useState(false);
+  const [actualCash, setActualCash] = useState("");
+  const [registerNotes, setRegisterNotes] = useState("");
+  const addSession = useCashSessionStore(s => s.addSession);
+  const sessions = useCashSessionStore(s => s.sessions);
+  const canCloseRegister = user.role === "superadmin" || user.role === "admin" || user.role === "cashier";
   const searchRef = useRef<HTMLInputElement>(null);
 
   // Keyboard shortcut: "/" to focus search
@@ -98,9 +114,24 @@ export function POSPage() {
     toast.success(t.memberAdded as string);
   };
 
+  // Discount-aware calculations
+  const calcItemDiscount = (ci: typeof cartItems[0]) => {
+    if (!ci.discountType || !ci.discountValue) return 0;
+    const gross = ci.unitPrice * ci.quantity;
+    return ci.discountType === "percent" ? Math.round(gross * ci.discountValue / 100) : Math.min(ci.discountValue, gross);
+  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const itemDiscountsTotal = useMemo(() => cartItems.reduce((s, i) => s + calcItemDiscount(i), 0), [cartItems]);
   const cartSubtotal = useMemo(() => cartItems.reduce((s, i) => s + i.unitPrice * i.quantity, 0), [cartItems]);
-  const ppnAmount = useMemo(() => Math.round(cartSubtotal * ppnRate / 100), [cartSubtotal, ppnRate]);
-  const cartTotal = cartSubtotal + ppnAmount;
+  const cartSubtotalAfterItemDisc = cartSubtotal - itemDiscountsTotal;
+  const orderDiscAmount = useMemo(() => {
+    if (!orderDiscountType || !orderDiscountValue) return 0;
+    return orderDiscountType === "percent" ? Math.round(cartSubtotalAfterItemDisc * orderDiscountValue / 100) : Math.min(orderDiscountValue, cartSubtotalAfterItemDisc);
+  }, [orderDiscountType, orderDiscountValue, cartSubtotalAfterItemDisc]);
+  const discountedSubtotal = cartSubtotalAfterItemDisc - orderDiscAmount;
+  const ppnAmount = useMemo(() => Math.round(discountedSubtotal * ppnRate / 100), [discountedSubtotal, ppnRate]);
+  const cartTotal = discountedSubtotal + ppnAmount;
+  const totalDiscount = itemDiscountsTotal + orderDiscAmount;
   const cartCount = useMemo(() => cartItems.reduce((s, i) => s + i.quantity, 0), [cartItems]);
 
   const filtered = useMemo(() => products.filter(p => {
@@ -137,6 +168,38 @@ export function POSPage() {
 
   useBarcodeScanner({ onScan: handleBarcodeScan });
 
+  // Close Register
+  const expectedCash = useMemo(() => {
+    const today = new Date();
+    const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    return useOrderStore.getState().orders
+      .filter(o => o.status === "completed" && o.payment === "cash" && new Date(o.createdAt) >= startOfDay)
+      .reduce((s, o) => s + o.total, 0);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [closeRegisterOpen]);
+
+  const todaySessions = useMemo(() => {
+    const today = new Date();
+    const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    return sessions.filter(s => new Date(s.closedAt) >= startOfDay);
+  }, [sessions]);
+
+  const doCloseRegister = () => {
+    const actual = parseFloat(actualCash) || 0;
+    const diff = actual - expectedCash;
+    addSession({
+      id: genId(), date: new Date().toISOString(),
+      expectedCash, actualCash: actual, difference: diff,
+      notes: registerNotes.trim(), closedBy: user.id,
+      closedAt: new Date().toISOString(),
+    });
+    useAuditStore.getState().log("register_closed", user.id, user.name, `Expected: ${$(expectedCash)} · Actual: ${$(actual)} · Diff: ${$(diff)}`);
+    setCloseRegisterOpen(false);
+    setActualCash("");
+    setRegisterNotes("");
+    toast.success(t.registerClosed as string);
+  };
+
   const handleQtyUpdate = useCallback((itemId: string, delta: number) => {
     if (delta > 0) {
       const item = cartItems.find(i => i.id === itemId);
@@ -160,12 +223,20 @@ export function POSPage() {
   const doCheckout = () => {
     const order: Order = {
       id: `ORD-${Date.now().toString(36).toUpperCase()}`,
-      items: cartItems.map(ci => ({ productId: ci.productId, name: ci.name, quantity: ci.quantity, unitType: ci.unitType, unitPrice: ci.unitPrice })),
-      subtotal: cartSubtotal, ppnRate, ppn: ppnAmount, total: cartTotal,
+      items: cartItems.map(ci => {
+        const disc = calcItemDiscount(ci);
+        return {
+          productId: ci.productId, name: ci.name, quantity: ci.quantity,
+          unitType: ci.unitType, unitPrice: ci.unitPrice,
+          ...(ci.discountType ? { discountType: ci.discountType, discountValue: ci.discountValue, discountAmount: disc } : {}),
+        };
+      }),
+      subtotal: discountedSubtotal, ppnRate, ppn: ppnAmount, total: cartTotal,
       payment, status: "completed" as const,
       customer: customer || (t.walkIn as string),
       createdAt: new Date().toISOString(), createdBy: user.id,
       ...((payment === "qris" || payment === "transfer") && proofImage ? { paymentProof: proofImage } : {}),
+      ...(orderDiscountType ? { orderDiscountType, orderDiscountValue, orderDiscount: orderDiscAmount } : {}),
     };
     addOrder(order);
     cartItems.forEach(ci => {
@@ -173,6 +244,7 @@ export function POSPage() {
       adjustStock(ci.productId, -delta);
       consumeFIFO(ci.productId, delta);
     });
+    useAuditStore.getState().log("order_created", user.id, user.name, `${order.id} · ${$(order.total)}`);
     setLastOrder(order);
     clearCart();
     setCashRcv("");
@@ -242,6 +314,8 @@ export function POSPage() {
         </div>
       ) : cartItems.map(ci => {
         const prod = products.find(p => p.id === ci.productId);
+        const itemGross = ci.unitPrice * ci.quantity;
+        const itemDisc = calcItemDiscount(ci);
         return (
           <div key={ci.id} className={`flex gap-3 p-3 rounded-[18px] border ${th.card2} ${th.bdr}`}>
             {prod && <ProductImage product={prod} size={40} />}
@@ -252,6 +326,7 @@ export function POSPage() {
                   {ci.unitType === "box" ? `${t.box}(${ci.qtyPerBox})` : t.individual}
                 </span>
                 <span className={`text-[11px] ${th.txm}`}>{$(ci.unitPrice)}</span>
+                {ci.discountType && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-[#E89B48]/15 text-[#E89B48]">-{ci.discountType === "percent" ? `${ci.discountValue}%` : $(ci.discountValue || 0)}</span>}
               </div>
               <div className="flex items-center justify-between mt-2">
                 <div className="flex items-center gap-1.5">
@@ -260,10 +335,33 @@ export function POSPage() {
                   <button onClick={() => handleQtyUpdate(ci.id, 1)} className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold ${th.elev} ${th.tx}`}><Plus size={12} /></button>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className={`text-sm font-extrabold ${th.tx}`}>{$(ci.unitPrice * ci.quantity)}</span>
+                  {itemDisc > 0 ? (
+                    <div className="text-right">
+                      <span className={`text-[10px] line-through ${th.txf}`}>{$(itemGross)}</span>
+                      <span className={`text-sm font-extrabold ml-1 ${th.tx}`}>{$(itemGross - itemDisc)}</span>
+                    </div>
+                  ) : (
+                    <span className={`text-sm font-extrabold ${th.tx}`}>{$(itemGross)}</span>
+                  )}
+                  <button onClick={() => { setDiscountItemId(discountItemId === ci.id ? null : ci.id); setDiscountMode(ci.discountType || "percent"); setDiscountInput(ci.discountValue ? String(ci.discountValue) : ""); }}
+                    className={`w-6 h-6 rounded-md flex items-center justify-center ${ci.discountType ? "text-[#E89B48]" : th.txf}`}><Tag size={11} /></button>
                   <button onClick={() => removeItem(ci.id)} className="text-[#D4627A]/60 hover:text-[#D4627A]"><Trash2 size={14} /></button>
                 </div>
               </div>
+              {discountItemId === ci.id && (
+                <div className="mt-2 flex items-center gap-1.5">
+                  <div className="flex rounded-lg overflow-hidden border">
+                    <button onClick={() => setDiscountMode("percent")} className={`px-2 py-1 text-[10px] font-bold ${discountMode === "percent" ? "bg-[#E89B48] text-white" : `${th.elev} ${th.txm}`}`}><Percent size={10} /></button>
+                    <button onClick={() => setDiscountMode("fixed")} className={`px-2 py-1 text-[10px] font-bold ${discountMode === "fixed" ? "bg-[#E89B48] text-white" : `${th.elev} ${th.txm}`}`}>Rp</button>
+                  </div>
+                  <input value={discountInput} onChange={e => setDiscountInput(e.target.value)} type="number" placeholder="0"
+                    className={`flex-1 px-2 py-1 text-xs rounded-lg border w-16 ${th.inp}`} />
+                  <button onClick={() => { setItemDiscount(ci.id, discountMode, parseFloat(discountInput) || 0); setDiscountItemId(null); }}
+                    className="px-2 py-1 rounded-lg text-[10px] font-bold text-white bg-[#E89B48]">{t.save}</button>
+                  {ci.discountType && <button onClick={() => { setItemDiscount(ci.id, null, 0); setDiscountItemId(null); }}
+                    className="text-[10px] font-bold text-[#C4504A]"><X size={10} /></button>}
+                </div>
+              )}
             </div>
           </div>
         );
@@ -272,6 +370,12 @@ export function POSPage() {
       {cartItems.length > 0 && <>
         <div className={`p-4 rounded-[18px] ${th.elev}`}>
           <div className="flex justify-between text-sm"><span className={th.txm}>{t.subtotal}</span><span className={`font-semibold ${th.tx}`}>{$(cartSubtotal)}</span></div>
+          {itemDiscountsTotal > 0 && (
+            <div className="flex justify-between text-sm mt-1"><span className="text-[#E89B48]">{t.itemDiscount}</span><span className="font-semibold text-[#E89B48]">-{$(itemDiscountsTotal)}</span></div>
+          )}
+          {orderDiscAmount > 0 && (
+            <div className="flex justify-between text-sm mt-1"><span className="text-[#E89B48]">{t.orderDiscount}</span><span className="font-semibold text-[#E89B48]">-{$(orderDiscAmount)}</span></div>
+          )}
           {ppnRate > 0 && (
             <div className="flex justify-between text-sm mt-1"><span className={th.txm}>{t.ppn} ({ppnRate}%)</span><span className={`font-semibold ${th.tx}`}>{$(ppnAmount)}</span></div>
           )}
@@ -279,6 +383,31 @@ export function POSPage() {
             <span className={`font-extrabold ${th.tx}`}>{t.total}</span>
             <span className={`font-black text-xl ${th.acc}`}>{$(cartTotal)}</span>
           </div>
+          {/* Order discount toggle */}
+          {!showOrderDiscount && !orderDiscountType ? (
+            <button onClick={() => { setShowOrderDiscount(true); setOrderDiscMode("percent"); setOrderDiscInput(""); }}
+              className={`mt-2 flex items-center gap-1.5 text-[11px] font-bold ${th.acc}`}>
+              <Tag size={11} /> {t.addDiscount}
+            </button>
+          ) : !showOrderDiscount && orderDiscountType ? (
+            <div className="mt-2 flex items-center justify-between">
+              <span className="text-[11px] font-bold text-[#E89B48]">{t.orderDiscount}: -{orderDiscountType === "percent" ? `${orderDiscountValue}%` : $(orderDiscountValue)}</span>
+              <button onClick={() => { setOrderDiscount(null, 0); }} className="text-[10px] font-bold text-[#C4504A]">{t.removeDiscount}</button>
+            </div>
+          ) : null}
+          {showOrderDiscount && (
+            <div className="mt-2 flex items-center gap-1.5">
+              <div className="flex rounded-lg overflow-hidden border">
+                <button onClick={() => setOrderDiscMode("percent")} className={`px-2 py-1 text-[10px] font-bold ${orderDiscMode === "percent" ? "bg-[#E89B48] text-white" : `${th.elev} ${th.txm}`}`}><Percent size={10} /></button>
+                <button onClick={() => setOrderDiscMode("fixed")} className={`px-2 py-1 text-[10px] font-bold ${orderDiscMode === "fixed" ? "bg-[#E89B48] text-white" : `${th.elev} ${th.txm}`}`}>Rp</button>
+              </div>
+              <input value={orderDiscInput} onChange={e => setOrderDiscInput(e.target.value)} type="number" placeholder="0"
+                className={`flex-1 px-2 py-1 text-xs rounded-lg border w-16 ${th.inp}`} />
+              <button onClick={() => { setOrderDiscount(orderDiscMode, parseFloat(orderDiscInput) || 0); setShowOrderDiscount(false); }}
+                className="px-2 py-1 rounded-lg text-[10px] font-bold text-white bg-[#E89B48]">{t.save}</button>
+              <button onClick={() => setShowOrderDiscount(false)} className={th.txf}><X size={12} /></button>
+            </div>
+          )}
         </div>
 
         <div className="grid grid-cols-4 gap-2">
@@ -303,8 +432,9 @@ export function POSPage() {
     <div className="lg:flex lg:gap-5">
       {/* Left: products */}
       <div className="flex-1 min-w-0">
-        {/* Search */}
-        <div className="relative mb-4">
+        {/* Search + Close Register */}
+        <div className="flex gap-2 mb-4">
+        <div className="relative flex-1">
           <Search size={16} className={`absolute left-3.5 top-1/2 -translate-y-1/2 ${th.txf}`} />
           <input ref={searchRef} value={query} onChange={e => setQuery(e.target.value)} placeholder={`${t.search}  ( / )`}
             onKeyDown={e => {
@@ -319,6 +449,13 @@ export function POSPage() {
             }}
             className={`w-full pl-10 pr-12 py-3 text-sm rounded-2xl border focus:outline-none focus:ring-2 focus:ring-[#A0673C]/20 font-medium ${th.inp}`} />
           <ScanLine size={16} className={`absolute right-3.5 top-1/2 -translate-y-1/2 ${th.txf}`} />
+        </div>
+        {canCloseRegister && (
+          <button onClick={() => setCloseRegisterOpen(true)}
+            className={`shrink-0 flex items-center gap-1.5 px-3.5 py-3 rounded-2xl text-xs font-bold border ${th.bdr} ${th.txm}`}>
+            <DollarSign size={14} /> {t.closeRegister}
+          </button>
+        )}
         </div>
 
         {/* Category pills with fade gradient */}
@@ -404,9 +541,11 @@ export function POSPage() {
           <div className={`rounded-[20px] p-6 text-center ${th.accBg}`}>
             <p className={`text-xs font-semibold ${th.acc}`}>{t.totalAmount}</p>
             <p className={`text-[32px] font-black tracking-tight mt-1 ${th.acc}`}>{$(cartTotal)}</p>
-            {ppnRate > 0 && (
+            {(ppnRate > 0 || totalDiscount > 0) && (
               <p className={`text-[11px] mt-1 ${th.acc} opacity-70`}>
-                {t.subtotal}: {$(cartSubtotal)} + {t.ppn} {ppnRate}%: {$(ppnAmount)}
+                {t.subtotal}: {$(cartSubtotal)}
+                {totalDiscount > 0 && ` - ${t.discount}: ${$(totalDiscount)}`}
+                {ppnRate > 0 && ` + ${t.ppn} ${ppnRate}%: ${$(ppnAmount)}`}
               </p>
             )}
           </div>
@@ -504,22 +643,50 @@ export function POSPage() {
             </div>
             <div className={`rounded-[18px] border p-4 ${th.card2} ${th.bdr}`}>
               {lastOrder.items.map((item, i) => (
-                <div key={i} className={`flex justify-between py-1.5 ${i > 0 ? `border-t ${th.bdr}` : ""}`}>
-                  <span className={`text-sm ${th.tx}`}>{item.name} ×{item.quantity}</span>
-                  <span className={`text-sm font-bold ${th.tx}`}>{$(item.unitPrice * item.quantity)}</span>
+                <div key={i} className={`py-1.5 ${i > 0 ? `border-t ${th.bdr}` : ""}`}>
+                  <div className="flex justify-between">
+                    <span className={`text-sm ${th.tx}`}>{item.name} ×{item.quantity}</span>
+                    <span className={`text-sm font-bold ${th.tx}`}>{$(item.unitPrice * item.quantity)}</span>
+                  </div>
+                  {(item.discountAmount || 0) > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-[11px] text-[#E89B48]">&nbsp;&nbsp;{t.discount} {item.discountType === "percent" ? `${item.discountValue}%` : ""}</span>
+                      <span className="text-[11px] font-bold text-[#E89B48]">-{$(item.discountAmount || 0)}</span>
+                    </div>
+                  )}
                 </div>
               ))}
-              {lastOrder.ppnRate > 0 && (<>
-                <div className={`flex justify-between pt-2 mt-2 border-t ${th.bdr}`}>
-                  <span className={`text-sm ${th.txm}`}>{t.subtotal}</span>
-                  <span className={`text-sm font-semibold ${th.tx}`}>{$(lastOrder.subtotal)}</span>
-                </div>
-                <div className="flex justify-between py-0.5">
-                  <span className={`text-sm ${th.txm}`}>{t.ppn} ({lastOrder.ppnRate}%)</span>
-                  <span className={`text-sm font-semibold ${th.tx}`}>{$(lastOrder.ppn)}</span>
-                </div>
-              </>)}
-              <div className={`flex justify-between pt-2 ${lastOrder.ppnRate === 0 ? `mt-2 border-t ${th.bdr}` : ""}`}>
+              {(() => {
+                const grossSub = lastOrder.items.reduce((s, i) => s + i.quantity * i.unitPrice, 0);
+                const itemDiscSum = lastOrder.items.reduce((s, i) => s + (i.discountAmount || 0), 0);
+                const orderDisc = lastOrder.orderDiscount || 0;
+                const hasDisc = itemDiscSum > 0 || orderDisc > 0;
+                return (hasDisc || lastOrder.ppnRate > 0) ? (<>
+                  <div className={`flex justify-between pt-2 mt-2 border-t ${th.bdr}`}>
+                    <span className={`text-sm ${th.txm}`}>{t.subtotal}</span>
+                    <span className={`text-sm font-semibold ${th.tx}`}>{$(grossSub)}</span>
+                  </div>
+                  {itemDiscSum > 0 && (
+                    <div className="flex justify-between py-0.5">
+                      <span className="text-sm text-[#E89B48]">{t.itemDiscount}</span>
+                      <span className="text-sm font-semibold text-[#E89B48]">-{$(itemDiscSum)}</span>
+                    </div>
+                  )}
+                  {orderDisc > 0 && (
+                    <div className="flex justify-between py-0.5">
+                      <span className="text-sm text-[#E89B48]">{t.orderDiscount}{lastOrder.orderDiscountType === "percent" ? ` ${lastOrder.orderDiscountValue}%` : ""}</span>
+                      <span className="text-sm font-semibold text-[#E89B48]">-{$(orderDisc)}</span>
+                    </div>
+                  )}
+                  {lastOrder.ppnRate > 0 && (
+                    <div className="flex justify-between py-0.5">
+                      <span className={`text-sm ${th.txm}`}>{t.ppn} ({lastOrder.ppnRate}%)</span>
+                      <span className={`text-sm font-semibold ${th.tx}`}>{$(lastOrder.ppn)}</span>
+                    </div>
+                  )}
+                </>) : null;
+              })()}
+              <div className={`flex justify-between pt-2 mt-2 border-t ${th.bdr}`}>
                 <span className={`font-extrabold ${th.tx}`}>{t.total}</span>
                 <span className={`font-black text-lg ${th.acc}`}>{$(lastOrder.total)}</span>
               </div>
@@ -538,6 +705,68 @@ export function POSPage() {
         )}
       </Modal>
       <ProductDetailModal productId={detailProductId} onClose={() => setDetailProductId(null)} />
+
+      {/* Close Register modal */}
+      <Modal open={closeRegisterOpen} onClose={() => { setCloseRegisterOpen(false); setActualCash(""); setRegisterNotes(""); }} title={t.closeRegister as string}>
+        <div className="flex flex-col gap-4">
+          <div className={`rounded-[18px] border p-4 ${th.card2} ${th.bdr}`}>
+            <div className="flex justify-between mb-1">
+              <span className={`text-sm ${th.txm}`}>{t.expectedCash}</span>
+              <span className={`text-sm font-black ${th.tx}`}>{$(expectedCash)}</span>
+            </div>
+            <p className={`text-[10px] ${th.txf}`}>{t.cash} orders {t.today?.toString().toLowerCase()}</p>
+          </div>
+          <div>
+            <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>{t.actualCash}</p>
+            <input type="number" value={actualCash} onChange={e => setActualCash(e.target.value)}
+              placeholder="0" className={`w-full px-4 py-3 text-sm rounded-2xl border ${th.inp}`} />
+          </div>
+          {actualCash && (() => {
+            const diff = (parseFloat(actualCash) || 0) - expectedCash;
+            const color = diff === 0 ? "text-[#4A8B3F]" : diff > 0 ? "text-[#5B8DEF]" : "text-[#C4504A]";
+            const label = diff === 0 ? t.cashBalanced : diff > 0 ? t.cashOver : t.cashShort;
+            return (
+              <div className="flex justify-between px-1">
+                <span className={`text-sm font-bold ${color}`}>{t.cashDifference}: {label}</span>
+                <span className={`text-sm font-black ${color}`}>{diff >= 0 ? "+" : ""}{$(diff)}</span>
+              </div>
+            );
+          })()}
+          <div>
+            <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>{t.registerNotes}</p>
+            <input value={registerNotes} onChange={e => setRegisterNotes(e.target.value)}
+              placeholder={t.note as string} className={`w-full px-4 py-3 text-sm rounded-2xl border ${th.inp}`} />
+          </div>
+          <div className="flex gap-2">
+            <button onClick={() => { setCloseRegisterOpen(false); setActualCash(""); setRegisterNotes(""); }}
+              className={`flex-1 py-3 rounded-2xl text-sm font-bold border ${th.bdr} ${th.txm}`}>{t.cancel}</button>
+            <button onClick={doCloseRegister} disabled={!actualCash}
+              className="flex-1 py-3 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-[#E8B088] to-[#A0673C] disabled:opacity-40">{t.confirm}</button>
+          </div>
+
+          {/* Today's register history */}
+          {todaySessions.length > 0 && (
+            <div className={`rounded-[18px] border overflow-hidden ${th.card2} ${th.bdr}`}>
+              <div className={`px-4 py-3 border-b ${th.bdr}`}>
+                <p className={`text-xs font-extrabold tracking-tight ${th.tx}`}>{t.registerHistory}</p>
+              </div>
+              {todaySessions.map(s => {
+                const diffColor = s.difference === 0 ? "text-[#4A8B3F]" : s.difference > 0 ? "text-[#5B8DEF]" : "text-[#C4504A]";
+                return (
+                  <div key={s.id} className={`px-4 py-2.5 border-b last:border-0 ${th.bdr}/50`}>
+                    <div className="flex justify-between">
+                      <span className={`text-sm font-bold ${th.tx}`}>{formatTime(s.closedAt)}</span>
+                      <span className={`text-sm font-black ${diffColor}`}>{s.difference >= 0 ? "+" : ""}{$(s.difference)}</span>
+                    </div>
+                    <p className={`text-[11px] ${th.txm}`}>{t.expectedCash}: {$(s.expectedCash)} · {t.actualCash}: {$(s.actualCash)}</p>
+                    {s.notes && <p className={`text-[10px] mt-0.5 ${th.txf}`}>{s.notes}</p>}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </Modal>
     </div>
   );
 }

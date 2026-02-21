@@ -6,12 +6,14 @@ import { ProductImage } from "@/components/ProductImage";
 import { ProductDetailModal } from "@/components/ProductDetailModal";
 import { SupplierDetailModal } from "@/components/SupplierDetailModal";
 import { useThemeClasses } from "@/hooks/useThemeClasses";
+import { useDebounce } from "@/hooks/useDebounce";
 import { formatCurrency as $, formatTime, formatDate, genId, genBatchNumber, calcDueDate, compressImage, printBarcodeLabel } from "@/utils";
+import { exportProducts, exportInventory } from "@/utils/export";
 import type { UnitType, StockType, StockMovement, PaymentTerms, PaymentStatus, UnitOfMeasure } from "@/types";
 import toast from "react-hot-toast";
 import {
   Package, Plus, ChevronDown, ArrowDownCircle, ArrowUpCircle, Barcode,
-  LayoutGrid, Clock, AlertTriangle, Truck, X, Check, CircleDollarSign,
+  LayoutGrid, Clock, AlertTriangle, Truck, X, Check, CircleDollarSign, Pencil, Download, Search,
 } from "lucide-react";
 
 type InventoryTab = "overview" | "stockIn" | "stockOut" | "expiry" | "history" | "suppliers";
@@ -34,6 +36,7 @@ export function InventoryPage() {
   const products = useProductStore(s => s.products);
   const adjustStock = useProductStore(s => s.adjustStock);
   const addProduct = useProductStore(s => s.addProduct);
+  const updateProduct = useProductStore(s => s.updateProduct);
   const toggleActive = useProductStore(s => s.toggleActive);
   const { movements, addMovement, updatePaymentStatus } = useInventoryStore();
   const { addBatch, consumeFIFO, getExpiringBatches } = useBatchStore();
@@ -60,6 +63,16 @@ export function InventoryPage() {
   const [newCat, setNewCat] = useState({ name: "", nameId: "", color: "#C4884A" });
   const catColors = ["#C4884A", "#D4627A", "#5B8DEF", "#7D5A44", "#8B6FC0", "#6F9A4D", "#E89B48", "#2BA5B5", "#9B59B6", "#E74C3C"];
   const [overviewFilter, setOverviewFilter] = useState<"all" | "low" | "out" | "inactive">("all");
+  const [productSearch, setProductSearch] = useState("");
+  const debouncedProductSearch = useDebounce(productSearch, 150);
+  const [confirmDeleteSupplierId, setConfirmDeleteSupplierId] = useState<string | null>(null);
+  const [editProdOpen, setEditProdOpen] = useState(false);
+  const [editProdId, setEditProdId] = useState<string | null>(null);
+  const [editProd, setEditProd] = useState({
+    name: "", nameId: "", sku: "", category: "c1",
+    purchasePrice: "", sellingPrice: "",
+    qtyPerBox: "12", unit: "kg" as UnitOfMeasure, image: "", minStock: "10",
+  });
 
   // Supplier modal state
   const [supplierModal, setSupplierModal] = useState<"add" | "edit" | null>(null);
@@ -82,13 +95,20 @@ export function InventoryPage() {
   const inactiveCount = useMemo(() => products.filter(p => !p.isActive).length, [products]);
 
   const filteredProducts = useMemo(() => {
+    let list = products;
     switch (overviewFilter) {
-      case "low": return products.filter(p => p.stock > 0 && p.stock <= p.minStock);
-      case "out": return products.filter(p => p.stock === 0);
-      case "inactive": return products.filter(p => !p.isActive);
-      default: return products;
+      case "low": list = list.filter(p => p.stock > 0 && p.stock <= p.minStock); break;
+      case "out": list = list.filter(p => p.stock === 0); break;
+      case "inactive": list = list.filter(p => !p.isActive); break;
     }
-  }, [products, overviewFilter]);
+    if (debouncedProductSearch.trim()) {
+      const q = debouncedProductSearch.toLowerCase();
+      list = list.filter(p =>
+        p.name.toLowerCase().includes(q) || p.nameId.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q)
+      );
+    }
+    return list;
+  }, [products, overviewFilter, debouncedProductSearch]);
 
   // Expiry data
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -141,6 +161,39 @@ export function InventoryPage() {
     setAddProdOpen(false);
     setNewProd({ name: "", nameId: "", sku: "", category: "c1", purchasePrice: "", sellingPrice: "", qtyPerBox: "12", stock: "0", unit: "kg", image: "", minStock: "10" });
     toast.success(t.productAdded as string);
+  };
+
+  const openEditProduct = (productId: string) => {
+    const p = products.find(pr => pr.id === productId);
+    if (!p) return;
+    setEditProdId(productId);
+    setEditProd({
+      name: p.name, nameId: p.nameId, sku: p.sku, category: p.category,
+      purchasePrice: String(p.purchasePrice), sellingPrice: String(p.sellingPrice),
+      qtyPerBox: String(p.qtyPerBox), unit: p.unit, image: p.image, minStock: String(p.minStock),
+    });
+    setEditProdOpen(true);
+  };
+
+  const doEditProduct = () => {
+    if (!editProdId || !editProd.name || !editProd.nameId || !editProd.sku) return;
+    updateProduct(editProdId, {
+      name: editProd.name, nameId: editProd.nameId, sku: editProd.sku,
+      category: editProd.category, purchasePrice: parseInt(editProd.purchasePrice) || 0,
+      sellingPrice: parseInt(editProd.sellingPrice) || 0, qtyPerBox: parseInt(editProd.qtyPerBox) || 12,
+      unit: editProd.unit, image: editProd.image || "", minStock: parseInt(editProd.minStock) || 10,
+    });
+    setEditProdOpen(false);
+    setEditProdId(null);
+    toast.success(t.productUpdated as string);
+  };
+
+  const handleEditImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const base64 = await compressImage(file);
+    setEditProd({ ...editProd, image: base64 });
+    toast.success(t.imageUploaded as string);
   };
 
   const doStock = () => {
@@ -294,6 +347,32 @@ export function InventoryPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className={`text-[22px] font-black tracking-tight ${th.tx}`}>{t.inventory}</h1>
+        <div className="flex gap-1.5">
+          {activeTab === "overview" && (
+            <>
+              <button onClick={() => { exportProducts(products, "csv"); toast.success(t.exportSuccess as string); }}
+                className={`flex items-center gap-1 px-2.5 py-2 rounded-xl text-[10px] font-bold ${th.elev} ${th.txm}`}>
+                <Download size={11} /> CSV
+              </button>
+              <button onClick={() => { exportProducts(products, "xlsx"); toast.success(t.exportSuccess as string); }}
+                className={`flex items-center gap-1 px-2.5 py-2 rounded-xl text-[10px] font-bold ${th.elev} ${th.txm}`}>
+                <Download size={11} /> Excel
+              </button>
+            </>
+          )}
+          {activeTab === "history" && (
+            <>
+              <button onClick={() => { exportInventory(movements, products, "csv"); toast.success(t.exportSuccess as string); }}
+                className={`flex items-center gap-1 px-2.5 py-2 rounded-xl text-[10px] font-bold ${th.elev} ${th.txm}`}>
+                <Download size={11} /> CSV
+              </button>
+              <button onClick={() => { exportInventory(movements, products, "xlsx"); toast.success(t.exportSuccess as string); }}
+                className={`flex items-center gap-1 px-2.5 py-2 rounded-xl text-[10px] font-bold ${th.elev} ${th.txm}`}>
+                <Download size={11} /> Excel
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Tab bar */}
@@ -348,6 +427,14 @@ export function InventoryPage() {
             ))}
           </div>
 
+          {/* Product search */}
+          <div className="relative">
+            <Search size={16} className={`absolute left-3.5 top-1/2 -translate-y-1/2 ${th.txf}`} />
+            <input value={productSearch} onChange={e => setProductSearch(e.target.value)}
+              placeholder={t.searchProducts as string}
+              className={`w-full pl-10 pr-4 py-3 text-sm rounded-2xl border focus:outline-none focus:ring-2 focus:ring-[#A0673C]/20 font-medium ${th.inp}`} />
+          </div>
+
           {/* Product list */}
           <div className={`rounded-[22px] border overflow-hidden ${th.card} ${th.bdr}`}>
             <div className={`px-5 py-3.5 border-b ${th.bdr}`}>
@@ -386,21 +473,29 @@ export function InventoryPage() {
                     </span>
                   </div>
                   {canWrite && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        toggleActive(product.id);
-                        toast.success(product.isActive ? t.productHidden as string : t.productShown as string);
-                      }}
-                      className={`w-10 h-6 rounded-full transition-colors relative ${
-                        product.isActive ? "bg-[#4A8B3F]" : (th.dark ? "bg-[#352E28]" : "bg-[#E8DDD2]")
-                      }`}
-                      title={product.isActive ? t.hideFromPOS as string : t.showInPOS as string}
-                    >
-                      <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-transform ${
-                        product.isActive ? "translate-x-[18px]" : "translate-x-0.5"
-                      }`} />
-                    </button>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); openEditProduct(product.id); }}
+                        className={`w-7 h-7 rounded-lg flex items-center justify-center ${th.dark ? "bg-[#5B8DEF]/15 text-[#5B8DEF]" : "bg-blue-50 text-[#5B8DEF]"}`}
+                      >
+                        <Pencil size={12} />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleActive(product.id);
+                          toast.success(product.isActive ? t.productHidden as string : t.productShown as string);
+                        }}
+                        className={`w-10 h-6 rounded-full transition-colors relative ${
+                          product.isActive ? "bg-[#4A8B3F]" : (th.dark ? "bg-[#352E28]" : "bg-[#E8DDD2]")
+                        }`}
+                        title={product.isActive ? t.hideFromPOS as string : t.showInPOS as string}
+                      >
+                        <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-transform ${
+                          product.isActive ? "translate-x-[18px]" : "translate-x-0.5"
+                        }`} />
+                      </button>
+                    </div>
                   )}
                 </div>
               </div>
@@ -614,10 +709,23 @@ export function InventoryPage() {
                           className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold ${th.dark ? "bg-[#5B8DEF]/15 text-[#5B8DEF]" : "bg-blue-50 text-[#5B8DEF]"}`}>
                           {t.editSupplier}
                         </button>
-                        <button onClick={(e) => { e.stopPropagation(); deleteSupplier(sup.id); toast.success(t.supplierDeleted as string); }}
-                          className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold ${th.dark ? "bg-[#C4504A]/15 text-[#C4504A]" : "bg-red-50 text-[#C4504A]"}`}>
-                          {t.deleteSupplier}
-                        </button>
+                        {confirmDeleteSupplierId === sup.id ? (
+                          <div className="flex gap-1.5" onClick={e => e.stopPropagation()}>
+                            <button onClick={() => setConfirmDeleteSupplierId(null)}
+                              className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold border ${th.bdr} ${th.txm}`}>
+                              {t.cancel}
+                            </button>
+                            <button onClick={() => { deleteSupplier(sup.id); setConfirmDeleteSupplierId(null); toast.success(t.supplierDeleted as string); }}
+                              className="px-2.5 py-1.5 rounded-lg text-[10px] font-bold text-white bg-[#C4504A]">
+                              {t.confirm}
+                            </button>
+                          </div>
+                        ) : (
+                          <button onClick={(e) => { e.stopPropagation(); setConfirmDeleteSupplierId(sup.id); }}
+                            className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold ${th.dark ? "bg-[#C4504A]/15 text-[#C4504A]" : "bg-red-50 text-[#C4504A]"}`}>
+                            {t.deleteSupplier}
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>
@@ -914,6 +1022,96 @@ export function InventoryPage() {
               className={`flex-1 py-3 rounded-2xl text-sm font-bold border ${th.bdr} ${th.txm}`}>{t.cancel}</button>
             <button onClick={supplierModal === "edit" ? doEditSupplier : doAddSupplier}
               disabled={!supForm.name.trim()}
+              className="flex-1 py-3 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-[#E8B088] to-[#A0673C] disabled:opacity-40">{t.save}</button>
+          </div>
+        </div>
+      </Modal>
+      {/* Edit Product modal */}
+      <Modal open={editProdOpen} onClose={() => setEditProdOpen(false)} title={t.editProduct as string}>
+        <div className="flex flex-col gap-3">
+          <div>
+            <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>{t.productName}</p>
+            <input value={editProd.name} onChange={e => setEditProd({ ...editProd, name: e.target.value })}
+              className={inp} />
+          </div>
+          <div>
+            <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>{t.productNameId}</p>
+            <input value={editProd.nameId} onChange={e => setEditProd({ ...editProd, nameId: e.target.value })}
+              className={inp} />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>{t.sku}</p>
+              <input value={editProd.sku} onChange={e => setEditProd({ ...editProd, sku: e.target.value })}
+                className={inp} />
+            </div>
+            <div className="relative">
+              <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>{lang === "id" ? "Kategori" : "Category"}</p>
+              <select value={editProd.category} onChange={e => setEditProd({ ...editProd, category: e.target.value })}
+                className={`w-full px-4 py-2.5 text-sm rounded-xl border appearance-none ${th.inp}`}>
+                {categories.map(c => <option key={c.id} value={c.id}>{lang === "id" ? c.nameId : c.name}</option>)}
+              </select>
+              <ChevronDown size={14} className={`absolute right-4 bottom-3 ${th.txf}`} />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>{t.purchasePrice}</p>
+              <input type="number" value={editProd.purchasePrice} onChange={e => setEditProd({ ...editProd, purchasePrice: e.target.value })}
+                className={inp} min="0" />
+            </div>
+            <div>
+              <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>{t.sellingPrice}</p>
+              <input type="number" value={editProd.sellingPrice} onChange={e => setEditProd({ ...editProd, sellingPrice: e.target.value })}
+                className={inp} min="0" />
+            </div>
+          </div>
+          {editProd.sellingPrice && editProd.qtyPerBox && (
+            <p className={`text-[11px] -mt-1 font-medium ${th.acc}`}>
+              {t.boxPrice}: {$((parseInt(editProd.sellingPrice) || 0) * (parseInt(editProd.qtyPerBox) || 0))}
+            </p>
+          )}
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>{t.qtyPerBox}</p>
+              <input type="number" value={editProd.qtyPerBox} onChange={e => setEditProd({ ...editProd, qtyPerBox: e.target.value })}
+                className={inp} min="1" />
+            </div>
+            <div className="relative">
+              <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>{t.unitLabel}</p>
+              <select value={editProd.unit} onChange={e => setEditProd({ ...editProd, unit: e.target.value as UnitOfMeasure })}
+                className={`w-full px-4 py-2.5 text-sm rounded-xl border appearance-none ${th.inp}`}>
+                {UNIT_OPTIONS.map(u => <option key={u} value={u}>{u}</option>)}
+              </select>
+              <ChevronDown size={14} className={`absolute right-4 bottom-3 ${th.txf}`} />
+            </div>
+            <div>
+              <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>{t.minStockLabel}</p>
+              <input type="number" value={editProd.minStock} onChange={e => setEditProd({ ...editProd, minStock: e.target.value })}
+                className={inp} min="0" />
+            </div>
+          </div>
+          <div>
+            <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>{t.uploadImage}</p>
+            <div className="flex items-center gap-3">
+              <label className={`flex-1 py-2.5 rounded-xl border text-center text-xs font-bold cursor-pointer ${th.bdr} ${th.txm}`}>
+                {t.chooseImage}
+                <input type="file" accept="image/*" onChange={handleEditImageUpload} className="hidden" />
+              </label>
+              {editProd.image && (
+                <div className="relative">
+                  <img src={editProd.image} alt="preview" className="w-12 h-12 rounded-xl object-cover" />
+                  <button onClick={() => setEditProd({ ...editProd, image: "" })}
+                    className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-[#C4504A] text-white flex items-center justify-center">
+                    <X size={10} />
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+          <div className="flex gap-2 mt-1">
+            <button onClick={() => setEditProdOpen(false)} className={`flex-1 py-3 rounded-2xl text-sm font-bold border ${th.bdr} ${th.txm}`}>{t.cancel}</button>
+            <button onClick={doEditProduct} disabled={!editProd.name || !editProd.nameId || !editProd.sku}
               className="flex-1 py-3 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-[#E8B088] to-[#A0673C] disabled:opacity-40">{t.save}</button>
           </div>
         </div>

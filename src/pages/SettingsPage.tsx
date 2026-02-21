@@ -1,16 +1,16 @@
 import { useState, useMemo, useRef, useEffect } from "react";
-import { useAuthStore, useLangStore, useThemeStore, useSettingsStore } from "@/stores";
+import { useAuthStore, useLangStore, useThemeStore, useSettingsStore, useAuditStore } from "@/stores";
 import { useThemeClasses } from "@/hooks/useThemeClasses";
 import {
   Sun, Moon, UserPlus, X, Plus, Trash2, Search, Building2,
-  Palette, Store, Users, LogOut,
+  Palette, Store, Users, LogOut, Clock,
 } from "lucide-react";
-import { genId } from "@/utils";
+import { genId, formatDate, formatTime } from "@/utils";
 import { INDONESIAN_BANKS } from "@/constants";
 import toast from "react-hot-toast";
 import type { Role, BankAccount } from "@/types";
 
-type SettingsTab = "preferences" | "store" | "team";
+type SettingsTab = "preferences" | "store" | "team" | "activity";
 const DEFAULT_PASSWORD = "bakeshop123";
 
 export function SettingsPage() {
@@ -23,6 +23,7 @@ export function SettingsPage() {
   const addUser = useAuthStore(s => s.addUser);
   const logout = useAuthStore(s => s.logout);
   const isAdmin = user?.role === "superadmin" || user?.role === "admin";
+  const auditEntries = useAuditStore(s => s.entries);
 
   const [activeTab, setActiveTab] = useState<SettingsTab>("preferences");
 
@@ -37,7 +38,10 @@ export function SettingsPage() {
   const [bankForm, setBankForm] = useState({ bankName: "", accountNumber: "", accountHolder: "" });
   const [bankQuery, setBankQuery] = useState("");
   const [showBankDropdown, setShowBankDropdown] = useState(false);
+  const [confirmRemoveBankId, setConfirmRemoveBankId] = useState<string | null>(null);
   const bankDropdownRef = useRef<HTMLDivElement>(null);
+  const ACTIVITY_PAGE_SIZE = 20;
+  const [activityVisible, setActivityVisible] = useState(ACTIVITY_PAGE_SIZE);
 
   const filteredBanks = useMemo(() =>
     bankQuery ? INDONESIAN_BANKS.filter(b => b.toLowerCase().includes(bankQuery.toLowerCase())) : INDONESIAN_BANKS,
@@ -117,6 +121,7 @@ export function SettingsPage() {
     ...(isAdmin ? [
       { id: "store" as SettingsTab, label: t.storeSettings as string, icon: <Store size={15} /> },
       { id: "team" as SettingsTab, label: t.team as string, icon: <Users size={15} /> },
+      { id: "activity" as SettingsTab, label: t.activity as string, icon: <Clock size={15} /> },
     ] : []),
   ];
 
@@ -288,9 +293,24 @@ export function SettingsPage() {
                           <p className={`text-[11px] mt-0.5 ${th.txm}`}>{acc.accountHolder}</p>
                         </div>
                       </div>
-                      <button onClick={() => handleRemoveBank(acc.id)} className="text-[#D4627A]/50 hover:text-[#D4627A] p-1 shrink-0">
-                        <Trash2 size={14} />
-                      </button>
+                      <div className="shrink-0">
+                        {confirmRemoveBankId === acc.id ? (
+                          <div className="flex gap-1.5">
+                            <button onClick={() => setConfirmRemoveBankId(null)}
+                              className={`px-2 py-1 rounded-lg text-[10px] font-bold border ${th.bdr} ${th.txm}`}>
+                              {t.cancel}
+                            </button>
+                            <button onClick={() => { handleRemoveBank(acc.id); setConfirmRemoveBankId(null); }}
+                              className="px-2 py-1 rounded-lg text-[10px] font-bold text-white bg-[#C4504A]">
+                              {t.confirm}
+                            </button>
+                          </div>
+                        ) : (
+                          <button onClick={() => setConfirmRemoveBankId(acc.id)} className="text-[#D4627A]/50 hover:text-[#D4627A] p-1">
+                            <Trash2 size={14} />
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -339,6 +359,53 @@ export function SettingsPage() {
                   }`}>{(t.roles as Record<string, string>)[u.role]}</span>
                 </div>
               ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════ */}
+      {/* TAB: Activity                                   */}
+      {/* ═══════════════════════════════════════════════ */}
+      {currentTab === "activity" && isAdmin && (
+        <div className="flex flex-col gap-4">
+          <div className="mb-1">
+            <h3 className={`text-[15px] font-extrabold tracking-tight ${th.tx}`}>{t.activity}</h3>
+            <p className={`text-[12px] mt-0.5 ${th.txm}`}>{t.activityDesc}</p>
+          </div>
+          {auditEntries.length === 0 ? (
+            <div className={`rounded-[22px] border p-8 text-center ${th.card} ${th.bdr}`}>
+              <Clock size={32} className={`mx-auto mb-2 opacity-20 ${th.txm}`} />
+              <p className={`text-sm ${th.txm}`}>{t.noActivity}</p>
+            </div>
+          ) : (
+            <div className={`rounded-[22px] border overflow-hidden ${th.card} ${th.bdr}`}>
+              {auditEntries.slice(0, activityVisible).map((entry, i) => {
+                const actionColor =
+                  entry.action === "order_created" ? "text-[#4A8B3F]"
+                  : entry.action === "order_voided" ? "text-[#C4504A]"
+                  : entry.action === "order_refunded" ? "text-[#E89B48]"
+                  : entry.action === "register_closed" ? "text-[#5B8DEF]"
+                  : entry.action === "product_added" || entry.action === "product_edited" ? "text-[#8B6FC0]"
+                  : th.txm;
+                const actionLabel = entry.action.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+                return (
+                  <div key={entry.id} className={`px-5 py-3 ${i > 0 ? `border-t ${th.bdr}/50` : ""}`}>
+                    <div className="flex items-center justify-between">
+                      <span className={`text-[11px] font-bold uppercase tracking-wider ${actionColor}`}>{actionLabel}</span>
+                      <span className={`text-[10px] ${th.txf}`}>{formatDate(entry.createdAt)} · {formatTime(entry.createdAt)}</span>
+                    </div>
+                    <p className={`text-sm mt-0.5 ${th.tx}`}>{entry.details}</p>
+                    <p className={`text-[10px] mt-0.5 ${th.txm}`}>{entry.userName}</p>
+                  </div>
+                );
+              })}
+              {activityVisible < auditEntries.length && (
+                <button onClick={() => setActivityVisible(v => v + ACTIVITY_PAGE_SIZE)}
+                  className={`w-full py-3 text-sm font-bold ${th.acc} hover:opacity-70 border-t ${th.bdr}`}>
+                  {t.loadMore} ({auditEntries.length - activityVisible})
+                </button>
+              )}
             </div>
           )}
         </div>

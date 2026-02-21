@@ -78,6 +78,10 @@ export function printReceipt(order: Order, opts?: { cashierName?: string }) {
   const barcodeSvg = generateBarcodeSvg(order.id, { width: 1.2, height: 35, fontSize: 10 });
   const customerName = order.customer || "Walk-in";
   const cashier = opts?.cashierName;
+  const grossSubtotal = order.items.reduce((s, i) => s + i.quantity * i.unitPrice, 0);
+  const itemDiscTotal = order.items.reduce((s, i) => s + (i.discountAmount || 0), 0);
+  const orderDiscTotal = order.orderDiscount || 0;
+  const hasDiscounts = itemDiscTotal > 0 || orderDiscTotal > 0;
 
   const win = window.open("", "_blank", "width=360,height=600");
   if (!win) return;
@@ -99,10 +103,12 @@ export function printReceipt(order: Order, opts?: { cashierName?: string }) {
   <div class="r"><span>Customer</span><span>${escapeHtml(customerName)}</span></div>
   ${cashier ? `<div class="r"><span>Kasir</span><span>${escapeHtml(cashier)}</span></div>` : ""}
   <div class="ln"></div>
-  ${order.items.map(i => `<div><p>${escapeHtml(i.name)}</p><div class="r"><span>${i.quantity} x Rp ${i.unitPrice.toLocaleString("id-ID")}</span><span class="b">Rp ${(i.quantity * i.unitPrice).toLocaleString("id-ID")}</span></div></div>`).join("")}
+  ${order.items.map(i => { const g = i.quantity * i.unitPrice; const d = i.discountAmount || 0; return `<div><p>${escapeHtml(i.name)}</p><div class="r"><span>${i.quantity} x Rp ${i.unitPrice.toLocaleString("id-ID")}</span><span class="b">Rp ${g.toLocaleString("id-ID")}</span></div>${d > 0 ? `<div class="r" style="color:#B87333;font-size:11px"><span>&nbsp;&nbsp;Disc ${i.discountType === "percent" ? i.discountValue + "%" : ""}</span><span>-Rp ${d.toLocaleString("id-ID")}</span></div>` : ""}</div>`; }).join("")}
   <div class="ln"></div>
-  ${order.ppnRate > 0 ? `<div class="r"><span>Subtotal</span><span>Rp ${order.subtotal.toLocaleString("id-ID")}</span></div>
-  <div class="r"><span>PPN (${order.ppnRate}%)</span><span>Rp ${order.ppn.toLocaleString("id-ID")}</span></div>` : ""}
+  ${hasDiscounts || order.ppnRate > 0 ? `<div class="r"><span>Subtotal</span><span>Rp ${grossSubtotal.toLocaleString("id-ID")}</span></div>` : ""}
+  ${itemDiscTotal > 0 ? `<div class="r" style="color:#B87333"><span>Item Disc</span><span>-Rp ${itemDiscTotal.toLocaleString("id-ID")}</span></div>` : ""}
+  ${orderDiscTotal > 0 ? `<div class="r" style="color:#B87333"><span>Order Disc${order.orderDiscountType === "percent" ? " " + order.orderDiscountValue + "%" : ""}</span><span>-Rp ${orderDiscTotal.toLocaleString("id-ID")}</span></div>` : ""}
+  ${order.ppnRate > 0 ? `<div class="r"><span>PPN (${order.ppnRate}%)</span><span>Rp ${order.ppn.toLocaleString("id-ID")}</span></div>` : ""}
   <div class="r b"><span>TOTAL</span><span>Rp ${order.total.toLocaleString("id-ID")}</span></div>
   <div class="r"><span>Payment</span><span>${order.payment.toUpperCase()}</span></div>
   <div class="ln"></div>

@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { User, Product, CartItem, Order, StockMovement, StockBatch, Category, Supplier, BankAccount, Member, PaymentMethod, PaymentStatus, UnitType, Lang, PageId } from "@/types";
+import type { User, Product, CartItem, Order, StockMovement, StockBatch, Category, Supplier, BankAccount, Member, Refund, CashSession, AuditEntry, PaymentMethod, PaymentStatus, DiscountType, UnitType, Lang, PageId, AuditAction } from "@/types";
 import { translations } from "@/i18n";
 import { MOCK_USERS, MOCK_PRODUCTS, MOCK_ORDERS, MOCK_MOVEMENTS, MOCK_BATCHES, MOCK_SUPPLIERS, CATEGORIES, ROLE_PERMISSIONS } from "@/constants";
 import { genId } from "@/utils";
@@ -69,12 +69,16 @@ export const useSupplierStore = create<SupplierState>((set) => ({
 interface ProductState {
   products: Product[];
   addProduct: (product: Product) => void;
+  updateProduct: (id: string, data: Partial<Omit<Product, "id" | "createdAt">>) => void;
   adjustStock: (id: string, delta: number) => void;
   toggleActive: (id: string) => void;
 }
 export const useProductStore = create<ProductState>((set) => ({
   products: MOCK_PRODUCTS,
   addProduct: (product) => set(s => ({ products: [product, ...s.products] })),
+  updateProduct: (id, data) => set(s => ({
+    products: s.products.map(p => p.id === id ? { ...p, ...data } : p),
+  })),
   adjustStock: (id, delta) => set(s => ({
     products: s.products.map(p => p.id === id ? { ...p, stock: Math.max(0, p.stock + delta) } : p),
   })),
@@ -88,11 +92,15 @@ interface CartState {
   items: CartItem[];
   customer: string;
   payment: PaymentMethod;
+  orderDiscountType: DiscountType | null;
+  orderDiscountValue: number;
   setCustomer: (n: string) => void;
   setPayment: (p: PaymentMethod) => void;
   addItem: (product: Product, unitType: UnitType, lang: Lang) => void;
   updateQty: (id: string, delta: number) => void;
   removeItem: (id: string) => void;
+  setItemDiscount: (id: string, type: DiscountType | null, value: number) => void;
+  setOrderDiscount: (type: DiscountType | null, value: number) => void;
   clearCart: () => void;
   total: () => number;
   count: () => number;
@@ -103,6 +111,8 @@ export const useCartStore = create<CartState>()(
       items: [],
       customer: "",
       payment: "cash",
+      orderDiscountType: null,
+      orderDiscountValue: 0,
       setCustomer: (n) => set({ customer: n }),
       setPayment: (p) => set({ payment: p }),
       addItem: (product, unitType, lang) => {
@@ -126,15 +136,19 @@ export const useCartStore = create<CartState>()(
         items: s.items.map(i => i.id === id ? { ...i, quantity: i.quantity + delta } : i).filter(i => i.quantity > 0),
       })),
       removeItem: (id) => set(s => ({ items: s.items.filter(i => i.id !== id) })),
-      clearCart: () => set({ items: [], customer: "", payment: "cash" }),
+      setItemDiscount: (id, type, value) => set(s => ({
+        items: s.items.map(i => i.id === id ? { ...i, discountType: type || undefined, discountValue: type ? value : undefined } : i),
+      })),
+      setOrderDiscount: (type, value) => set({ orderDiscountType: type, orderDiscountValue: type ? value : 0 }),
+      clearCart: () => set({ items: [], customer: "", payment: "cash", orderDiscountType: null, orderDiscountValue: 0 }),
       total: () => get().items.reduce((s, i) => s + i.unitPrice * i.quantity, 0),
       count: () => get().items.reduce((s, i) => s + i.quantity, 0),
     }),
     {
       name: "bakeshop-cart",
-      version: 2,
-      migrate: () => ({ items: [], customer: "", payment: "cash" as PaymentMethod }),
-      partialize: (state) => ({ items: state.items, customer: state.customer, payment: state.payment }),
+      version: 3,
+      migrate: () => ({ items: [], customer: "", payment: "cash" as PaymentMethod, orderDiscountType: null, orderDiscountValue: 0 }),
+      partialize: (state) => ({ items: state.items, customer: state.customer, payment: state.payment, orderDiscountType: state.orderDiscountType, orderDiscountValue: state.orderDiscountValue }),
     }
   )
 );
@@ -144,6 +158,7 @@ interface OrderState {
   orders: Order[];
   addOrder: (order: Order) => void;
   cancelOrder: (id: string) => void;
+  refundOrder: (id: string) => void;
 }
 export const useOrderStore = create<OrderState>((set) => ({
   orders: MOCK_ORDERS,
@@ -161,6 +176,9 @@ export const useOrderStore = create<OrderState>((set) => ({
     }
     return { orders: s.orders.map(o => o.id === id ? { ...o, status: "cancelled" as const } : o) };
   }),
+  refundOrder: (id) => set(s => ({
+    orders: s.orders.map(o => o.id === id ? { ...o, status: "refunded" as const } : o),
+  })),
 }));
 
 // ─── Inventory ───
@@ -273,6 +291,57 @@ export const useMemberStore = create<MemberState>()(
       deleteMember: (id) => set(s => ({ members: s.members.filter(m => m.id !== id) })),
     }),
     { name: "bakeshop-members" }
+  )
+);
+
+// ─── Refunds ───
+interface RefundState {
+  refunds: Refund[];
+  addRefund: (refund: Refund) => void;
+}
+export const useRefundStore = create<RefundState>((set) => ({
+  refunds: [],
+  addRefund: (refund) => {
+    // Restore stock for refunded items
+    refund.items.forEach(item => {
+      const delta = item.unitType === "box"
+        ? item.quantity * (useProductStore.getState().products.find(p => p.id === item.productId)?.qtyPerBox || 1)
+        : item.quantity;
+      useProductStore.getState().adjustStock(item.productId, delta);
+    });
+    set(s => ({ refunds: [refund, ...s.refunds] }));
+  },
+}));
+
+// ─── Cash Sessions (persisted) ───
+interface CashSessionState {
+  sessions: CashSession[];
+  addSession: (session: CashSession) => void;
+}
+export const useCashSessionStore = create<CashSessionState>()(
+  persist(
+    (set) => ({
+      sessions: [],
+      addSession: (session) => set(s => ({ sessions: [session, ...s.sessions] })),
+    }),
+    { name: "bakeshop-cash-sessions" }
+  )
+);
+
+// ─── Audit Log (persisted) ───
+interface AuditState {
+  entries: AuditEntry[];
+  log: (action: AuditAction, userId: string, userName: string, details: string) => void;
+}
+export const useAuditStore = create<AuditState>()(
+  persist(
+    (set) => ({
+      entries: [],
+      log: (action, userId, userName, details) => set(s => ({
+        entries: [{ id: genId(), action, userId, userName, details, createdAt: new Date().toISOString() }, ...s.entries],
+      })),
+    }),
+    { name: "bakeshop-audit" }
   )
 );
 
