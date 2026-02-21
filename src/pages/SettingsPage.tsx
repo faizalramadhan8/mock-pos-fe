@@ -151,7 +151,7 @@ export function SettingsPage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className={`text-sm font-bold truncate ${th.tx}`}>{u.name}</p>
-                    <p className={`text-[11px] truncate ${th.txm}`}>{u.email}{u.phone ? ` \u00B7 ${u.phone}` : ""}</p>
+                    <p className={`text-[11px] truncate ${th.txm}`}>{u.email}{u.phone ? ` · ${u.phone}` : ""}</p>
                   </div>
                   <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md shrink-0 ${
                     u.role === "cashier"

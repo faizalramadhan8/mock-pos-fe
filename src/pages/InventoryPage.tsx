@@ -460,7 +460,7 @@ export function InventoryPage() {
                           {product ? (lang === "id" ? product.nameId : product.name) : batch.productId}
                         </p>
                         <p className={`text-[11px] ${th.txf}`}>
-                          {batch.batchNumber} \u00B7 {batch.quantity} {product?.unit || "pcs"}
+                          {batch.batchNumber} · {batch.quantity} {product?.unit || "pcs"}
                         </p>
                       </div>
                     </div>
@@ -529,11 +529,11 @@ export function InventoryPage() {
                     <div className="min-w-0 flex-1">
                       <p className={`text-sm font-bold truncate ${th.tx}`}>{sup?.name || "\u2014"}</p>
                       <p className={`text-[11px] ${th.txf}`}>
-                        {lang === "id" ? prod?.nameId : prod?.name} \u00B7 {inv.quantity} \u00B7 {$(inv.unitPrice * inv.quantity)}
+                        {lang === "id" ? prod?.nameId : prod?.name} · {inv.quantity} · {$(inv.unitPrice * inv.quantity)}
                       </p>
                       <p className={`text-[10px] ${isOverdue ? "text-[#D4627A] font-bold" : th.txm}`}>
                         {t.dueDate}: {inv.dueDate ? formatDate(inv.dueDate) : "\u2014"}
-                        {isOverdue && ` \u00B7 ${t.overdue}`}
+                        {isOverdue && ` · ${t.overdue}`}
                       </p>
                     </div>
                     {canWrite && (
@@ -580,7 +580,7 @@ export function InventoryPage() {
                     <div className="min-w-0 flex-1">
                       <p className={`text-sm font-bold ${th.tx}`}>{sup.name}</p>
                       <p className={`text-[11px] ${th.txm}`}>
-                        {sup.phone}{sup.email ? ` \u00B7 ${sup.email}` : ""}
+                        {sup.phone}{sup.email ? ` · ${sup.email}` : ""}
                       </p>
                       {sup.address && <p className={`text-[10px] mt-0.5 ${th.txf}`}>{sup.address}</p>}
                     </div>
