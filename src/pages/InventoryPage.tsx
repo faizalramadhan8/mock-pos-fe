@@ -1,18 +1,18 @@
 import { useState, useMemo } from "react";
-import { useCategoryStore, useProductStore, useInventoryStore, useBatchStore, useAuthStore, useLangStore } from "@/stores";
-import { INVENTORY_WRITE_ROLES } from "@/constants";
+import { useCategoryStore, useProductStore, useInventoryStore, useBatchStore, useAuthStore, useLangStore, useSupplierStore } from "@/stores";
+import { INVENTORY_WRITE_ROLES, UNIT_OPTIONS, PAYMENT_TERMS_OPTIONS } from "@/constants";
 import { Modal } from "@/components/Modal";
 import { ProductImage } from "@/components/ProductImage";
 import { useThemeClasses } from "@/hooks/useThemeClasses";
-import { formatCurrency as $, formatTime, genId, printBarcodeLabel } from "@/utils";
-import type { UnitType, StockType, StockMovement } from "@/types";
+import { formatCurrency as $, formatTime, formatDate, genId, genBatchNumber, calcDueDate, compressImage, printBarcodeLabel } from "@/utils";
+import type { UnitType, StockType, StockMovement, PaymentTerms, PaymentStatus, UnitOfMeasure } from "@/types";
 import toast from "react-hot-toast";
 import {
   Package, Plus, ChevronDown, ArrowDownCircle, ArrowUpCircle, Barcode,
-  LayoutGrid, Clock, AlertTriangle,
+  LayoutGrid, Clock, AlertTriangle, Truck, X, Check, CircleDollarSign,
 } from "lucide-react";
 
-type InventoryTab = "overview" | "stockIn" | "stockOut" | "expiry" | "history";
+type InventoryTab = "overview" | "stockIn" | "stockOut" | "expiry" | "history" | "suppliers";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function getDateLabel(dateStr: string, t: Record<string, any>): string {
@@ -33,21 +33,34 @@ export function InventoryPage() {
   const adjustStock = useProductStore(s => s.adjustStock);
   const addProduct = useProductStore(s => s.addProduct);
   const toggleActive = useProductStore(s => s.toggleActive);
-  const { movements, addMovement, totalIn, totalOut } = useInventoryStore();
+  const { movements, addMovement, updatePaymentStatus, getUnpaidInvoices, totalIn, totalOut } = useInventoryStore();
   const { addBatch, consumeFIFO, getExpiringBatches } = useBatchStore();
   const batches = useBatchStore(s => s.batches);
   const user = useAuthStore(s => s.user)!;
   const canWrite = INVENTORY_WRITE_ROLES.includes(user.role);
+  const { suppliers, addSupplier, updateSupplier, deleteSupplier } = useSupplierStore();
 
   const [activeTab, setActiveTab] = useState<InventoryTab>("overview");
   const [stockModal, setStockModal] = useState<StockType | null>(null);
-  const [form, setForm] = useState({ prod: "", qty: "", unit: "individual" as UnitType, price: "", note: "", expiryDate: "" });
+  const [form, setForm] = useState({
+    prod: "", qty: "", unit: "individual" as UnitType, price: "", note: "", expiryDate: "",
+    supplierId: "", paymentTerms: "COD" as PaymentTerms, paymentStatus: "unpaid" as PaymentStatus,
+  });
   const [addProdOpen, setAddProdOpen] = useState(false);
-  const [newProd, setNewProd] = useState({ name: "", nameId: "", sku: "", category: "c1", priceIndividual: "", priceBox: "", qtyPerBox: "12", stock: "0", unit: "kg", image: "", minStock: "10" });
+  const [newProd, setNewProd] = useState({
+    name: "", nameId: "", sku: "", category: "c1",
+    purchasePrice: "", sellingPrice: "",
+    qtyPerBox: "12", stock: "0", unit: "kg" as UnitOfMeasure, image: "", minStock: "10",
+  });
   const [addCatOpen, setAddCatOpen] = useState(false);
   const [newCat, setNewCat] = useState({ name: "", nameId: "", color: "#C4884A" });
   const catColors = ["#C4884A", "#D4627A", "#5B8DEF", "#7D5A44", "#8B6FC0", "#6F9A4D", "#E89B48", "#2BA5B5", "#9B59B6", "#E74C3C"];
   const [overviewFilter, setOverviewFilter] = useState<"all" | "low" | "out" | "inactive">("all");
+
+  // Supplier modal state
+  const [supplierModal, setSupplierModal] = useState<"add" | "edit" | null>(null);
+  const [editSupplierId, setEditSupplierId] = useState<string | null>(null);
+  const [supForm, setSupForm] = useState({ name: "", phone: "", email: "", address: "" });
 
   // Tab definitions
   const tabs: { id: InventoryTab; label: string; icon: React.ReactNode }[] = [
@@ -56,6 +69,7 @@ export function InventoryPage() {
     { id: "stockOut", label: t.invStockOut as string, icon: <ArrowUpCircle size={14} /> },
     { id: "expiry", label: t.invExpiry as string, icon: <AlertTriangle size={14} /> },
     { id: "history", label: t.invHistory as string, icon: <Clock size={14} /> },
+    { id: "suppliers", label: t.invSuppliers as string, icon: <Truck size={14} /> },
   ];
 
   // Overview stats
@@ -72,9 +86,13 @@ export function InventoryPage() {
     }
   }, [products, overviewFilter]);
 
-  // Expiry data — batches dependency triggers recalculation when store updates
+  // Expiry data
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const expiringBatches = useMemo(() => getExpiringBatches(60), [batches, getExpiringBatches]);
+
+  // Unpaid invoices
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const unpaidInvoices = useMemo(() => getUnpaidInvoices(), [movements, getUnpaidInvoices]);
 
   // Movement helpers
   const groupMovements = (list: StockMovement[]) => {
@@ -100,13 +118,14 @@ export function InventoryPage() {
     if (!newProd.name || !newProd.nameId || !newProd.sku) return;
     addProduct({
       id: genId(), sku: newProd.sku, name: newProd.name, nameId: newProd.nameId,
-      category: newProd.category, priceIndividual: parseInt(newProd.priceIndividual) || 0,
-      priceBox: parseInt(newProd.priceBox) || 0, qtyPerBox: parseInt(newProd.qtyPerBox) || 12,
-      stock: parseInt(newProd.stock) || 0, unit: newProd.unit || "kg",
+      category: newProd.category, purchasePrice: parseInt(newProd.purchasePrice) || 0,
+      sellingPrice: parseInt(newProd.sellingPrice) || 0, qtyPerBox: parseInt(newProd.qtyPerBox) || 12,
+      stock: parseInt(newProd.stock) || 0, unit: newProd.unit,
       image: newProd.image || "", minStock: parseInt(newProd.minStock) || 10, isActive: true,
+      createdAt: new Date().toISOString(),
     });
     setAddProdOpen(false);
-    setNewProd({ name: "", nameId: "", sku: "", category: "c1", priceIndividual: "", priceBox: "", qtyPerBox: "12", stock: "0", unit: "kg", image: "", minStock: "10" });
+    setNewProd({ name: "", nameId: "", sku: "", category: "c1", purchasePrice: "", sellingPrice: "", qtyPerBox: "12", stock: "0", unit: "kg", image: "", minStock: "10" });
     toast.success(t.productAdded as string);
   };
 
@@ -120,20 +139,67 @@ export function InventoryPage() {
       return;
     }
     adjustStock(prod.id, stockModal === "in" ? total : -total);
+
+    const priceForUnit = stockModal === "in"
+      ? (form.unit === "box" ? prod.purchasePrice * prod.qtyPerBox : prod.purchasePrice)
+      : (form.unit === "box" ? prod.sellingPrice * prod.qtyPerBox : prod.sellingPrice);
+
     if (stockModal === "in") {
-      addBatch({ id: genId(), productId: prod.id, quantity: total, expiryDate: form.expiryDate || "", receivedAt: new Date().toISOString(), note: form.note || "—" });
+      addBatch({
+        id: genId(), productId: prod.id, quantity: total,
+        expiryDate: form.expiryDate || "", receivedAt: new Date().toISOString(),
+        note: form.note || "\u2014", batchNumber: genBatchNumber(),
+      });
     } else {
       consumeFIFO(prod.id, total);
     }
+
+    const now = new Date().toISOString();
     addMovement({
       id: genId(), productId: prod.id, type: stockModal, quantity: total, unitType: form.unit,
-      unitPrice: form.price ? parseInt(form.price) : (form.unit === "box" ? prod.priceBox : prod.priceIndividual),
-      note: form.note || "—", createdAt: new Date().toISOString(), createdBy: user.id,
+      unitPrice: form.price ? parseInt(form.price) : priceForUnit,
+      note: form.note || "\u2014", createdAt: now, createdBy: user.id,
       expiryDate: stockModal === "in" ? form.expiryDate || undefined : undefined,
+      supplierId: stockModal === "in" && form.supplierId ? form.supplierId : undefined,
+      paymentTerms: stockModal === "in" && form.supplierId ? form.paymentTerms : undefined,
+      dueDate: stockModal === "in" && form.supplierId ? calcDueDate(now, form.paymentTerms) : undefined,
+      paymentStatus: stockModal === "in" && form.supplierId ? form.paymentStatus : undefined,
     });
     setStockModal(null);
-    setForm({ prod: "", qty: "", unit: "individual", price: "", note: "", expiryDate: "" });
+    setForm({ prod: "", qty: "", unit: "individual", price: "", note: "", expiryDate: "", supplierId: "", paymentTerms: "COD", paymentStatus: "unpaid" });
     toast.success(t.stockRecorded as string);
+  };
+
+  const doAddSupplier = () => {
+    if (!supForm.name.trim()) return;
+    addSupplier({
+      id: genId(), name: supForm.name.trim(), phone: supForm.phone.trim(),
+      email: supForm.email.trim(), address: supForm.address.trim(),
+      createdAt: new Date().toISOString(),
+    });
+    setSupplierModal(null);
+    setSupForm({ name: "", phone: "", email: "", address: "" });
+    toast.success(t.supplierAdded as string);
+  };
+
+  const doEditSupplier = () => {
+    if (!editSupplierId || !supForm.name.trim()) return;
+    updateSupplier(editSupplierId, {
+      name: supForm.name.trim(), phone: supForm.phone.trim(),
+      email: supForm.email.trim(), address: supForm.address.trim(),
+    });
+    setSupplierModal(null);
+    setEditSupplierId(null);
+    setSupForm({ name: "", phone: "", email: "", address: "" });
+    toast.success(t.supplierUpdated as string);
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const base64 = await compressImage(file);
+    setNewProd({ ...newProd, image: base64 });
+    toast.success(t.imageUploaded as string);
   };
 
   // Render movement list (reused by stockIn, stockOut, history tabs)
@@ -206,6 +272,8 @@ export function InventoryPage() {
     return Math.ceil((expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
   };
 
+  const inp = `w-full px-4 py-2.5 text-sm rounded-xl border ${th.inp}`;
+
   return (
     <div className="flex flex-col gap-4">
       {/* Header */}
@@ -244,7 +312,7 @@ export function InventoryPage() {
         </div>
       )}
 
-      {/* ═══════ OVERVIEW TAB ═══════ */}
+      {/* ======= OVERVIEW TAB ======= */}
       {activeTab === "overview" && (
         <>
           {/* Stats */}
@@ -324,11 +392,11 @@ export function InventoryPage() {
         </>
       )}
 
-      {/* ═══════ STOCK IN TAB ═══════ */}
+      {/* ======= STOCK IN TAB ======= */}
       {activeTab === "stockIn" && (
         <>
           {canWrite && (
-            <button onClick={() => { setStockModal("in"); setForm({ prod: "", qty: "", unit: "individual", price: "", note: "", expiryDate: "" }); }}
+            <button onClick={() => { setStockModal("in"); setForm({ prod: "", qty: "", unit: "individual", price: "", note: "", expiryDate: "", supplierId: "", paymentTerms: "COD", paymentStatus: "unpaid" }); }}
               className="w-full py-3 rounded-2xl text-sm font-bold text-white bg-[#4A8B3F] flex items-center justify-center gap-2">
               <ArrowDownCircle size={16} /> {t.stockIn}
             </button>
@@ -343,11 +411,11 @@ export function InventoryPage() {
         </>
       )}
 
-      {/* ═══════ STOCK OUT TAB ═══════ */}
+      {/* ======= STOCK OUT TAB ======= */}
       {activeTab === "stockOut" && (
         <>
           {canWrite && (
-            <button onClick={() => { setStockModal("out"); setForm({ prod: "", qty: "", unit: "individual", price: "", note: "", expiryDate: "" }); }}
+            <button onClick={() => { setStockModal("out"); setForm({ prod: "", qty: "", unit: "individual", price: "", note: "", expiryDate: "", supplierId: "", paymentTerms: "COD", paymentStatus: "unpaid" }); }}
               className="w-full py-3 rounded-2xl text-sm font-bold text-white bg-[#C4504A] flex items-center justify-center gap-2">
               <ArrowUpCircle size={16} /> {t.stockOut}
             </button>
@@ -362,7 +430,7 @@ export function InventoryPage() {
         </>
       )}
 
-      {/* ═══════ EXPIRY TAB ═══════ */}
+      {/* ======= EXPIRY TAB ======= */}
       {activeTab === "expiry" && (
         <>
           {expiringBatches.length === 0 ? (
@@ -392,7 +460,7 @@ export function InventoryPage() {
                           {product ? (lang === "id" ? product.nameId : product.name) : batch.productId}
                         </p>
                         <p className={`text-[11px] ${th.txf}`}>
-                          {batch.note} — {batch.quantity} {product?.unit || "pcs"}
+                          {batch.batchNumber} \u00B7 {batch.quantity} {product?.unit || "pcs"}
                         </p>
                       </div>
                     </div>
@@ -418,7 +486,7 @@ export function InventoryPage() {
         </>
       )}
 
-      {/* ═══════ HISTORY TAB ═══════ */}
+      {/* ======= HISTORY TAB ======= */}
       {activeTab === "history" && (
         <>
           <div className="grid grid-cols-3 gap-3">
@@ -442,7 +510,105 @@ export function InventoryPage() {
         </>
       )}
 
-      {/* ═══════ MODALS ═══════ */}
+      {/* ======= SUPPLIERS TAB ======= */}
+      {activeTab === "suppliers" && (
+        <>
+          {/* Unpaid Invoices */}
+          {unpaidInvoices.length > 0 && (
+            <div className={`rounded-[22px] border overflow-hidden ${th.card} ${th.bdr}`}>
+              <div className={`px-5 py-3.5 border-b ${th.bdr} flex items-center gap-2`}>
+                <CircleDollarSign size={14} className="text-[#E89B48]" />
+                <p className={`text-sm font-extrabold tracking-tight ${th.tx}`}>{t.unpaidInvoices} ({unpaidInvoices.length})</p>
+              </div>
+              {unpaidInvoices.map(inv => {
+                const prod = products.find(p => p.id === inv.productId);
+                const sup = suppliers.find(s => s.id === inv.supplierId);
+                const isOverdue = inv.dueDate ? new Date(inv.dueDate) < new Date() : false;
+                return (
+                  <div key={inv.id} className={`flex items-center justify-between px-4 py-3 border-b last:border-0 ${th.bdr}/50`}>
+                    <div className="min-w-0 flex-1">
+                      <p className={`text-sm font-bold truncate ${th.tx}`}>{sup?.name || "\u2014"}</p>
+                      <p className={`text-[11px] ${th.txf}`}>
+                        {lang === "id" ? prod?.nameId : prod?.name} \u00B7 {inv.quantity} \u00B7 {$(inv.unitPrice * inv.quantity)}
+                      </p>
+                      <p className={`text-[10px] ${isOverdue ? "text-[#D4627A] font-bold" : th.txm}`}>
+                        {t.dueDate}: {inv.dueDate ? formatDate(inv.dueDate) : "\u2014"}
+                        {isOverdue && ` \u00B7 ${t.overdue}`}
+                      </p>
+                    </div>
+                    {canWrite && (
+                      <button onClick={() => { updatePaymentStatus(inv.id, "paid"); toast.success(t.paid as string); }}
+                        className={`shrink-0 ml-3 px-3 py-1.5 rounded-xl text-[11px] font-bold flex items-center gap-1 ${
+                          th.dark ? "bg-[#4A8B3F]/15 text-[#4A8B3F]" : "bg-green-50 text-[#4A8B3F]"
+                        }`}>
+                        <Check size={12} /> {t.markAsPaid}
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          {unpaidInvoices.length === 0 && (
+            <div className={`rounded-[18px] border p-3.5 flex items-center gap-2 ${th.card} ${th.bdr}`}>
+              <Check size={14} className="text-[#4A8B3F]" />
+              <p className={`text-sm font-semibold ${th.txm}`}>{t.noUnpaid}</p>
+            </div>
+          )}
+
+          {/* Supplier list */}
+          <div className="flex items-center justify-between">
+            <p className={`text-[15px] font-extrabold tracking-tight ${th.tx}`}>{t.suppliers}</p>
+            {canWrite && (
+              <button onClick={() => { setSupplierModal("add"); setSupForm({ name: "", phone: "", email: "", address: "" }); }}
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-[#E8B088] to-[#A0673C]">
+                <Plus size={13} /> {t.addSupplier}
+              </button>
+            )}
+          </div>
+
+          {suppliers.length === 0 ? (
+            <div className={`rounded-[22px] border p-8 text-center ${th.card} ${th.bdr}`}>
+              <Truck size={36} className={`mx-auto opacity-20 mb-2 ${th.txm}`} />
+              <p className={`text-sm font-semibold ${th.txm}`}>{t.noSuppliers}</p>
+            </div>
+          ) : (
+            <div className={`rounded-[22px] border overflow-hidden ${th.card} ${th.bdr}`}>
+              {suppliers.map((sup, i) => (
+                <div key={sup.id} className={`px-5 py-3.5 ${i > 0 ? `border-t ${th.bdr}` : ""}`}>
+                  <div className="flex items-center justify-between">
+                    <div className="min-w-0 flex-1">
+                      <p className={`text-sm font-bold ${th.tx}`}>{sup.name}</p>
+                      <p className={`text-[11px] ${th.txm}`}>
+                        {sup.phone}{sup.email ? ` \u00B7 ${sup.email}` : ""}
+                      </p>
+                      {sup.address && <p className={`text-[10px] mt-0.5 ${th.txf}`}>{sup.address}</p>}
+                    </div>
+                    {canWrite && (
+                      <div className="flex gap-1.5 shrink-0 ml-3">
+                        <button onClick={() => {
+                          setEditSupplierId(sup.id);
+                          setSupForm({ name: sup.name, phone: sup.phone, email: sup.email, address: sup.address });
+                          setSupplierModal("edit");
+                        }}
+                          className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold ${th.dark ? "bg-[#5B8DEF]/15 text-[#5B8DEF]" : "bg-blue-50 text-[#5B8DEF]"}`}>
+                          {t.editSupplier}
+                        </button>
+                        <button onClick={() => { deleteSupplier(sup.id); toast.success(t.supplierDeleted as string); }}
+                          className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold ${th.dark ? "bg-[#C4504A]/15 text-[#C4504A]" : "bg-red-50 text-[#C4504A]"}`}>
+                          {t.deleteSupplier}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+
+      {/* ======= MODALS ======= */}
 
       {/* Stock In/Out modal */}
       <Modal open={!!stockModal} onClose={() => setStockModal(null)} title={(stockModal === "in" ? t.stockIn : t.stockOut) as string}>
@@ -452,7 +618,7 @@ export function InventoryPage() {
                 const prodId = e.target.value;
                 if (stockModal === "out") {
                   const sp = products.find(p => p.id === prodId);
-                  setForm({ ...form, prod: prodId, price: sp ? String(form.unit === "box" ? sp.priceBox : sp.priceIndividual) : "" });
+                  setForm({ ...form, prod: prodId, price: sp ? String(form.unit === "box" ? sp.sellingPrice * sp.qtyPerBox : sp.sellingPrice) : "" });
                 } else {
                   setForm({ ...form, prod: prodId });
                 }
@@ -463,6 +629,49 @@ export function InventoryPage() {
             </select>
             <ChevronDown size={14} className={`absolute right-4 top-1/2 -translate-y-1/2 ${th.txf}`} />
           </div>
+
+          {/* Supplier & Payment (stock-in only) */}
+          {stockModal === "in" && (
+            <>
+              <div className="relative">
+                <select value={form.supplierId} onChange={e => setForm({ ...form, supplierId: e.target.value })}
+                  className={`w-full px-4 py-3 text-sm rounded-2xl border appearance-none ${th.inp}`}>
+                  <option value="">{t.selectSupplier}</option>
+                  {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+                <ChevronDown size={14} className={`absolute right-4 top-1/2 -translate-y-1/2 ${th.txf}`} />
+              </div>
+              {form.supplierId && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>{t.paymentTerms}</p>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {PAYMENT_TERMS_OPTIONS.map(pt => (
+                        <button key={pt} onClick={() => setForm({ ...form, paymentTerms: pt })}
+                          className={`py-2 rounded-xl text-[11px] font-bold ${
+                            form.paymentTerms === pt ? "text-white bg-gradient-to-r from-[#E8B088] to-[#A0673C]" : `border ${th.bdr} ${th.txm}`
+                          }`}>{pt}</button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>{t.paymentStatus}</p>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {(["unpaid", "paid"] as PaymentStatus[]).map(ps => (
+                        <button key={ps} onClick={() => setForm({ ...form, paymentStatus: ps })}
+                          className={`py-2 rounded-xl text-[11px] font-bold ${
+                            form.paymentStatus === ps
+                              ? (ps === "paid" ? "text-white bg-[#4A8B3F]" : "text-white bg-[#E89B48]")
+                              : `border ${th.bdr} ${th.txm}`
+                          }`}>{ps === "paid" ? t.paid : t.unpaid}</button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
           <div className="grid grid-cols-2 gap-3">
             <div>
               <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>{t.unitType}</p>
@@ -471,7 +680,7 @@ export function InventoryPage() {
                   <button key={ut} onClick={() => {
                     if (stockModal === "out" && form.prod) {
                       const sp = products.find(p => p.id === form.prod);
-                      setForm({ ...form, unit: ut, price: sp ? String(ut === "box" ? sp.priceBox : sp.priceIndividual) : "" });
+                      setForm({ ...form, unit: ut, price: sp ? String(ut === "box" ? sp.sellingPrice * sp.qtyPerBox : sp.sellingPrice) : "" });
                     } else {
                       setForm({ ...form, unit: ut });
                     }
@@ -489,20 +698,27 @@ export function InventoryPage() {
             <div>
               <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>{t.quantity}</p>
               <input type="number" value={form.qty} onChange={e => setForm({ ...form, qty: e.target.value })}
-                className={`w-full px-4 py-2.5 text-sm rounded-xl border ${th.inp}`} min="1" />
+                className={inp} min="1" />
             </div>
           </div>
           <div>
             <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>{t.price}</p>
             <input type="number" value={form.price} onChange={e => setForm({ ...form, price: e.target.value })}
-              placeholder={form.prod ? $((form.unit === "box" ? products.find(p => p.id === form.prod)?.priceBox : products.find(p => p.id === form.prod)?.priceIndividual) || 0) : ""}
-              className={`w-full px-4 py-2.5 text-sm rounded-xl border ${th.inp}`} min="0" />
+              placeholder={form.prod ? (() => {
+                const p = products.find(pr => pr.id === form.prod);
+                if (!p) return "";
+                const val = stockModal === "in"
+                  ? (form.unit === "box" ? p.purchasePrice * p.qtyPerBox : p.purchasePrice)
+                  : (form.unit === "box" ? p.sellingPrice * p.qtyPerBox : p.sellingPrice);
+                return $(val);
+              })() : ""}
+              className={inp} min="0" />
           </div>
           {stockModal === "in" && (
             <div>
               <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>{t.expiryDate}</p>
               <input type="date" value={form.expiryDate} onChange={e => setForm({ ...form, expiryDate: e.target.value })}
-                className={`w-full px-4 py-2.5 text-sm rounded-xl border ${th.inp}`} />
+                className={inp} />
             </div>
           )}
           <div>
@@ -530,18 +746,18 @@ export function InventoryPage() {
           <div>
             <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>{t.productName}</p>
             <input value={newProd.name} onChange={e => setNewProd({ ...newProd, name: e.target.value })}
-              className={`w-full px-4 py-2.5 text-sm rounded-xl border ${th.inp}`} />
+              className={inp} />
           </div>
           <div>
             <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>{t.productNameId}</p>
             <input value={newProd.nameId} onChange={e => setNewProd({ ...newProd, nameId: e.target.value })}
-              className={`w-full px-4 py-2.5 text-sm rounded-xl border ${th.inp}`} />
+              className={inp} />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>{t.sku}</p>
               <input value={newProd.sku} onChange={e => setNewProd({ ...newProd, sku: e.target.value })}
-                className={`w-full px-4 py-2.5 text-sm rounded-xl border ${th.inp}`} />
+                className={inp} />
             </div>
             <div className="relative">
               <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>{lang === "id" ? "Kategori" : "Category"}</p>
@@ -552,33 +768,62 @@ export function InventoryPage() {
               <ChevronDown size={14} className={`absolute right-4 bottom-3 ${th.txf}`} />
             </div>
           </div>
+          {/* Pricing */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>{t.priceIndividual}</p>
-              <input type="number" value={newProd.priceIndividual} onChange={e => setNewProd({ ...newProd, priceIndividual: e.target.value })}
-                className={`w-full px-4 py-2.5 text-sm rounded-xl border ${th.inp}`} min="0" />
+              <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>{t.purchasePrice}</p>
+              <input type="number" value={newProd.purchasePrice} onChange={e => setNewProd({ ...newProd, purchasePrice: e.target.value })}
+                className={inp} min="0" />
             </div>
             <div>
-              <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>{t.priceBox}</p>
-              <input type="number" value={newProd.priceBox} onChange={e => setNewProd({ ...newProd, priceBox: e.target.value })}
-                className={`w-full px-4 py-2.5 text-sm rounded-xl border ${th.inp}`} min="0" />
+              <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>{t.sellingPrice}</p>
+              <input type="number" value={newProd.sellingPrice} onChange={e => setNewProd({ ...newProd, sellingPrice: e.target.value })}
+                className={inp} min="0" />
             </div>
           </div>
+          {/* Box price hint */}
+          {newProd.sellingPrice && newProd.qtyPerBox && (
+            <p className={`text-[11px] -mt-1 font-medium ${th.acc}`}>
+              {t.boxPrice}: {$((parseInt(newProd.sellingPrice) || 0) * (parseInt(newProd.qtyPerBox) || 0))}
+            </p>
+          )}
           <div className="grid grid-cols-3 gap-3">
             <div>
               <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>{t.qtyPerBox}</p>
               <input type="number" value={newProd.qtyPerBox} onChange={e => setNewProd({ ...newProd, qtyPerBox: e.target.value })}
-                className={`w-full px-4 py-2.5 text-sm rounded-xl border ${th.inp}`} min="1" />
+                className={inp} min="1" />
             </div>
-            <div>
+            <div className="relative">
               <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>{t.unitLabel}</p>
-              <input value={newProd.unit} onChange={e => setNewProd({ ...newProd, unit: e.target.value })}
-                className={`w-full px-4 py-2.5 text-sm rounded-xl border ${th.inp}`} />
+              <select value={newProd.unit} onChange={e => setNewProd({ ...newProd, unit: e.target.value as UnitOfMeasure })}
+                className={`w-full px-4 py-2.5 text-sm rounded-xl border appearance-none ${th.inp}`}>
+                {UNIT_OPTIONS.map(u => <option key={u} value={u}>{u}</option>)}
+              </select>
+              <ChevronDown size={14} className={`absolute right-4 bottom-3 ${th.txf}`} />
             </div>
             <div>
               <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>{t.minStockLabel}</p>
               <input type="number" value={newProd.minStock} onChange={e => setNewProd({ ...newProd, minStock: e.target.value })}
-                className={`w-full px-4 py-2.5 text-sm rounded-xl border ${th.inp}`} min="0" />
+                className={inp} min="0" />
+            </div>
+          </div>
+          {/* Image upload */}
+          <div>
+            <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>{t.uploadImage}</p>
+            <div className="flex items-center gap-3">
+              <label className={`flex-1 py-2.5 rounded-xl border text-center text-xs font-bold cursor-pointer ${th.bdr} ${th.txm}`}>
+                {t.chooseImage}
+                <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
+              </label>
+              {newProd.image && (
+                <div className="relative">
+                  <img src={newProd.image} alt="preview" className="w-12 h-12 rounded-xl object-cover" />
+                  <button onClick={() => setNewProd({ ...newProd, image: "" })}
+                    className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-[#C4504A] text-white flex items-center justify-center">
+                    <X size={10} />
+                  </button>
+                </div>
+              )}
             </div>
           </div>
           <div className="flex gap-2 mt-1">
@@ -595,12 +840,12 @@ export function InventoryPage() {
           <div>
             <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>{t.categoryName}</p>
             <input value={newCat.name} onChange={e => setNewCat({ ...newCat, name: e.target.value })}
-              className={`w-full px-4 py-2.5 text-sm rounded-xl border ${th.inp}`} />
+              className={inp} />
           </div>
           <div>
             <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>{t.categoryNameId}</p>
             <input value={newCat.nameId} onChange={e => setNewCat({ ...newCat, nameId: e.target.value })}
-              className={`w-full px-4 py-2.5 text-sm rounded-xl border ${th.inp}`} />
+              className={inp} />
           </div>
           <div>
             <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>{t.categoryColor}</p>
@@ -615,6 +860,40 @@ export function InventoryPage() {
           <div className="flex gap-2 mt-1">
             <button onClick={() => setAddCatOpen(false)} className={`flex-1 py-3 rounded-2xl text-sm font-bold border ${th.bdr} ${th.txm}`}>{t.cancel}</button>
             <button onClick={doAddCategory} disabled={!newCat.name || !newCat.nameId}
+              className="flex-1 py-3 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-[#E8B088] to-[#A0673C] disabled:opacity-40">{t.save}</button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Supplier Add/Edit modal */}
+      <Modal open={!!supplierModal} onClose={() => { setSupplierModal(null); setEditSupplierId(null); }}
+        title={(supplierModal === "edit" ? t.editSupplier : t.addSupplier) as string}>
+        <div className="flex flex-col gap-3">
+          <div>
+            <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>{t.supplierName}</p>
+            <input value={supForm.name} onChange={e => setSupForm({ ...supForm, name: e.target.value })}
+              className={inp} />
+          </div>
+          <div>
+            <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>{t.supplierPhone}</p>
+            <input value={supForm.phone} onChange={e => setSupForm({ ...supForm, phone: e.target.value })}
+              className={inp} type="tel" />
+          </div>
+          <div>
+            <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>{t.supplierEmail}</p>
+            <input value={supForm.email} onChange={e => setSupForm({ ...supForm, email: e.target.value })}
+              className={inp} type="email" />
+          </div>
+          <div>
+            <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>{t.supplierAddress}</p>
+            <textarea value={supForm.address} onChange={e => setSupForm({ ...supForm, address: e.target.value })} rows={2}
+              className={`w-full px-4 py-2.5 text-sm rounded-xl border resize-none ${th.inp}`} />
+          </div>
+          <div className="flex gap-2 mt-1">
+            <button onClick={() => { setSupplierModal(null); setEditSupplierId(null); }}
+              className={`flex-1 py-3 rounded-2xl text-sm font-bold border ${th.bdr} ${th.txm}`}>{t.cancel}</button>
+            <button onClick={supplierModal === "edit" ? doEditSupplier : doAddSupplier}
+              disabled={!supForm.name.trim()}
               className="flex-1 py-3 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-[#E8B088] to-[#A0673C] disabled:opacity-40">{t.save}</button>
           </div>
         </div>

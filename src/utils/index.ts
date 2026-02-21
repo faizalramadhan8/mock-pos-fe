@@ -1,6 +1,6 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
-import type { Order, Product } from "@/types";
+import type { Order, Product, PaymentTerms } from "@/types";
 import JsBarcode from "jsbarcode";
 
 export function cn(...inputs: ClassValue[]) { return twMerge(clsx(inputs)); }
@@ -13,6 +13,39 @@ export function formatTime(d: string) {
   return new Date(d).toLocaleTimeString("en", { hour: "2-digit", minute: "2-digit" });
 }
 export function genId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+
+export function genBatchNumber(): string {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, "0");
+  const d = String(now.getDate()).padStart(2, "0");
+  const seq = String(Math.floor(Math.random() * 999) + 1).padStart(3, "0");
+  return `B-${y}${m}${d}-${seq}`;
+}
+
+export function calcDueDate(baseDate: string, terms: PaymentTerms): string {
+  if (terms === "COD") return baseDate;
+  const days = parseInt(terms.replace("NET", ""));
+  const dt = new Date(baseDate);
+  dt.setDate(dt.getDate() + days);
+  return dt.toISOString();
+}
+
+export function compressImage(file: File, maxWidth = 400, quality = 0.7): Promise<string> {
+  return new Promise((resolve) => {
+    const canvas = document.createElement("canvas");
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, maxWidth / img.width);
+      canvas.width = img.width * scale;
+      canvas.height = img.height * scale;
+      canvas.getContext("2d")!.drawImage(img, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL("image/jpeg", quality));
+      URL.revokeObjectURL(img.src);
+    };
+    img.src = URL.createObjectURL(file);
+  });
+}
 
 function generateBarcodeSvg(value: string, opts?: { width?: number; height?: number; displayValue?: boolean; fontSize?: number }): string {
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -94,7 +127,7 @@ export function printBarcodeLabel(product: Product, lang: "en" | "id") {
 </style></head><body>
   <div class="label">
     <div class="name">${name}</div>
-    <div class="price">Rp ${product.priceIndividual.toLocaleString("id-ID")} / ${product.unit}</div>
+    <div class="price">Rp ${product.sellingPrice.toLocaleString("id-ID")} / ${product.unit}</div>
     <div class="bc">${barcodeSvg}</div>
   </div>
 </body></html>`;

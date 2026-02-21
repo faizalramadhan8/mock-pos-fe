@@ -28,10 +28,12 @@ export const translations = {
     note: "Reason / notes", record: "Record", price: "Unit price (Rp)", boxEquals: "1 box",
     // Add Product & Category
     addProduct: "Add Product", productName: "Product name (EN)", productNameId: "Product name (ID)",
-    sku: "SKU", priceIndividual: "Price (Pcs)", priceBox: "Price (Box)",
-    qtyPerBox: "Qty per Box", unitLabel: "Unit", minStockLabel: "Min Stock", imageUrl: "Image URL",
+    sku: "SKU", purchasePrice: "Purchase Price", sellingPrice: "Selling Price", boxPrice: "Box Price",
+    qtyPerBox: "Qty per Box", unitLabel: "Unit", minStockLabel: "Min Stock",
     addCategory: "Add Category", categoryName: "Category name (EN)", categoryNameId: "Category name (ID)",
     categoryColor: "Color",
+    // Image
+    uploadImage: "Upload Image", chooseImage: "Choose Image", imageUploaded: "Image uploaded",
     // FIFO
     expiryDate: "Expiry date", expires: "Exp", expired: "Expired",
     // Orders
@@ -63,7 +65,7 @@ export const translations = {
     yesterday: "Yesterday",
     // Inventory tabs
     invOverview: "Overview", invStockIn: "Stock In", invStockOut: "Stock Out",
-    invExpiry: "Expiry", invHistory: "History",
+    invExpiry: "Expiry", invHistory: "History", invSuppliers: "Suppliers",
     // Overview
     product: "Product", currentStock: "Current Stock", status: "Status", actions: "Actions",
     lowStock: "Low Stock", outOfStock: "Out of Stock", normalStock: "Normal",
@@ -73,6 +75,7 @@ export const translations = {
     // Expiry
     expiryAlerts: "Expiry Alerts", expiringIn: "Expiring in",
     days: "days", alreadyExpired: "Already expired", noExpiryAlerts: "No expiry alerts",
+    batchNumber: "Batch No.",
     // Barcode scanner
     scannerReady: "Scanner ready", productScanned: "Product scanned", skuNotFound: "SKU not found",
     // RBAC
@@ -83,6 +86,19 @@ export const translations = {
     defaultPassword: "Default password", userRegistered: "User registered successfully",
     emailExists: "Email already registered", staffList: "Staff List",
     noStaff: "No staff registered yet", registered: "Registered",
+    // Supplier
+    supplier: "Supplier", suppliers: "Suppliers", addSupplier: "Add Supplier",
+    editSupplier: "Edit Supplier", supplierName: "Supplier name",
+    supplierPhone: "Phone", supplierEmail: "Email", supplierAddress: "Address",
+    noSuppliers: "No suppliers yet", supplierAdded: "Supplier added",
+    supplierUpdated: "Supplier updated", supplierDeleted: "Supplier deleted",
+    selectSupplier: "Select supplier", deleteSupplier: "Delete",
+    // Payment tracking
+    paymentTerms: "Payment Terms", dueDate: "Due Date",
+    paymentStatus: "Payment Status", paid: "Paid", unpaid: "Unpaid",
+    markAsPaid: "Mark as Paid", unpaidInvoices: "Unpaid Invoices",
+    overdue: "Overdue", noUnpaid: "No unpaid invoices",
+    cod: "COD", net30: "Net 30 Days", net60: "Net 60 Days", net90: "Net 90 Days",
   },
   id: {
     appName: "BakeShop",
@@ -106,10 +122,12 @@ export const translations = {
     selectProduct: "Pilih produk", quantity: "Jumlah", unitType: "Tipe unit",
     note: "Alasan / catatan", record: "Catat", price: "Harga satuan (Rp)", boxEquals: "1 dus",
     addProduct: "Tambah Produk", productName: "Nama produk (EN)", productNameId: "Nama produk (ID)",
-    sku: "SKU", priceIndividual: "Harga (Satuan)", priceBox: "Harga (Dus)",
-    qtyPerBox: "Isi per Dus", unitLabel: "Satuan", minStockLabel: "Stok Minimum", imageUrl: "URL Gambar",
+    sku: "SKU", purchasePrice: "Harga Beli", sellingPrice: "Harga Jual", boxPrice: "Harga Dus",
+    qtyPerBox: "Isi per Dus", unitLabel: "Satuan", minStockLabel: "Stok Minimum",
     addCategory: "Tambah Kategori", categoryName: "Nama kategori (EN)", categoryNameId: "Nama kategori (ID)",
     categoryColor: "Warna",
+    // Image
+    uploadImage: "Upload Gambar", chooseImage: "Pilih Gambar", imageUploaded: "Gambar diunggah",
     expiryDate: "Tanggal kedaluwarsa", expires: "Exp", expired: "Kedaluwarsa",
     allOrders: "Semua", completed: "Selesai", pending: "Tertunda",
     theme: "Tampilan", language: "Bahasa", light: "Terang", dark: "Gelap",
@@ -136,7 +154,7 @@ export const translations = {
     yesterday: "Kemarin",
     // Inventory tabs
     invOverview: "Ringkasan", invStockIn: "Masuk", invStockOut: "Keluar",
-    invExpiry: "Kedaluwarsa", invHistory: "Riwayat",
+    invExpiry: "Kedaluwarsa", invHistory: "Riwayat", invSuppliers: "Pemasok",
     // Overview
     product: "Produk", currentStock: "Stok Saat Ini", status: "Status", actions: "Aksi",
     lowStock: "Stok Rendah", outOfStock: "Stok Habis", normalStock: "Normal",
@@ -146,6 +164,7 @@ export const translations = {
     // Expiry
     expiryAlerts: "Peringatan Kedaluwarsa", expiringIn: "Kedaluwarsa dalam",
     days: "hari", alreadyExpired: "Sudah kedaluwarsa", noExpiryAlerts: "Tidak ada peringatan",
+    batchNumber: "No. Batch",
     // Barcode scanner
     scannerReady: "Scanner siap", productScanned: "Produk dipindai", skuNotFound: "SKU tidak ditemukan",
     // RBAC
@@ -156,6 +175,19 @@ export const translations = {
     defaultPassword: "Password default", userRegistered: "Pengguna berhasil didaftarkan",
     emailExists: "Email sudah terdaftar", staffList: "Daftar Staf",
     noStaff: "Belum ada staf terdaftar", registered: "Terdaftar",
+    // Supplier
+    supplier: "Pemasok", suppliers: "Pemasok", addSupplier: "Tambah Pemasok",
+    editSupplier: "Edit Pemasok", supplierName: "Nama pemasok",
+    supplierPhone: "Telepon", supplierEmail: "Email", supplierAddress: "Alamat",
+    noSuppliers: "Belum ada pemasok", supplierAdded: "Pemasok ditambahkan",
+    supplierUpdated: "Pemasok diperbarui", supplierDeleted: "Pemasok dihapus",
+    selectSupplier: "Pilih pemasok", deleteSupplier: "Hapus",
+    // Payment tracking
+    paymentTerms: "Termin Pembayaran", dueDate: "Jatuh Tempo",
+    paymentStatus: "Status Pembayaran", paid: "Lunas", unpaid: "Belum Lunas",
+    markAsPaid: "Tandai Lunas", unpaidInvoices: "Tagihan Belum Lunas",
+    overdue: "Lewat Jatuh Tempo", noUnpaid: "Tidak ada tagihan",
+    cod: "COD", net30: "Net 30 Hari", net60: "Net 60 Hari", net90: "Net 90 Hari",
   },
 } as const;
 

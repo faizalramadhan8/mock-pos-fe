@@ -29,7 +29,7 @@ export const ProductCard = memo(function ProductCard({ product: p, inCart, lang,
           {lang === "id" ? p.nameId : p.name}
         </p>
         <div className="flex items-baseline gap-1 mt-1.5">
-          <span className={`text-[15px] font-black tracking-tight ${th.acc}`}>{$(p.priceIndividual)}</span>
+          <span className={`text-[15px] font-black tracking-tight ${th.acc}`}>{$(p.sellingPrice)}</span>
           <span className={`text-[10px] ${th.txf}`}>/{p.unit}</span>
         </div>
         <div className="mt-1.5">

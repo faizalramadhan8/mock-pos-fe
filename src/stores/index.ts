@@ -1,8 +1,8 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { User, Product, CartItem, Order, StockMovement, StockBatch, Category, PaymentMethod, UnitType, Lang, PageId } from "@/types";
+import type { User, Product, CartItem, Order, StockMovement, StockBatch, Category, Supplier, PaymentMethod, PaymentStatus, UnitType, Lang, PageId } from "@/types";
 import { translations } from "@/i18n";
-import { MOCK_USERS, MOCK_PRODUCTS, MOCK_ORDERS, MOCK_MOVEMENTS, MOCK_BATCHES, CATEGORIES, ROLE_PERMISSIONS } from "@/constants";
+import { MOCK_USERS, MOCK_PRODUCTS, MOCK_ORDERS, MOCK_MOVEMENTS, MOCK_BATCHES, MOCK_SUPPLIERS, CATEGORIES, ROLE_PERMISSIONS } from "@/constants";
 import { genId } from "@/utils";
 
 // ─── Auth ───
@@ -45,6 +45,24 @@ interface CategoryState {
 export const useCategoryStore = create<CategoryState>((set) => ({
   categories: CATEGORIES,
   addCategory: (category) => set(s => ({ categories: [...s.categories, category] })),
+}));
+
+// ─── Suppliers ───
+interface SupplierState {
+  suppliers: Supplier[];
+  addSupplier: (supplier: Supplier) => void;
+  updateSupplier: (id: string, data: Partial<Omit<Supplier, "id" | "createdAt">>) => void;
+  deleteSupplier: (id: string) => void;
+}
+export const useSupplierStore = create<SupplierState>((set) => ({
+  suppliers: [...MOCK_SUPPLIERS],
+  addSupplier: (supplier) => set(s => ({ suppliers: [...s.suppliers, supplier] })),
+  updateSupplier: (id, data) => set(s => ({
+    suppliers: s.suppliers.map(sup => sup.id === id ? { ...sup, ...data } : sup),
+  })),
+  deleteSupplier: (id) => set(s => ({
+    suppliers: s.suppliers.filter(sup => sup.id !== id),
+  })),
 }));
 
 // ─── Products ───
@@ -100,7 +118,7 @@ export const useCartStore = create<CartState>()(
             name: lang === "id" ? product.nameId : product.name,
             category: product.category, image: product.image,
             quantity: 1, unitType,
-            unitPrice: unitType === "box" ? product.priceBox : product.priceIndividual,
+            unitPrice: unitType === "box" ? product.sellingPrice * product.qtyPerBox : product.sellingPrice,
             qtyPerBox: product.qtyPerBox, unit: product.unit,
           };
           return { items: [...s.items, item] };
@@ -116,6 +134,8 @@ export const useCartStore = create<CartState>()(
     }),
     {
       name: "bakeshop-cart",
+      version: 2,
+      migrate: () => ({ items: [], customer: "", payment: "cash" as PaymentMethod }),
       partialize: (state) => ({ items: state.items, customer: state.customer, payment: state.payment }),
     }
   )
@@ -137,12 +157,18 @@ export const useOrderStore = create<OrderState>((set, get) => ({
 interface InventoryState {
   movements: StockMovement[];
   addMovement: (m: StockMovement) => void;
+  updatePaymentStatus: (movementId: string, status: PaymentStatus) => void;
+  getUnpaidInvoices: () => StockMovement[];
   totalIn: () => number;
   totalOut: () => number;
 }
 export const useInventoryStore = create<InventoryState>((set, get) => ({
   movements: MOCK_MOVEMENTS,
   addMovement: (m) => set(s => ({ movements: [m, ...s.movements] })),
+  updatePaymentStatus: (id, status) => set(s => ({
+    movements: s.movements.map(m => m.id === id ? { ...m, paymentStatus: status } : m),
+  })),
+  getUnpaidInvoices: () => get().movements.filter(m => m.type === "in" && m.paymentStatus === "unpaid"),
   totalIn: () => get().movements.filter(m => m.type === "in").reduce((s, m) => s + m.quantity, 0),
   totalOut: () => get().movements.filter(m => m.type === "out").reduce((s, m) => s + m.quantity, 0),
 }));

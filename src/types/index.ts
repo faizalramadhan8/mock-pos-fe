@@ -6,6 +6,9 @@ export type OrderStatus = "completed" | "pending" | "cancelled";
 export type UnitType = "individual" | "box";
 export type StockType = "in" | "out";
 export type PageId = "dashboard" | "pos" | "inventory" | "orders" | "settings";
+export type PaymentTerms = "COD" | "NET30" | "NET60" | "NET90";
+export type PaymentStatus = "paid" | "unpaid";
+export type UnitOfMeasure = "kg" | "gr" | "ltr" | "ml" | "pcs" | "pack" | "btl" | "can" | "bar" | "blk" | "tray" | "sachet";
 
 export interface User {
   id: string;
@@ -23,8 +26,17 @@ export interface Category {
   id: string;
   name: string;
   nameId: string;
-  icon: string; // key for SVG icon component
+  icon: string;
   color: string;
+}
+
+export interface Supplier {
+  id: string;
+  name: string;
+  phone: string;
+  email: string;
+  address: string;
+  createdAt: string;
 }
 
 export interface Product {
@@ -33,14 +45,15 @@ export interface Product {
   name: string;
   nameId: string;
   category: string;
-  priceIndividual: number;
-  priceBox: number;
+  purchasePrice: number;
+  sellingPrice: number;
   qtyPerBox: number;
   stock: number;
-  unit: string;
-  image: string; // URL path to product image
+  unit: UnitOfMeasure;
+  image: string;
   minStock: number;
   isActive: boolean;
+  createdAt: string;
 }
 
 export interface CartItem {
@@ -89,6 +102,10 @@ export interface StockMovement {
   createdAt: string;
   createdBy: string;
   expiryDate?: string;
+  supplierId?: string;
+  paymentTerms?: PaymentTerms;
+  dueDate?: string;
+  paymentStatus?: PaymentStatus;
 }
 
 export interface StockBatch {
@@ -98,4 +115,5 @@ export interface StockBatch {
   expiryDate: string;
   receivedAt: string;
   note: string;
+  batchNumber: string;
 }
