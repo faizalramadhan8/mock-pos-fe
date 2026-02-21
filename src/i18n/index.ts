@@ -99,6 +99,15 @@ export const translations = {
     markAsPaid: "Mark as Paid", unpaidInvoices: "Unpaid Invoices",
     overdue: "Overdue", noUnpaid: "No unpaid invoices",
     cod: "COD", net30: "Net 30 Days", net60: "Net 60 Days", net90: "Net 90 Days",
+    // Product detail modal
+    productDetail: "Product Detail", pricingInfo: "Pricing", perUnit: "per unit", perBox: "per box",
+    profitMargin: "Margin", stockInfo: "Stock", batchInfo: "Batches",
+    noBatches: "No batch data", recentMovements: "Recent Movements",
+    noRecentMovements: "No movements recorded", moreBatches: "more batches",
+    // Order & Supplier detail modals
+    orderDetail: "Order Detail", supplierDetail: "Supplier Detail",
+    orderItems: "Items", contactInfo: "Contact", stockInHistory: "Stock In History",
+    noStockInHistory: "No stock-in records", createdDate: "Registered",
   },
   id: {
     appName: "BakeShop",
@@ -188,6 +197,15 @@ export const translations = {
     markAsPaid: "Tandai Lunas", unpaidInvoices: "Tagihan Belum Lunas",
     overdue: "Lewat Jatuh Tempo", noUnpaid: "Tidak ada tagihan",
     cod: "COD", net30: "Net 30 Hari", net60: "Net 60 Hari", net90: "Net 90 Hari",
+    // Product detail modal
+    productDetail: "Detail Produk", pricingInfo: "Harga", perUnit: "per satuan", perBox: "per dus",
+    profitMargin: "Margin", stockInfo: "Stok", batchInfo: "Batch",
+    noBatches: "Tidak ada data batch", recentMovements: "Pergerakan Terakhir",
+    noRecentMovements: "Belum ada pergerakan", moreBatches: "batch lainnya",
+    // Order & Supplier detail modals
+    orderDetail: "Detail Pesanan", supplierDetail: "Detail Pemasok",
+    orderItems: "Item", contactInfo: "Kontak", stockInHistory: "Riwayat Stok Masuk",
+    noStockInHistory: "Belum ada catatan masuk", createdDate: "Terdaftar",
   },
 } as const;
 

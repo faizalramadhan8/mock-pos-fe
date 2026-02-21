@@ -1,5 +1,7 @@
 import { useState } from "react";
-import { useLangStore, useOrderStore } from "@/stores";
+import { useLangStore, useOrderStore, useProductStore } from "@/stores";
+import { ProductDetailModal } from "@/components/ProductDetailModal";
+import { OrderDetailModal } from "@/components/OrderDetailModal";
 import { useThemeClasses } from "@/hooks/useThemeClasses";
 import { formatCurrency as $, formatTime } from "@/utils";
 
@@ -7,7 +9,10 @@ export function OrdersPage() {
   const th = useThemeClasses();
   const { t } = useLangStore();
   const orders = useOrderStore(s => s.orders);
+  const products = useProductStore(s => s.products);
   const [filter, setFilter] = useState("all");
+  const [detailProductId, setDetailProductId] = useState<string | null>(null);
+  const [detailOrderId, setDetailOrderId] = useState<string | null>(null);
 
   const filtered = filter === "all" ? orders : orders.filter(o => o.status === filter);
 
@@ -28,7 +33,8 @@ export function OrdersPage() {
             <p className="text-sm font-semibold">{t.noResults}</p>
           </div>
         ) : filtered.map(o => (
-          <div key={o.id} className={`px-5 py-4 border-b last:border-0 ${th.bdr}/50`}>
+          <div key={o.id} onClick={() => setDetailOrderId(o.id)}
+            className={`px-5 py-4 border-b last:border-0 cursor-pointer active:opacity-70 ${th.bdr}/50`}>
             <div className="flex items-center justify-between mb-1.5">
               <div className="flex items-center gap-2.5">
                 <div className={`w-2 h-2 rounded-full ${o.status === "completed" ? "bg-[#4A8B3F]" : o.status === "pending" ? "bg-[#E8B088]" : "bg-[#C4504A]"}`} />
@@ -48,7 +54,9 @@ export function OrdersPage() {
             </div>
             <div className="flex flex-wrap gap-1 ml-5">
               {o.items.map((item, i) => (
-                <span key={i} className={`text-[10px] px-2 py-0.5 rounded-md font-medium ${th.elev} ${th.txm}`}>
+                <span key={i}
+                  onClick={(e) => { e.stopPropagation(); if (products.find(p => p.id === item.productId)) setDetailProductId(item.productId); }}
+                  className={`text-[10px] px-2 py-0.5 rounded-md font-medium cursor-pointer active:opacity-70 ${th.elev} ${th.txm}`}>
                   {item.name} ×{item.quantity}
                 </span>
               ))}
@@ -56,6 +64,8 @@ export function OrdersPage() {
           </div>
         ))}
       </div>
+      <ProductDetailModal productId={detailProductId} onClose={() => setDetailProductId(null)} />
+      <OrderDetailModal orderId={detailOrderId} onClose={() => setDetailOrderId(null)} />
     </div>
   );
 }

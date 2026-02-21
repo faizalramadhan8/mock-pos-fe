@@ -1,4 +1,5 @@
 import { memo } from "react";
+import { Info } from "lucide-react";
 import { ProductImage } from "./ProductImage";
 import { useThemeClasses } from "@/hooks/useThemeClasses";
 import { formatCurrency as $ } from "@/utils";
@@ -11,9 +12,10 @@ interface ProductCardProps {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   t: Record<string, any>;
   onAdd: (product: Product, unitType: UnitType) => void;
+  onDetail?: (productId: string) => void;
 }
 
-export const ProductCard = memo(function ProductCard({ product: p, inCart, lang, t, onAdd }: ProductCardProps) {
+export const ProductCard = memo(function ProductCard({ product: p, inCart, lang, t, onAdd, onDetail }: ProductCardProps) {
   const th = useThemeClasses();
 
   return (
@@ -21,6 +23,14 @@ export const ProductCard = memo(function ProductCard({ product: p, inCart, lang,
       inCart ? "border-[#A0673C] ring-1 ring-[#A0673C]/20" : th.bdr
     } ${th.card} ${p.stock === 0 ? "opacity-40" : ""}`}>
       <div className="p-3.5 relative">
+        {onDetail && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onDetail(p.id); }}
+            className={`absolute top-2 right-2 z-10 p-1.5 rounded-lg ${th.elev} ${th.txm} hover:opacity-70`}
+          >
+            <Info size={14} />
+          </button>
+        )}
         <div className={`flex justify-center py-3 rounded-2xl mb-3 ${th.ring}`}>
           <ProductImage product={p} size={72} />
         </div>

@@ -3,6 +3,8 @@ import { useCategoryStore, useProductStore, useInventoryStore, useBatchStore, us
 import { INVENTORY_WRITE_ROLES, UNIT_OPTIONS, PAYMENT_TERMS_OPTIONS } from "@/constants";
 import { Modal } from "@/components/Modal";
 import { ProductImage } from "@/components/ProductImage";
+import { ProductDetailModal } from "@/components/ProductDetailModal";
+import { SupplierDetailModal } from "@/components/SupplierDetailModal";
 import { useThemeClasses } from "@/hooks/useThemeClasses";
 import { formatCurrency as $, formatTime, formatDate, genId, genBatchNumber, calcDueDate, compressImage, printBarcodeLabel } from "@/utils";
 import type { UnitType, StockType, StockMovement, PaymentTerms, PaymentStatus, UnitOfMeasure } from "@/types";
@@ -40,6 +42,8 @@ export function InventoryPage() {
   const canWrite = INVENTORY_WRITE_ROLES.includes(user.role);
   const { suppliers, addSupplier, updateSupplier, deleteSupplier } = useSupplierStore();
 
+  const [detailProductId, setDetailProductId] = useState<string | null>(null);
+  const [detailSupplierId, setDetailSupplierId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<InventoryTab>("overview");
   const [stockModal, setStockModal] = useState<StockType | null>(null);
   const [form, setForm] = useState({
@@ -224,7 +228,8 @@ export function InventoryPage() {
             {group.items.map(m => {
               const prod = products.find(p => p.id === m.productId);
               return (
-                <div key={m.id} className={`flex items-center justify-between px-5 py-3 border-b last:border-0 ${th.bdr}/50`}>
+                <div key={m.id} onClick={() => setDetailProductId(m.productId)}
+                  className={`flex items-center justify-between px-5 py-3 border-b last:border-0 cursor-pointer active:opacity-70 ${th.bdr}/50`}>
                   <div className="flex items-center gap-2.5">
                     <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${
                       m.type === "in" ? (th.dark ? "bg-[#4A8B3F]/15" : "bg-green-50") : (th.dark ? "bg-[#C4504A]/15" : "bg-red-50")
@@ -346,7 +351,8 @@ export function InventoryPage() {
                 <p className="text-sm font-semibold">{t.noResults}</p>
               </div>
             ) : filteredProducts.map(product => (
-              <div key={product.id} className={`flex items-center justify-between px-4 py-3 border-b last:border-0 ${th.bdr}/50`}>
+              <div key={product.id} onClick={() => setDetailProductId(product.id)}
+                className={`flex items-center justify-between px-4 py-3 border-b last:border-0 cursor-pointer active:opacity-70 ${th.bdr}/50`}>
                 <div className="flex items-center gap-3 min-w-0 flex-1">
                   <ProductImage product={product} size={36} />
                   <div className="min-w-0">
@@ -371,7 +377,8 @@ export function InventoryPage() {
                   </div>
                   {canWrite && (
                     <button
-                      onClick={() => {
+                      onClick={(e) => {
+                        e.stopPropagation();
                         toggleActive(product.id);
                         toast.success(product.isActive ? t.productHidden as string : t.productShown as string);
                       }}
@@ -452,7 +459,8 @@ export function InventoryPage() {
                 const isUrgent = days > 0 && days <= 14;
 
                 return (
-                  <div key={batch.id} className={`flex items-center justify-between px-4 py-3 border-b last:border-0 ${th.bdr}/50`}>
+                  <div key={batch.id} onClick={() => product && setDetailProductId(product.id)}
+                    className={`flex items-center justify-between px-4 py-3 border-b last:border-0 cursor-pointer active:opacity-70 ${th.bdr}/50`}>
                     <div className="flex items-center gap-3 min-w-0 flex-1">
                       {product && <ProductImage product={product} size={32} />}
                       <div className="min-w-0">
@@ -575,7 +583,8 @@ export function InventoryPage() {
           ) : (
             <div className={`rounded-[22px] border overflow-hidden ${th.card} ${th.bdr}`}>
               {suppliers.map((sup, i) => (
-                <div key={sup.id} className={`px-5 py-3.5 ${i > 0 ? `border-t ${th.bdr}` : ""}`}>
+                <div key={sup.id} onClick={() => setDetailSupplierId(sup.id)}
+                  className={`px-5 py-3.5 cursor-pointer active:opacity-70 ${i > 0 ? `border-t ${th.bdr}` : ""}`}>
                   <div className="flex items-center justify-between">
                     <div className="min-w-0 flex-1">
                       <p className={`text-sm font-bold ${th.tx}`}>{sup.name}</p>
@@ -586,7 +595,8 @@ export function InventoryPage() {
                     </div>
                     {canWrite && (
                       <div className="flex gap-1.5 shrink-0 ml-3">
-                        <button onClick={() => {
+                        <button onClick={(e) => {
+                          e.stopPropagation();
                           setEditSupplierId(sup.id);
                           setSupForm({ name: sup.name, phone: sup.phone, email: sup.email, address: sup.address });
                           setSupplierModal("edit");
@@ -594,7 +604,7 @@ export function InventoryPage() {
                           className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold ${th.dark ? "bg-[#5B8DEF]/15 text-[#5B8DEF]" : "bg-blue-50 text-[#5B8DEF]"}`}>
                           {t.editSupplier}
                         </button>
-                        <button onClick={() => { deleteSupplier(sup.id); toast.success(t.supplierDeleted as string); }}
+                        <button onClick={(e) => { e.stopPropagation(); deleteSupplier(sup.id); toast.success(t.supplierDeleted as string); }}
                           className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold ${th.dark ? "bg-[#C4504A]/15 text-[#C4504A]" : "bg-red-50 text-[#C4504A]"}`}>
                           {t.deleteSupplier}
                         </button>
@@ -898,6 +908,8 @@ export function InventoryPage() {
           </div>
         </div>
       </Modal>
+      <ProductDetailModal productId={detailProductId} onClose={() => setDetailProductId(null)} />
+      <SupplierDetailModal supplierId={detailSupplierId} onClose={() => setDetailSupplierId(null)} />
     </div>
   );
 }

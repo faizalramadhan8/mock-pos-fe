@@ -1,6 +1,8 @@
-import { useMemo } from "react";
+import { useState, useMemo } from "react";
 import { useAuthStore, useLangStore, useOrderStore, useProductStore, useBatchStore } from "@/stores";
 import { ProductImage } from "@/components/ProductImage";
+import { ProductDetailModal } from "@/components/ProductDetailModal";
+import { OrderDetailModal } from "@/components/OrderDetailModal";
 import { useThemeClasses } from "@/hooks/useThemeClasses";
 import { formatCurrency as $, formatTime } from "@/utils";
 
@@ -13,6 +15,8 @@ export function DashboardPage() {
   const products = useProductStore(s => s.products);
   const lowStock = useProductStore(s => s.getLowStock)();
 
+  const [detailProductId, setDetailProductId] = useState<string | null>(null);
+  const [detailOrderId, setDetailOrderId] = useState<string | null>(null);
   const isOwner = user.role === "superadmin" || user.role === "admin";
   const isCashier = user.role === "cashier";
   const isStaff = user.role === "staff";
@@ -89,7 +93,8 @@ export function DashboardPage() {
             <p className={`text-sm font-extrabold tracking-tight ${th.tx}`}>{t.recentOrders}</p>
           </div>
           {orders.slice(0, 4).map(o => (
-            <div key={o.id} className={`flex items-center justify-between px-5 py-3 border-b last:border-0 ${th.bdr}/50`}>
+            <div key={o.id} onClick={() => setDetailOrderId(o.id)}
+              className={`flex items-center justify-between px-5 py-3 border-b last:border-0 cursor-pointer active:opacity-70 ${th.bdr}/50`}>
               <div className="flex items-center gap-2.5">
                 <div className={`w-2 h-2 rounded-full ${o.status === "completed" ? "bg-[#4A8B3F]" : "bg-[#E8B088]"}`} />
                 <div>
@@ -111,7 +116,8 @@ export function DashboardPage() {
             <p className={`text-sm font-extrabold tracking-tight ${th.tx}`}>{t.lowStockItems}</p>
           </div>
           {lowStock.slice(0, 5).map(p => (
-            <div key={p.id} className={`flex items-center justify-between px-5 py-2.5 border-b last:border-0 ${th.bdr}/50`}>
+            <div key={p.id} onClick={() => setDetailProductId(p.id)}
+              className={`flex items-center justify-between px-5 py-2.5 border-b last:border-0 cursor-pointer active:opacity-70 ${th.bdr}/50`}>
               <div className="flex items-center gap-2.5">
                 <ProductImage product={p} size={28} />
                 <p className={`text-sm font-semibold ${th.tx}`}>{lang === "id" ? p.nameId : p.name}</p>
@@ -139,7 +145,8 @@ export function DashboardPage() {
             const isExpired = days <= 0;
             const isUrgent = days > 0 && days <= 14;
             return (
-              <div key={batch.id} className={`flex items-center justify-between px-5 py-2.5 border-b last:border-0 ${th.bdr}/50`}>
+              <div key={batch.id} onClick={() => product && setDetailProductId(product.id)}
+                className={`flex items-center justify-between px-5 py-2.5 border-b last:border-0 cursor-pointer active:opacity-70 ${th.bdr}/50`}>
                 <div className="flex items-center gap-2.5">
                   {product && <ProductImage product={product} size={28} />}
                   <div>
@@ -161,6 +168,8 @@ export function DashboardPage() {
           })}
         </div>
       )}
+      <ProductDetailModal productId={detailProductId} onClose={() => setDetailProductId(null)} />
+      <OrderDetailModal orderId={detailOrderId} onClose={() => setDetailOrderId(null)} />
     </div>
   );
 }

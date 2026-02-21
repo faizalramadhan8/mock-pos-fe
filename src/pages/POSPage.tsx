@@ -3,6 +3,7 @@ import { useCategoryStore, useProductStore, useCartStore, useOrderStore, useAuth
 import { Modal } from "@/components/Modal";
 import { ProductImage } from "@/components/ProductImage";
 import { ProductCard } from "@/components/ProductCard";
+import { ProductDetailModal } from "@/components/ProductDetailModal";
 import { CategoryIconMap } from "@/components/icons";
 import { useThemeClasses } from "@/hooks/useThemeClasses";
 import { useDebounce } from "@/hooks/useDebounce";
@@ -42,6 +43,7 @@ export function POSPage() {
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [cashRcv, setCashRcv] = useState("");
   const [lastOrder, setLastOrder] = useState<Order | null>(null);
+  const [detailProductId, setDetailProductId] = useState<string | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
   // Keyboard shortcut: "/" to focus search
@@ -271,6 +273,7 @@ export function POSPage() {
                 lang={lang}
                 t={t}
                 onAdd={handleAddToCart}
+                onDetail={setDetailProductId}
               />
             ))}
           </div>
@@ -384,6 +387,7 @@ export function POSPage() {
           </div>
         )}
       </Modal>
+      <ProductDetailModal productId={detailProductId} onClose={() => setDetailProductId(null)} />
     </div>
   );
 }
