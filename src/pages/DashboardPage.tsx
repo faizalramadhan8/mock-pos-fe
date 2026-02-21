@@ -11,9 +11,16 @@ export function DashboardPage() {
   const { t, lang } = useLangStore();
   const user = useAuthStore(s => s.user)!;
   const orders = useOrderStore(s => s.orders);
-  const revenue = useOrderStore(s => s.todayRevenue)();
   const products = useProductStore(s => s.products);
-  const lowStock = useProductStore(s => s.getLowStock)();
+
+  const revenue = useMemo(() =>
+    orders.filter(o => o.status === "completed").reduce((s, o) => s + o.total, 0),
+    [orders]
+  );
+  const lowStock = useMemo(() =>
+    products.filter(p => p.stock <= p.minStock),
+    [products]
+  );
 
   const [detailProductId, setDetailProductId] = useState<string | null>(null);
   const [detailOrderId, setDetailOrderId] = useState<string | null>(null);
@@ -27,10 +34,18 @@ export function DashboardPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const expiringBatches = useMemo(() => isStaff ? getExpiringBatches(60) : [], [isStaff, batches, getExpiringBatches]);
 
+  const greeting = useMemo(() => {
+    const h = new Date().getHours();
+    if (h < 11) return t.goodMorning;
+    if (h < 15) return t.goodAfternoon;
+    if (h < 18) return t.goodEvening;
+    return t.goodNight;
+  }, [t]);
+
   return (
     <div className="flex flex-col gap-5">
       <div>
-        <h1 className={`text-[22px] font-black tracking-tight ${th.tx}`}>{t.welcome}, {user.name.split(" ")[0]}</h1>
+        <h1 className={`text-[22px] font-black tracking-tight ${th.tx}`}>{greeting}, {user.name.split(" ")[0]}</h1>
         <p className={`text-sm mt-0.5 ${th.txm}`}>{t.todayOverview}</p>
       </div>
 
@@ -40,7 +55,7 @@ export function DashboardPage() {
           <div className="row-span-2 rounded-[22px] p-5 text-white bg-gradient-to-br from-[#E8B088] to-[#8B5E3C]">
             <p className="text-[11px] font-semibold uppercase tracking-wider opacity-70">{t.revenue}</p>
             <p className="text-[28px] font-black tracking-tight mt-1.5">{$(revenue)}</p>
-            <p className="text-[11px] mt-2 opacity-50">+12.5% vs yesterday</p>
+            <p className={`text-[11px] mt-2 opacity-50`}>{orders.length} {t.ordersCount?.toString().toLowerCase()}</p>
           </div>
           {[
             { label: t.ordersCount, value: orders.length, color: "#5B8DEF" },

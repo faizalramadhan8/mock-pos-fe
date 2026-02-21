@@ -2,11 +2,12 @@ import { useState } from "react";
 import { Modal } from "./Modal";
 import { ProductImage } from "./ProductImage";
 import { ProductDetailModal } from "./ProductDetailModal";
-import { useOrderStore, useProductStore, useLangStore } from "@/stores";
+import { useOrderStore, useProductStore, useAuthStore, useLangStore } from "@/stores";
 import { useThemeClasses } from "@/hooks/useThemeClasses";
 import { formatCurrency as $, formatDate, formatTime, printReceipt } from "@/utils";
-import { Printer } from "lucide-react";
+import { Printer, Ban } from "lucide-react";
 import Barcode from "react-barcode";
+import toast from "react-hot-toast";
 
 interface OrderDetailModalProps {
   orderId: string | null;
@@ -17,8 +18,13 @@ export function OrderDetailModal({ orderId, onClose }: OrderDetailModalProps) {
   const th = useThemeClasses();
   const { t } = useLangStore();
   const orders = useOrderStore(s => s.orders);
+  const cancelOrder = useOrderStore(s => s.cancelOrder);
   const products = useProductStore(s => s.products);
+  const user = useAuthStore(s => s.user);
+  const users = useAuthStore(s => s.users);
   const [detailProductId, setDetailProductId] = useState<string | null>(null);
+  const [showVoidConfirm, setShowVoidConfirm] = useState(false);
+  const canVoid = user && ["superadmin", "admin", "cashier"].includes(user.role);
 
   const order = orderId ? orders.find(o => o.id === orderId) : null;
 
@@ -46,7 +52,7 @@ export function OrderDetailModal({ orderId, onClose }: OrderDetailModalProps) {
             <p className={`text-[11px] mt-0.5 ${th.txf}`}>{formatDate(order.createdAt)} · {formatTime(order.createdAt)}</p>
           </div>
           <span className={`text-[10px] font-bold px-2.5 py-1 rounded-md ${statusColor}`}>
-            {order.status === "completed" ? t.completed : t.pending}
+            {order.status === "completed" ? t.completed : order.status === "cancelled" ? t.cancelled : t.pending}
           </span>
         </div>
 
@@ -62,7 +68,13 @@ export function OrderDetailModal({ orderId, onClose }: OrderDetailModalProps) {
             </span>
           </div>
           {order.createdBy && (
-            <p className={`text-[10px] mt-2 ${th.txf}`}>{t.cashier as string}: {order.createdBy}</p>
+            <p className={`text-[10px] mt-2 ${th.txf}`}>{t.cashier as string}: {users.find(u => u.id === order.createdBy)?.name || order.createdBy}</p>
+          )}
+          {order.paymentProof && (
+            <div className="mt-3">
+              <p className={`text-[10px] uppercase tracking-wider mb-1 ${th.txf}`}>{t.uploadProof}</p>
+              <img src={order.paymentProof} alt="Payment proof" className="w-full rounded-xl object-cover" />
+            </div>
           )}
         </div>
 
@@ -118,13 +130,35 @@ export function OrderDetailModal({ orderId, onClose }: OrderDetailModalProps) {
           <Barcode value={order.id} format="CODE128" width={1.2} height={35} displayValue={true}
             fontSize={10} font="DM Sans" background="transparent" margin={0} />
           <button
-            onClick={() => printReceipt(order)}
+            onClick={() => printReceipt(order, { cashierName: order.createdBy ? (users.find(u => u.id === order.createdBy)?.name) : undefined })}
             className={`flex items-center gap-1.5 text-[11px] font-bold px-4 py-2 rounded-xl ${th.accBg} ${th.acc}`}
           >
             <Printer size={12} />
             {t.printReceipt}
           </button>
         </div>
+
+        {/* Void Order */}
+        {canVoid && order.status === "completed" && (
+          <div className="mt-4">
+            {!showVoidConfirm ? (
+              <button onClick={() => setShowVoidConfirm(true)}
+                className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-2xl text-sm font-bold text-[#C4504A] border border-[#C4504A]/20">
+                <Ban size={13} /> {t.voidOrder}
+              </button>
+            ) : (
+              <div className={`rounded-2xl border p-4 ${th.dark ? "border-[#C4504A]/30 bg-[#C4504A]/10" : "border-red-200 bg-red-50"}`}>
+                <p className={`text-sm font-bold mb-3 ${th.dark ? "text-[#E8A0A0]" : "text-[#C4504A]"}`}>{t.voidConfirm}</p>
+                <div className="flex gap-2">
+                  <button onClick={() => setShowVoidConfirm(false)}
+                    className={`flex-1 py-2.5 rounded-xl text-sm font-bold border ${th.bdr} ${th.txm}`}>{t.cancel}</button>
+                  <button onClick={() => { cancelOrder(order.id); setShowVoidConfirm(false); toast.success(t.orderVoided as string); }}
+                    className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white bg-[#C4504A]">{t.confirm}</button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </Modal>
       <ProductDetailModal productId={detailProductId} onClose={() => setDetailProductId(null)} />
     </>

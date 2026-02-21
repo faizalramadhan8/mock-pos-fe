@@ -35,7 +35,7 @@ export function InventoryPage() {
   const adjustStock = useProductStore(s => s.adjustStock);
   const addProduct = useProductStore(s => s.addProduct);
   const toggleActive = useProductStore(s => s.toggleActive);
-  const { movements, addMovement, updatePaymentStatus, getUnpaidInvoices, totalIn, totalOut } = useInventoryStore();
+  const { movements, addMovement, updatePaymentStatus } = useInventoryStore();
   const { addBatch, consumeFIFO, getExpiringBatches } = useBatchStore();
   const batches = useBatchStore(s => s.batches);
   const user = useAuthStore(s => s.user)!;
@@ -94,9 +94,19 @@ export function InventoryPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const expiringBatches = useMemo(() => getExpiringBatches(60), [batches, getExpiringBatches]);
 
-  // Unpaid invoices
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const unpaidInvoices = useMemo(() => getUnpaidInvoices(), [movements, getUnpaidInvoices]);
+  // Computed from movements (reactive)
+  const unpaidInvoices = useMemo(() =>
+    movements.filter(m => m.type === "in" && m.paymentStatus === "unpaid"),
+    [movements]
+  );
+  const totalInCount = useMemo(() =>
+    movements.filter(m => m.type === "in").reduce((s, m) => s + m.quantity, 0),
+    [movements]
+  );
+  const totalOutCount = useMemo(() =>
+    movements.filter(m => m.type === "out").reduce((s, m) => s + m.quantity, 0),
+    [movements]
+  );
 
   // Movement helpers
   const groupMovements = (list: StockMovement[]) => {
@@ -410,7 +420,7 @@ export function InventoryPage() {
           )}
           <div className={`rounded-[18px] border p-3.5 ${th.card} ${th.bdr}`}>
             <p className={`text-[10px] font-semibold uppercase tracking-wider ${th.txm}`}>{t.totalIn}</p>
-            <p className="text-xl font-black mt-1 text-[#4A8B3F]">+{totalIn()}</p>
+            <p className="text-xl font-black mt-1 text-[#4A8B3F]">+{totalInCount}</p>
           </div>
           <div className={`rounded-[22px] border overflow-hidden ${th.card} ${th.bdr}`}>
             {renderMovementList(stockInMovements, showAllIn, setShowAllIn, stockInMovements.length)}
@@ -429,7 +439,7 @@ export function InventoryPage() {
           )}
           <div className={`rounded-[18px] border p-3.5 ${th.card} ${th.bdr}`}>
             <p className={`text-[10px] font-semibold uppercase tracking-wider ${th.txm}`}>{t.totalOut}</p>
-            <p className="text-xl font-black mt-1 text-[#C4504A]">-{totalOut()}</p>
+            <p className="text-xl font-black mt-1 text-[#C4504A]">-{totalOutCount}</p>
           </div>
           <div className={`rounded-[22px] border overflow-hidden ${th.card} ${th.bdr}`}>
             {renderMovementList(stockOutMovements, showAllOut, setShowAllOut, stockOutMovements.length)}
@@ -499,9 +509,9 @@ export function InventoryPage() {
         <>
           <div className="grid grid-cols-3 gap-3">
             {[
-              { l: t.totalIn, v: `+${totalIn()}`, clr: "#4A8B3F" },
-              { l: t.totalOut, v: `-${totalOut()}`, clr: "#C4504A" },
-              { l: t.netChange, v: `${totalIn() - totalOut() >= 0 ? "+" : ""}${totalIn() - totalOut()}`, clr: "#5B8DEF" },
+              { l: t.totalIn, v: `+${totalInCount}`, clr: "#4A8B3F" },
+              { l: t.totalOut, v: `-${totalOutCount}`, clr: "#C4504A" },
+              { l: t.netChange, v: `${totalInCount - totalOutCount >= 0 ? "+" : ""}${totalInCount - totalOutCount}`, clr: "#5B8DEF" },
             ].map((s, i) => (
               <div key={i} className={`rounded-[18px] border p-3.5 ${th.card} ${th.bdr}`}>
                 <p className={`text-[10px] font-semibold uppercase tracking-wider ${th.txm}`}>{s.l}</p>

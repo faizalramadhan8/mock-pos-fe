@@ -1,7 +1,7 @@
 export type Lang = "en" | "id";
 export type Theme = "light" | "dark";
 export type Role = "superadmin" | "admin" | "cashier" | "staff" | "user";
-export type PaymentMethod = "cash" | "card" | "transfer";
+export type PaymentMethod = "cash" | "card" | "transfer" | "qris";
 export type OrderStatus = "completed" | "pending" | "cancelled";
 export type UnitType = "individual" | "box";
 export type StockType = "in" | "out";
@@ -81,6 +81,7 @@ export interface Order {
   customer: string;
   createdAt: string;
   createdBy: string;
+  paymentProof?: string;
 }
 
 export interface OrderItem {
@@ -108,6 +109,13 @@ export interface StockMovement {
   paymentStatus?: PaymentStatus;
 }
 
+export interface BankAccount {
+  id: string;
+  bankName: string;
+  accountNumber: string;
+  accountHolder: string;
+}
+
 export interface StockBatch {
   id: string;
   productId: string;
@@ -116,4 +124,11 @@ export interface StockBatch {
   receivedAt: string;
   note: string;
   batchNumber: string;
+}
+
+export interface Member {
+  id: string;
+  name: string;
+  phone: string;
+  createdAt: string;
 }

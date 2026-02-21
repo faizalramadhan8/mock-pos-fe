@@ -3,7 +3,7 @@ import type { User, Category, Product, Order, StockMovement, StockBatch, Supplie
 export const ROLE_PERMISSIONS: Record<Role, PageId[]> = {
   superadmin: ["dashboard", "pos", "inventory", "orders", "settings"],
   admin: ["dashboard", "pos", "inventory", "orders", "settings"],
-  cashier: ["dashboard", "pos", "inventory", "orders"],
+  cashier: ["dashboard", "pos", "inventory", "orders", "settings"],
   staff: ["dashboard", "inventory", "orders", "settings"],
   user: ["dashboard", "orders", "settings"],
 };
@@ -13,6 +13,50 @@ export const INVENTORY_WRITE_ROLES: Role[] = ["superadmin", "admin", "staff"];
 export const UNIT_OPTIONS: UnitOfMeasure[] = ["kg","gr","ltr","ml","pcs","pack","btl","can","bar","blk","tray","sachet"];
 
 export const PAYMENT_TERMS_OPTIONS: PaymentTerms[] = ["COD","NET30","NET60","NET90"];
+
+export const INDONESIAN_BANKS = [
+  "Bank Central Asia (BCA)",
+  "Bank Rakyat Indonesia (BRI)",
+  "Bank Mandiri",
+  "Bank Negara Indonesia (BNI)",
+  "Bank Syariah Indonesia (BSI)",
+  "Bank CIMB Niaga",
+  "Bank Danamon",
+  "Bank Permata",
+  "Bank OCBC NISP",
+  "Bank Panin",
+  "Bank Mega",
+  "Bank Bukopin",
+  "Bank Sinarmas",
+  "Bank BTPN",
+  "Bank Jago",
+  "Bank DBS Indonesia",
+  "Bank UOB Indonesia",
+  "Bank Maybank Indonesia",
+  "Bank HSBC Indonesia",
+  "Bank Commonwealth",
+  "Bank Muamalat",
+  "Bank BJB",
+  "Bank DKI",
+  "Bank Jatim",
+  "Bank Jateng",
+  "Bank DIY",
+  "Bank Sumut",
+  "Bank Nagari",
+  "Bank Riau Kepri",
+  "Bank Kalbar",
+  "Bank Kaltimtara",
+  "Bank Sulselbar",
+  "Bank NTT",
+  "Bank Bali/BPD Bali",
+  "Sea Bank",
+  "Bank Neo Commerce",
+  "Allo Bank",
+  "Bank Sahabat Sampoerna",
+  "Blu by BCA Digital",
+  "Line Bank",
+  "Superbank",
+];
 
 export const CATEGORIES: Category[] = [
   { id: "c1", name: "Flour & Starch", nameId: "Tepung & Pati", icon: "flour", color: "#C4884A" },

@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { User, Product, CartItem, Order, StockMovement, StockBatch, Category, Supplier, PaymentMethod, PaymentStatus, UnitType, Lang, PageId } from "@/types";
+import type { User, Product, CartItem, Order, StockMovement, StockBatch, Category, Supplier, BankAccount, Member, PaymentMethod, PaymentStatus, UnitType, Lang, PageId } from "@/types";
 import { translations } from "@/i18n";
 import { MOCK_USERS, MOCK_PRODUCTS, MOCK_ORDERS, MOCK_MOVEMENTS, MOCK_BATCHES, MOCK_SUPPLIERS, CATEGORIES, ROLE_PERMISSIONS } from "@/constants";
 import { genId } from "@/utils";
@@ -71,9 +71,8 @@ interface ProductState {
   addProduct: (product: Product) => void;
   adjustStock: (id: string, delta: number) => void;
   toggleActive: (id: string) => void;
-  getLowStock: () => Product[];
 }
-export const useProductStore = create<ProductState>((set, get) => ({
+export const useProductStore = create<ProductState>((set) => ({
   products: MOCK_PRODUCTS,
   addProduct: (product) => set(s => ({ products: [product, ...s.products] })),
   adjustStock: (id, delta) => set(s => ({
@@ -82,7 +81,6 @@ export const useProductStore = create<ProductState>((set, get) => ({
   toggleActive: (id) => set(s => ({
     products: s.products.map(p => p.id === id ? { ...p, isActive: !p.isActive } : p),
   })),
-  getLowStock: () => get().products.filter(p => p.stock <= p.minStock),
 }));
 
 // ─── Cart (persisted) ───
@@ -145,12 +143,24 @@ export const useCartStore = create<CartState>()(
 interface OrderState {
   orders: Order[];
   addOrder: (order: Order) => void;
-  todayRevenue: () => number;
+  cancelOrder: (id: string) => void;
 }
-export const useOrderStore = create<OrderState>((set, get) => ({
+export const useOrderStore = create<OrderState>((set) => ({
   orders: MOCK_ORDERS,
   addOrder: (order) => set(s => ({ orders: [order, ...s.orders] })),
-  todayRevenue: () => get().orders.filter(o => o.status === "completed").reduce((s, o) => s + o.total, 0),
+  cancelOrder: (id) => set(s => {
+    const order = s.orders.find(o => o.id === id);
+    if (order && order.status === "completed") {
+      // Restore stock for each item
+      order.items.forEach(item => {
+        const delta = item.unitType === "box"
+          ? item.quantity * (useProductStore.getState().products.find(p => p.id === item.productId)?.qtyPerBox || 1)
+          : item.quantity;
+        useProductStore.getState().adjustStock(item.productId, delta);
+      });
+    }
+    return { orders: s.orders.map(o => o.id === id ? { ...o, status: "cancelled" as const } : o) };
+  }),
 }));
 
 // ─── Inventory ───
@@ -158,19 +168,13 @@ interface InventoryState {
   movements: StockMovement[];
   addMovement: (m: StockMovement) => void;
   updatePaymentStatus: (movementId: string, status: PaymentStatus) => void;
-  getUnpaidInvoices: () => StockMovement[];
-  totalIn: () => number;
-  totalOut: () => number;
 }
-export const useInventoryStore = create<InventoryState>((set, get) => ({
+export const useInventoryStore = create<InventoryState>((set) => ({
   movements: MOCK_MOVEMENTS,
   addMovement: (m) => set(s => ({ movements: [m, ...s.movements] })),
   updatePaymentStatus: (id, status) => set(s => ({
     movements: s.movements.map(m => m.id === id ? { ...m, paymentStatus: status } : m),
   })),
-  getUnpaidInvoices: () => get().movements.filter(m => m.type === "in" && m.paymentStatus === "unpaid"),
-  totalIn: () => get().movements.filter(m => m.type === "in").reduce((s, m) => s + m.quantity, 0),
-  totalOut: () => get().movements.filter(m => m.type === "out").reduce((s, m) => s + m.quantity, 0),
 }));
 
 // ─── Batches (FIFO) ───
@@ -255,13 +259,31 @@ export const useLangStore = create<LangState>()(
   )
 );
 
+// ─── Members (persisted) ───
+interface MemberState {
+  members: Member[];
+  addMember: (member: Member) => void;
+  deleteMember: (id: string) => void;
+}
+export const useMemberStore = create<MemberState>()(
+  persist(
+    (set) => ({
+      members: [],
+      addMember: (member) => set(s => ({ members: [member, ...s.members] })),
+      deleteMember: (id) => set(s => ({ members: s.members.filter(m => m.id !== id) })),
+    }),
+    { name: "bakeshop-members" }
+  )
+);
+
 // ─── Settings (persisted) ───
 interface SettingsState {
   storeName: string;
   storeAddress: string;
   storePhone: string;
   ppnRate: number;
-  update: (data: Partial<Pick<SettingsState, "storeName" | "storeAddress" | "storePhone" | "ppnRate">>) => void;
+  bankAccounts: BankAccount[];
+  update: (data: Partial<Pick<SettingsState, "storeName" | "storeAddress" | "storePhone" | "ppnRate" | "bankAccounts">>) => void;
 }
 export const useSettingsStore = create<SettingsState>()(
   persist(
@@ -270,6 +292,7 @@ export const useSettingsStore = create<SettingsState>()(
       storeAddress: "Jl. Sudirman No. 123, Jakarta",
       storePhone: "+62 812-3456-7890",
       ppnRate: 11,
+      bankAccounts: [],
       update: (data) => set(s => ({ ...s, ...data })),
     }),
     { name: "bakeshop-settings" }

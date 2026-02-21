@@ -1,5 +1,5 @@
 import { lazy, Suspense, useState } from "react";
-import { useAuthStore, useThemeStore, useLangStore } from "@/stores";
+import { useAuthStore, useLangStore } from "@/stores";
 import { BakeryLogo } from "@/components/icons";
 import { ROLE_PERMISSIONS } from "@/constants";
 import { useThemeClasses } from "@/hooks/useThemeClasses";
@@ -7,7 +7,6 @@ import type { PageId } from "@/types";
 import { Toaster } from "react-hot-toast";
 import {
   Home, ShoppingBag, Package, FileText, Settings,
-  Sun, Moon, LogOut,
 } from "lucide-react";
 
 // Code-split pages
@@ -37,18 +36,14 @@ function PageLoader() {
 
 export default function App() {
   const th = useThemeClasses();
-  const { t, lang, setLang } = useLangStore();
-  const { dark, toggle } = useThemeStore();
-  const { user, logout, defaultPage } = useAuthStore();
+  const { t } = useLangStore();
+  const { user, defaultPage } = useAuthStore();
   const [page, setPage] = useState<PageId>("pos");
 
   if (!user) return (
     <>
       <Suspense fallback={<PageLoader />}><LoginPage /></Suspense>
-      <Toaster position="top-center" toastOptions={{
-        className: "!rounded-2xl !text-sm !font-semibold",
-        duration: 2500,
-      }} />
+      <Toaster position="top-center" toastOptions={{ className: "!rounded-2xl !text-sm !font-semibold", duration: 2500 }} />
     </>
   );
 
@@ -77,18 +72,6 @@ export default function App() {
             <p className={`text-sm font-extrabold leading-tight tracking-tight ${th.tx}`}>{t[currentPage as keyof typeof t] as string || t.appName}</p>
             <p className={`text-[10px] ${th.txm}`}>{user.name} · {(t.roles as Record<string, string>)[user.role]}</p>
           </div>
-        </div>
-        <div className="flex items-center gap-1">
-          <button onClick={toggle} className={`p-2 rounded-xl ${th.txm}`}>
-            {dark ? <Sun size={16} className="text-amber-400" /> : <Moon size={16} />}
-          </button>
-          <button onClick={() => setLang(lang === "en" ? "id" : "en")}
-            className={`px-2 py-1.5 rounded-xl text-[11px] font-extrabold ${th.tx}`}>
-            {lang === "en" ? "🇮🇩" : "🇬🇧"}
-          </button>
-          <button onClick={logout} className="p-2 rounded-xl text-[#C4504A]">
-            <LogOut size={16} />
-          </button>
         </div>
       </header>
 

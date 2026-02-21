@@ -18,7 +18,9 @@ export const translations = {
     low: "Low", soldOut: "Sold out", each: "each", inStock: "in stock", left: "left",
     addPcs: "+ Pcs", addBox: "Box",
     // Dashboard
-    welcome: "Good morning", todayOverview: "Today's overview",
+    goodMorning: "Good morning", goodAfternoon: "Good afternoon",
+    goodEvening: "Good evening", goodNight: "Good night",
+    todayOverview: "Today's overview",
     revenue: "Revenue", ordersCount: "Orders", productsCount: "Products", lowAlerts: "Low Stock",
     recentOrders: "Latest transactions", lowStockItems: "Running low",
     // Inventory
@@ -55,6 +57,7 @@ export const translations = {
     categoryAdded: "Category added",
     cartCleared: "Cart cleared",
     settingsSaved: "Settings saved",
+    qris: "QRIS", uploadProof: "Upload Payment Proof", proofUploaded: "Proof uploaded", proofRequired: "Please upload payment proof",
     printReceipt: "Print Receipt",
     printLabel: "Print Label",
     receipt: "Receipt",
@@ -108,6 +111,32 @@ export const translations = {
     orderDetail: "Order Detail", supplierDetail: "Supplier Detail",
     orderItems: "Items", contactInfo: "Contact", stockInHistory: "Stock In History",
     noStockInHistory: "No stock-in records", createdDate: "Registered",
+    cashier: "Cashier",
+    // Bank accounts
+    bankAccounts: "Bank Accounts", addBankAccount: "Add Account",
+    bankName: "Bank name", accountNumber: "Account number", accountHolder: "Account holder",
+    noBankAccounts: "No bank accounts added", searchBank: "Search bank...", transferTo: "Transfer to",
+    // Settings sections
+    general: "General", preferences: "Preferences", team: "Team", profile: "Profile",
+    storeSettings: "Store",
+    preferencesDesc: "Appearance and language",
+    storeInfoDesc: "Your store's public information",
+    taxDesc: "Tax applied to every order",
+    bankDesc: "Accounts shown on transfer payments",
+    teamDesc: "Manage staff and roles",
+    // Members
+    members: "Members", addMember: "Add Member", memberName: "Member name",
+    memberPhone: "Phone number", memberAdded: "Member added",
+    searchMember: "Search or type customer name...", searchMemberPhone: "Search by phone number...", noMembers: "No members saved",
+    // Void orders
+    cancelled: "Cancelled", voidOrder: "Void Order",
+    voidConfirm: "Void this order? Stock will be restored.",
+    orderVoided: "Order voided",
+    // Transaction report
+    thisWeek: "This Week", thisMonth: "This Month",
+    totalRevenue: "Revenue", avgOrder: "Avg Order",
+    cancelledCount: "Cancelled", printReport: "Print Report",
+    transactionReport: "Transaction Report", noOrdersInRange: "No orders in this period",
   },
   id: {
     appName: "BakeShop",
@@ -123,7 +152,9 @@ export const translations = {
     change: "Kembalian", walkIn: "Umum",
     low: "Sedikit", soldOut: "Habis", each: "satuan", inStock: "stok", left: "sisa",
     addPcs: "+ Satuan", addBox: "Dus",
-    welcome: "Selamat pagi", todayOverview: "Ringkasan hari ini",
+    goodMorning: "Selamat pagi", goodAfternoon: "Selamat siang",
+    goodEvening: "Selamat sore", goodNight: "Selamat malam",
+    todayOverview: "Ringkasan hari ini",
     revenue: "Pendapatan", ordersCount: "Pesanan", productsCount: "Produk", lowAlerts: "Stok Rendah",
     recentOrders: "Transaksi terakhir", lowStockItems: "Stok menipis",
     stockIn: "Masuk", stockOut: "Keluar", totalIn: "Diterima", totalOut: "Dikeluarkan",
@@ -153,6 +184,7 @@ export const translations = {
     categoryAdded: "Kategori ditambahkan",
     cartCleared: "Keranjang dikosongkan",
     settingsSaved: "Pengaturan disimpan",
+    qris: "QRIS", uploadProof: "Upload Bukti Pembayaran", proofUploaded: "Bukti terunggah", proofRequired: "Silakan upload bukti pembayaran",
     printReceipt: "Cetak Struk",
     printLabel: "Cetak Label",
     receipt: "Struk",
@@ -206,6 +238,32 @@ export const translations = {
     orderDetail: "Detail Pesanan", supplierDetail: "Detail Pemasok",
     orderItems: "Item", contactInfo: "Kontak", stockInHistory: "Riwayat Stok Masuk",
     noStockInHistory: "Belum ada catatan masuk", createdDate: "Terdaftar",
+    cashier: "Kasir",
+    // Bank accounts
+    bankAccounts: "Rekening Bank", addBankAccount: "Tambah Rekening",
+    bankName: "Nama bank", accountNumber: "Nomor rekening", accountHolder: "Nama pemilik rekening",
+    noBankAccounts: "Belum ada rekening bank", searchBank: "Cari bank...", transferTo: "Transfer ke",
+    // Settings sections
+    general: "Umum", preferences: "Preferensi", team: "Tim", profile: "Profil",
+    storeSettings: "Toko",
+    preferencesDesc: "Tampilan dan bahasa",
+    storeInfoDesc: "Informasi publik toko Anda",
+    taxDesc: "Pajak yang ditambahkan ke setiap pesanan",
+    bankDesc: "Rekening yang ditampilkan saat pembayaran transfer",
+    teamDesc: "Kelola staf dan peran",
+    // Members
+    members: "Anggota", addMember: "Tambah Anggota", memberName: "Nama anggota",
+    memberPhone: "Nomor telepon", memberAdded: "Anggota ditambahkan",
+    searchMember: "Cari atau ketik nama pelanggan...", searchMemberPhone: "Cari nomor telepon...", noMembers: "Belum ada anggota",
+    // Void orders
+    cancelled: "Dibatalkan", voidOrder: "Batalkan Pesanan",
+    voidConfirm: "Batalkan pesanan ini? Stok akan dikembalikan.",
+    orderVoided: "Pesanan dibatalkan",
+    // Transaction report
+    thisWeek: "Minggu Ini", thisMonth: "Bulan Ini",
+    totalRevenue: "Pendapatan", avgOrder: "Rata-rata",
+    cancelledCount: "Dibatalkan", printReport: "Cetak Laporan",
+    transactionReport: "Laporan Transaksi", noOrdersInRange: "Tidak ada pesanan di periode ini",
   },
 } as const;
 

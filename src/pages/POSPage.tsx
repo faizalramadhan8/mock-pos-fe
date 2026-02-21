@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
-import { useCategoryStore, useProductStore, useCartStore, useOrderStore, useAuthStore, useBatchStore, useLangStore, useSettingsStore } from "@/stores";
+import { useCategoryStore, useProductStore, useCartStore, useOrderStore, useAuthStore, useBatchStore, useLangStore, useSettingsStore, useMemberStore } from "@/stores";
 import { Modal } from "@/components/Modal";
 import { ProductImage } from "@/components/ProductImage";
 import { ProductCard } from "@/components/ProductCard";
@@ -8,12 +8,12 @@ import { CategoryIconMap } from "@/components/icons";
 import { useThemeClasses } from "@/hooks/useThemeClasses";
 import { useDebounce } from "@/hooks/useDebounce";
 import { useBarcodeScanner } from "@/hooks/useBarcodeScanner";
-import { formatCurrency as $, printReceipt } from "@/utils";
+import { formatCurrency as $, printReceipt, compressImage, genId } from "@/utils";
 import Barcode from "react-barcode";
 import type { PaymentMethod, UnitType, Product, Order } from "@/types";
 import toast from "react-hot-toast";
 import {
-  Search, ScanLine, ShoppingBag, Minus, Plus, Trash2,
+  Search, ScanLine, ShoppingBag, Minus, Plus, Trash2, ImagePlus, X, UserPlus,
 } from "lucide-react";
 
 export function POSPage() {
@@ -35,13 +35,24 @@ export function POSPage() {
   const consumeFIFO = useBatchStore(s => s.consumeFIFO);
   const user = useAuthStore(s => s.user)!;
   const ppnRate = useSettingsStore(s => s.ppnRate);
+  const bankAccounts = useSettingsStore(s => s.bankAccounts);
+  const members = useMemberStore(s => s.members);
+  const addMember = useMemberStore(s => s.addMember);
 
   const [query, setQuery] = useState("");
+  const [memberQuery, setMemberQuery] = useState("");
+  const [showMemberDropdown, setShowMemberDropdown] = useState(false);
+  const [showAddMember, setShowAddMember] = useState(false);
+  const [newMemberName, setNewMemberName] = useState("");
+  const [newMemberPhone, setNewMemberPhone] = useState("");
+  const memberDropdownRef = useRef<HTMLDivElement>(null);
   const debouncedQuery = useDebounce(query, 150);
   const [catFilter, setCatFilter] = useState("all");
   const [cartOpen, setCartOpen] = useState(false);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [cashRcv, setCashRcv] = useState("");
+  const [proofImage, setProofImage] = useState("");
+  const [selectedBankId, setSelectedBankId] = useState("");
   const [lastOrder, setLastOrder] = useState<Order | null>(null);
   const [detailProductId, setDetailProductId] = useState<string | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -57,6 +68,35 @@ export function POSPage() {
     window.addEventListener("keydown", handle);
     return () => window.removeEventListener("keydown", handle);
   }, []);
+
+  // Click outside to close member dropdown
+  useEffect(() => {
+    if (!showMemberDropdown) return;
+    const handle = (e: MouseEvent) => {
+      if (memberDropdownRef.current && !memberDropdownRef.current.contains(e.target as Node)) setShowMemberDropdown(false);
+    };
+    document.addEventListener("mousedown", handle);
+    return () => document.removeEventListener("mousedown", handle);
+  }, [showMemberDropdown]);
+
+  const filteredMembers = useMemo(() => {
+    if (!memberQuery.trim()) return members.slice(0, 5);
+    const q = memberQuery.trim();
+    return members.filter(m => m.phone.includes(q)).slice(0, 5);
+  }, [members, memberQuery]);
+
+  const handleAddNewMember = () => {
+    if (!newMemberName.trim()) return;
+    const member = { id: genId(), name: newMemberName.trim(), phone: newMemberPhone.trim(), createdAt: new Date().toISOString() };
+    addMember(member);
+    setCustomer(member.name + (member.phone ? ` (${member.phone})` : ""));
+    setMemberQuery("");
+    setNewMemberName("");
+    setNewMemberPhone("");
+    setShowAddMember(false);
+    setShowMemberDropdown(false);
+    toast.success(t.memberAdded as string);
+  };
 
   const cartSubtotal = useMemo(() => cartItems.reduce((s, i) => s + i.unitPrice * i.quantity, 0), [cartItems]);
   const ppnAmount = useMemo(() => Math.round(cartSubtotal * ppnRate / 100), [cartSubtotal, ppnRate]);
@@ -125,6 +165,7 @@ export function POSPage() {
       payment, status: "completed" as const,
       customer: customer || (t.walkIn as string),
       createdAt: new Date().toISOString(), createdBy: user.id,
+      ...((payment === "qris" || payment === "transfer") && proofImage ? { paymentProof: proofImage } : {}),
     };
     addOrder(order);
     cartItems.forEach(ci => {
@@ -135,6 +176,8 @@ export function POSPage() {
     setLastOrder(order);
     clearCart();
     setCashRcv("");
+    setProofImage("");
+    setSelectedBankId("");
     setCheckoutOpen(false);
     setCartOpen(false);
     toast.success(t.orderSuccess as string);
@@ -143,8 +186,53 @@ export function POSPage() {
   // Shared cart content renderer
   const renderCartContent = (isPanel: boolean) => (
     <div className="flex flex-col gap-3">
-      <input value={customer} onChange={e => setCustomer(e.target.value)} placeholder={t.customer as string}
-        className={`w-full px-4 py-3 text-sm rounded-2xl border ${th.inp}`} />
+      {/* Member / Customer selector */}
+      <div className="relative" ref={memberDropdownRef}>
+        <input
+          value={customer}
+          onChange={e => { setCustomer(e.target.value); setMemberQuery(e.target.value); setShowMemberDropdown(true); }}
+          onFocus={() => setShowMemberDropdown(true)}
+          placeholder={t.searchMemberPhone as string || t.searchMember as string}
+          type="tel" inputMode="tel"
+          className={`w-full px-4 py-3 text-sm rounded-2xl border ${th.inp}`}
+        />
+        {showMemberDropdown && (
+          <div className={`absolute top-full left-0 right-0 z-20 mt-1 rounded-xl border shadow-lg overflow-hidden ${th.card} ${th.bdr}`}>
+            {filteredMembers.length > 0 && filteredMembers.map(m => (
+              <button key={m.id} onClick={() => { setCustomer(m.name + (m.phone ? ` (${m.phone})` : "")); setMemberQuery(""); setShowMemberDropdown(false); }}
+                className={`w-full text-left px-4 py-2.5 flex items-center justify-between hover:opacity-70 border-b last:border-0 ${th.bdr}/50`}>
+                <div>
+                  <p className={`text-sm font-bold ${th.tx}`}>{m.name}</p>
+                  {m.phone && <p className={`text-[11px] ${th.txm}`}>{m.phone}</p>}
+                </div>
+              </button>
+            ))}
+            <button onClick={() => { setShowAddMember(true); setShowMemberDropdown(false); setNewMemberName(memberQuery || customer); }}
+              className={`w-full text-left px-4 py-2.5 flex items-center gap-2 ${th.acc}`}>
+              <UserPlus size={13} />
+              <span className="text-sm font-bold">{t.addMember}</span>
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Add Member mini-modal */}
+      {showAddMember && (
+        <div className={`rounded-[18px] border p-4 ${th.card2} ${th.bdr}`}>
+          <div className="flex items-center justify-between mb-3">
+            <p className={`text-sm font-extrabold ${th.tx}`}>{t.addMember}</p>
+            <button onClick={() => setShowAddMember(false)} className={th.txm}><X size={14} /></button>
+          </div>
+          <div className="flex flex-col gap-2">
+            <input value={newMemberName} onChange={e => setNewMemberName(e.target.value)}
+              placeholder={t.memberName as string} className={`w-full px-3 py-2.5 text-sm rounded-xl border ${th.inp}`} />
+            <input value={newMemberPhone} onChange={e => setNewMemberPhone(e.target.value)}
+              placeholder={t.memberPhone as string} type="tel" inputMode="tel" className={`w-full px-3 py-2.5 text-sm rounded-xl border ${th.inp}`} />
+            <button onClick={handleAddNewMember} disabled={!newMemberName.trim()}
+              className="w-full py-2.5 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-[#E8B088] to-[#A0673C] disabled:opacity-40">{t.save}</button>
+          </div>
+        </div>
+      )}
 
       {cartItems.length === 0 ? (
         <div className={`text-center py-10 ${th.txm}`}>
@@ -193,9 +281,9 @@ export function POSPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-2">
-          {(["cash", "card", "transfer"] as PaymentMethod[]).map(pm => (
-            <button key={pm} onClick={() => setPayment(pm)}
+        <div className="grid grid-cols-4 gap-2">
+          {(["cash", "card", "transfer", "qris"] as PaymentMethod[]).map(pm => (
+            <button key={pm} onClick={() => { setPayment(pm); if (pm !== "qris" && pm !== "transfer") setProofImage(""); if (pm !== "transfer") setSelectedBankId(""); }}
               className={`py-3 rounded-[14px] text-xs font-bold transition-all ${
                 payment === pm ? "text-white bg-gradient-to-r from-[#E8B088] to-[#A0673C]" : `border ${th.bdr} ${th.txm}`
               }`}>{t[pm]}</button>
@@ -333,9 +421,71 @@ export function POSPage() {
               )}
             </div>
           )}
+          {payment === "transfer" && bankAccounts.length > 0 && (
+            <div>
+              <p className={`text-sm font-bold mb-2 ${th.tx}`}>{t.transferTo}</p>
+              <div className="flex flex-col gap-2">
+                {bankAccounts.map(acc => {
+                  const selected = selectedBankId === acc.id;
+                  return (
+                    <button key={acc.id} onClick={() => setSelectedBankId(acc.id)}
+                      className={`w-full text-left rounded-2xl border p-3.5 transition-all ${
+                        selected
+                          ? "border-[#A0673C] bg-gradient-to-r from-[#E8B088]/10 to-[#A0673C]/10"
+                          : `${th.card2} ${th.bdr}`
+                      }`}>
+                      <div className="flex items-center gap-3">
+                        <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-[10px] font-extrabold shrink-0 ${
+                          selected ? "bg-gradient-to-r from-[#E8B088] to-[#A0673C] text-white" : `${th.accBg} ${th.acc}`
+                        }`}>
+                          {acc.bankName.split("(")[1]?.replace(")", "").trim().slice(0, 3) || acc.bankName.slice(0, 3).toUpperCase()}
+                        </div>
+                        <div className="min-w-0">
+                          <p className={`text-sm font-bold truncate ${th.tx}`}>{acc.bankName}</p>
+                          <p className={`text-[12px] font-mono mt-0.5 ${th.tx}`}>{acc.accountNumber}</p>
+                          <p className={`text-[11px] ${th.txm}`}>{acc.accountHolder}</p>
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+          {(payment === "qris" || payment === "transfer") && (
+            <div>
+              <p className={`text-sm font-bold mb-1.5 ${th.tx}`}>{t.uploadProof}</p>
+              {proofImage ? (
+                <div className="relative">
+                  <img src={proofImage} alt="proof" className="w-full rounded-2xl border object-cover max-h-48" />
+                  <button onClick={() => setProofImage("")}
+                    className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/50 text-white flex items-center justify-center">
+                    <X size={14} />
+                  </button>
+                </div>
+              ) : (
+                <label className={`flex items-center justify-center gap-2 w-full py-4 rounded-2xl border-2 border-dashed cursor-pointer ${th.bdr} ${th.txm}`}>
+                  <ImagePlus size={18} />
+                  <span className="text-sm font-semibold">{t.chooseImage}</span>
+                  <input type="file" accept="image/*" capture="environment" className="hidden" onChange={async e => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    const base64 = await compressImage(file);
+                    setProofImage(base64);
+                    toast.success(t.proofUploaded as string);
+                    e.target.value = "";
+                  }} />
+                </label>
+              )}
+            </div>
+          )}
           <div className="flex gap-2">
             <button onClick={() => setCheckoutOpen(false)} className={`flex-1 py-3 rounded-2xl text-sm font-bold border ${th.bdr} ${th.txm}`}>{t.cancel}</button>
-            <button onClick={doCheckout} disabled={payment === "cash" && (!cashRcv || parseFloat(cashRcv) < cartTotal)}
+            <button onClick={doCheckout} disabled={
+              (payment === "cash" && (!cashRcv || parseFloat(cashRcv) < cartTotal)) ||
+              (payment === "qris" && !proofImage) ||
+              (payment === "transfer" && (!proofImage || (bankAccounts.length > 0 && !selectedBankId)))
+            }
               className="flex-1 py-3 rounded-2xl text-sm font-bold text-white bg-[#4A8B3F] disabled:opacity-40">{t.confirm}</button>
           </div>
         </div>
@@ -378,7 +528,7 @@ export function POSPage() {
               <Barcode value={lastOrder.id} format="CODE128" width={1.5} height={40} displayValue={true}
                 fontSize={11} font="DM Sans" background="transparent" margin={0} />
             </div>
-            <button onClick={() => { printReceipt(lastOrder); }}
+            <button onClick={() => { printReceipt(lastOrder, { cashierName: user.name }); }}
               className={`w-full py-3 rounded-2xl text-sm font-bold border-2 ${th.bdr} ${th.tx}`}>
               🖨 {t.printReceipt}
             </button>
