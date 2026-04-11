@@ -1,4 +1,4 @@
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:7889';
+const API_URL = import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? 'http://localhost:7889' : '');
 const BASE = `${API_URL}/api/v1`;
 
 const TOKEN_KEY = 'bakeshop-token';
