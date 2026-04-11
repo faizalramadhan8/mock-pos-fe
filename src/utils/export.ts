@@ -1,4 +1,3 @@
-import * as XLSX from "xlsx";
 import type { Order, Product, StockMovement } from "@/types";
 import { formatCurrency } from "./index";
 
@@ -15,7 +14,8 @@ function downloadBlob(blob: Blob, filename: string) {
   URL.revokeObjectURL(url);
 }
 
-function sheetToFile(data: Record<string, unknown>[], sheetName: string, filename: string, format: ExportFormat) {
+async function sheetToFile(data: Record<string, unknown>[], sheetName: string, filename: string, format: ExportFormat) {
+  const XLSX = await import("xlsx");
   const ws = XLSX.utils.json_to_sheet(data);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, sheetName);
@@ -28,7 +28,7 @@ function sheetToFile(data: Record<string, unknown>[], sheetName: string, filenam
   }
 }
 
-export function exportOrders(orders: Order[], format: ExportFormat) {
+export async function exportOrders(orders: Order[], format: ExportFormat) {
   const data = orders.map(o => ({
     "Order ID": o.id,
     "Date": new Date(o.createdAt).toLocaleString("id-ID"),
@@ -42,10 +42,10 @@ export function exportOrders(orders: Order[], format: ExportFormat) {
     "Discount": o.orderDiscount || 0,
     "Total": o.total,
   }));
-  sheetToFile(data, "Orders", `orders-${new Date().toISOString().slice(0, 10)}`, format);
+  await sheetToFile(data, "Orders", `orders-${new Date().toISOString().slice(0, 10)}`, format);
 }
 
-export function exportProducts(products: Product[], format: ExportFormat) {
+export async function exportProducts(products: Product[], format: ExportFormat) {
   const data = products.map(p => ({
     "SKU": p.sku,
     "Name (EN)": p.name,
@@ -59,10 +59,10 @@ export function exportProducts(products: Product[], format: ExportFormat) {
     "Qty/Box": p.qtyPerBox,
     "Active": p.isActive ? "Yes" : "No",
   }));
-  sheetToFile(data, "Products", `products-${new Date().toISOString().slice(0, 10)}`, format);
+  await sheetToFile(data, "Products", `products-${new Date().toISOString().slice(0, 10)}`, format);
 }
 
-export function exportInventory(movements: StockMovement[], products: Product[], format: ExportFormat) {
+export async function exportInventory(movements: StockMovement[], products: Product[], format: ExportFormat) {
   const data = movements.map(m => {
     const prod = products.find(p => p.id === m.productId);
     return {
@@ -76,5 +76,5 @@ export function exportInventory(movements: StockMovement[], products: Product[],
       "Note": m.note,
     };
   });
-  sheetToFile(data, "Inventory", `inventory-${new Date().toISOString().slice(0, 10)}`, format);
+  await sheetToFile(data, "Inventory", `inventory-${new Date().toISOString().slice(0, 10)}`, format);
 }

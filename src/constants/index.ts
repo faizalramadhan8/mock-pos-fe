@@ -3,8 +3,8 @@ import type { User, Category, Product, Order, StockMovement, StockBatch, Supplie
 export const ROLE_PERMISSIONS: Record<Role, PageId[]> = {
   superadmin: ["dashboard", "pos", "inventory", "orders", "settings"],
   admin: ["dashboard", "pos", "inventory", "orders", "settings"],
-  cashier: ["dashboard", "pos", "inventory", "orders", "settings"],
-  staff: ["dashboard", "inventory", "orders", "settings"],
+  cashier: ["pos", "settings"],
+  staff: ["dashboard", "inventory", "settings"],
   user: ["dashboard", "orders", "settings"],
 };
 
@@ -13,6 +13,11 @@ export const INVENTORY_WRITE_ROLES: Role[] = ["superadmin", "admin", "staff"];
 export const UNIT_OPTIONS: UnitOfMeasure[] = ["kg","gr","ltr","ml","pcs","pack","btl","can","bar","blk","tray","sachet"];
 
 export const PAYMENT_TERMS_OPTIONS: PaymentTerms[] = ["COD","NET30","NET60","NET90"];
+
+export const CATEGORY_SKU_PREFIX: Record<string, string> = {
+  c1: "FLR", c2: "SUG", c3: "DRY", c4: "CHO",
+  c5: "LEV", c6: "NUT", c7: "FAT", c8: "FLV",
+};
 
 export const INDONESIAN_BANKS = [
   "Bank Central Asia (BCA)",

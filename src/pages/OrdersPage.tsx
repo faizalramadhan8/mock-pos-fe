@@ -6,34 +6,9 @@ import { useThemeClasses } from "@/hooks/useThemeClasses";
 import { useDebounce } from "@/hooks/useDebounce";
 import { formatCurrency as $, formatTime, printReport } from "@/utils";
 import { exportOrders } from "@/utils/export";
+import { getDateRange, type DateRange } from "@/utils/dateRange";
 import { Printer, FileText, Download, Search } from "lucide-react";
 import toast from "react-hot-toast";
-
-type DateRange = "today" | "yesterday" | "week" | "month" | "all";
-
-function getDateRange(range: DateRange): { start: Date; end: Date } | null {
-  if (range === "all") return null;
-  const now = new Date();
-  const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
-  const endOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999);
-
-  switch (range) {
-    case "today":
-      return { start: startOfDay(now), end: endOfDay(now) };
-    case "yesterday": {
-      const y = new Date(now);
-      y.setDate(y.getDate() - 1);
-      return { start: startOfDay(y), end: endOfDay(y) };
-    }
-    case "week": {
-      const s = new Date(now);
-      s.setDate(s.getDate() - s.getDay());
-      return { start: startOfDay(s), end: endOfDay(now) };
-    }
-    case "month":
-      return { start: new Date(now.getFullYear(), now.getMonth(), 1), end: endOfDay(now) };
-  }
-}
 
 export function OrdersPage() {
   const th = useThemeClasses();
@@ -119,11 +94,11 @@ export function OrdersPage() {
       <div className="flex items-center justify-between gap-2">
         <h1 className={`text-[22px] font-black tracking-tight shrink-0 ${th.tx}`}>{t.orders}</h1>
         <div className="flex gap-1.5 shrink-0">
-          <button onClick={() => { exportOrders(dateFiltered, "csv"); toast.success(t.exportSuccess as string); }}
+          <button onClick={async () => { await exportOrders(dateFiltered, "csv"); toast.success(t.exportSuccess as string); }}
             className={`flex items-center gap-1 px-2 py-1.5 rounded-xl text-[10px] font-bold ${th.elev} ${th.txm}`}>
             <Download size={11} /> CSV
           </button>
-          <button onClick={() => { exportOrders(dateFiltered, "xlsx"); toast.success(t.exportSuccess as string); }}
+          <button onClick={async () => { await exportOrders(dateFiltered, "xlsx"); toast.success(t.exportSuccess as string); }}
             className={`flex items-center gap-1 px-2 py-1.5 rounded-xl text-[10px] font-bold ${th.elev} ${th.txm}`}>
             <Download size={11} /> Excel
           </button>

@@ -16,6 +16,13 @@ export function useBarcodeScanner({
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    // Skip when user is typing in a form field — only listen for hardware barcode scanner
+    const tag = (e.target as HTMLElement)?.tagName;
+    if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") {
+      bufferRef.current = "";
+      return;
+    }
+
     const now = Date.now();
 
     if (e.key === "Enter") {

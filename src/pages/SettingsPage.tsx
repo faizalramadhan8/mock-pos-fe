@@ -3,9 +3,9 @@ import { useAuthStore, useLangStore, useThemeStore, useSettingsStore, useAuditSt
 import { useThemeClasses } from "@/hooks/useThemeClasses";
 import {
   Sun, Moon, UserPlus, X, Plus, Trash2, Search, Building2,
-  Palette, Store, Users, LogOut, Clock,
+  Palette, Store, Users, LogOut, Clock, ChevronDown, ChevronUp, Key, Power,
 } from "lucide-react";
-import { genId, formatDate, formatTime } from "@/utils";
+import { genId, formatDate, formatTime, LABEL_PRESETS } from "@/utils";
 import { INDONESIAN_BANKS } from "@/constants";
 import toast from "react-hot-toast";
 import type { Role, BankAccount } from "@/types";
@@ -21,7 +21,11 @@ export function SettingsPage() {
   const user = useAuthStore(s => s.user);
   const users = useAuthStore(s => s.users);
   const addUser = useAuthStore(s => s.addUser);
+  const updateUser = useAuthStore(s => s.updateUser);
+  const deleteUser = useAuthStore(s => s.deleteUser);
+  const toggleUserActive = useAuthStore(s => s.toggleUserActive);
   const logout = useAuthStore(s => s.logout);
+  const auditLog = useAuditStore(s => s.log);
   const isAdmin = user?.role === "superadmin" || user?.role === "admin";
   const auditEntries = useAuditStore(s => s.entries);
 
@@ -32,10 +36,13 @@ export function SettingsPage() {
   const [storeAddress, setStoreAddress] = useState(settings.storeAddress);
   const [storePhone, setStorePhone] = useState(settings.storePhone);
   const [ppnRate, setPpnRate] = useState(String(settings.ppnRate));
+  const [labelWidth, setLabelWidth] = useState(settings.labelWidth);
+  const [labelHeight, setLabelHeight] = useState(settings.labelHeight);
 
   // ─── Bank Accounts ───
   const [showAddBank, setShowAddBank] = useState(false);
   const [bankForm, setBankForm] = useState({ bankName: "", accountNumber: "", accountHolder: "" });
+  const [bankFormErrors, setBankFormErrors] = useState<Record<string, boolean>>({});
   const [bankQuery, setBankQuery] = useState("");
   const [showBankDropdown, setShowBankDropdown] = useState(false);
   const [confirmRemoveBankId, setConfirmRemoveBankId] = useState<string | null>(null);
@@ -58,7 +65,12 @@ export function SettingsPage() {
   }, [showBankDropdown]);
 
   const handleAddBank = () => {
-    if (!bankForm.bankName || !bankForm.accountNumber.trim() || !bankForm.accountHolder.trim()) return;
+    const errs: Record<string, boolean> = {};
+    if (!bankForm.bankName) errs.bankName = true;
+    if (!bankForm.accountNumber.trim()) errs.accountNumber = true;
+    if (!bankForm.accountHolder.trim()) errs.accountHolder = true;
+    if (Object.keys(errs).length) { setBankFormErrors(errs); return; }
+    setBankFormErrors({});
     const newAcc: BankAccount = { id: genId(), ...bankForm };
     const updated = [...settings.bankAccounts, newAcc];
     settings.update({ bankAccounts: updated });
@@ -77,16 +89,29 @@ export function SettingsPage() {
   const [regForm, setRegForm] = useState({
     nik: "", name: "", email: "", phone: "", dateOfBirth: "", role: "cashier" as Role,
   });
+  const [regFormErrors, setRegFormErrors] = useState<Record<string, boolean>>({});
+  const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
+  const [newPasswordInput, setNewPasswordInput] = useState("");
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const handleSave = () => {
     const rate = Math.max(0, Math.min(100, parseFloat(ppnRate) || 0));
-    settings.update({ storeName, storeAddress, storePhone, ppnRate: rate });
+    const lw = Math.max(30, Math.min(100, labelWidth || 60));
+    const lh = Math.max(20, Math.min(80, labelHeight || 40));
+    settings.update({ storeName, storeAddress, storePhone, ppnRate: rate, labelWidth: lw, labelHeight: lh });
+    setLabelWidth(lw);
+    setLabelHeight(lh);
     setPpnRate(String(rate));
     toast.success(t.settingsSaved as string);
   };
 
   const handleRegister = () => {
-    if (!regForm.name.trim() || !regForm.email.trim()) return;
+    const errs: Record<string, boolean> = {};
+    if (!regForm.name.trim()) errs.name = true;
+    if (!regForm.email.trim()) errs.email = true;
+    else if (!regForm.email.includes("@")) errs.invalidEmail = true;
+    if (Object.keys(errs).length) { setRegFormErrors(errs); return; }
+    setRegFormErrors({});
     if (users.some(u => u.email.toLowerCase() === regForm.email.toLowerCase())) {
       toast.error(t.emailExists as string);
       return;
@@ -109,6 +134,7 @@ export function SettingsPage() {
     });
     toast.success(t.userRegistered as string);
     setRegForm({ nik: "", name: "", email: "", phone: "", dateOfBirth: "", role: "cashier" });
+    setRegFormErrors({});
     setShowRegister(false);
   };
 
@@ -251,6 +277,39 @@ export function SettingsPage() {
             </div>
           </div>
 
+          {/* ── Label Size ── */}
+          <div className={`rounded-[22px] border p-5 ${th.card} ${th.bdr}`}>
+            <p className={`text-sm font-extrabold mb-1 ${th.tx}`}>Label Size (mm)</p>
+            <p className={`text-[11px] mb-3 ${th.txf}`}>{lang === "id" ? "Pilih ukuran label cetak" : "Select print label size"}</p>
+            <div className="flex flex-wrap gap-2 mb-3">
+              {Object.entries(LABEL_PRESETS).map(([key, s]) => (
+                <button key={key} type="button"
+                  onClick={() => { setLabelWidth(s.width); setLabelHeight(s.height); }}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${
+                    labelWidth === s.width && labelHeight === s.height
+                      ? `${th.accBg} ${th.acc} border-[#A0673C]`
+                      : `${th.card2} ${th.bdr}`
+                  }`}>
+                  {s.width}&times;{s.height}
+                </button>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <div className="flex-1">
+                <label className={`text-[10px] ${th.txf}`}>{lang === "id" ? "Lebar" : "Width"}</label>
+                <input type="number" value={labelWidth} min={30} max={100}
+                  onChange={e => setLabelWidth(Number(e.target.value))}
+                  className={`w-full px-3 py-2 text-sm rounded-xl border ${th.inp}`} />
+              </div>
+              <div className="flex-1">
+                <label className={`text-[10px] ${th.txf}`}>{lang === "id" ? "Tinggi" : "Height"}</label>
+                <input type="number" value={labelHeight} min={20} max={80}
+                  onChange={e => setLabelHeight(Number(e.target.value))}
+                  className={`w-full px-3 py-2 text-sm rounded-xl border ${th.inp}`} />
+              </div>
+            </div>
+          </div>
+
           {/* Save — clearly scoped to store info + tax */}
           <button onClick={handleSave}
             className="w-full py-3 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-[#E8B088] to-[#A0673C]">
@@ -306,7 +365,7 @@ export function SettingsPage() {
                             </button>
                           </div>
                         ) : (
-                          <button onClick={() => setConfirmRemoveBankId(acc.id)} className="text-[#D4627A]/50 hover:text-[#D4627A] p-1">
+                          <button onClick={() => setConfirmRemoveBankId(acc.id)} aria-label="Remove bank account" className="text-[#D4627A]/50 hover:text-[#D4627A] p-1">
                             <Trash2 size={14} />
                           </button>
                         )}
@@ -342,23 +401,102 @@ export function SettingsPage() {
               <p className={`text-sm ${th.txm}`}>{t.noStaff}</p>
             </div>
           ) : (
-            <div className={`rounded-[22px] border overflow-hidden ${th.card} ${th.bdr}`}>
-              {staffUsers.map((u, i) => (
-                <div key={u.id} className={`flex items-center gap-3 px-5 py-3.5 ${i > 0 ? `border-t ${th.bdr}` : ""}`}>
-                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-[11px] font-extrabold shrink-0 ${th.accBg} ${th.acc}`}>
-                    {u.initials}
+            <div className="flex flex-col gap-2.5">
+              {staffUsers.map(u => {
+                const expanded = expandedUserId === u.id;
+                const inactive = u.isActive === false;
+                return (
+                  <div key={u.id} className={`rounded-[18px] border overflow-hidden ${th.card} ${th.bdr} ${inactive ? "opacity-60" : ""}`}>
+                    <button onClick={() => { setExpandedUserId(expanded ? null : u.id); setNewPasswordInput(""); setConfirmDeleteId(null); }}
+                      className={`w-full flex items-center gap-3 px-5 py-3.5 text-left`}>
+                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-[11px] font-extrabold shrink-0 ${th.accBg} ${th.acc}`}>
+                        {u.initials}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className={`text-sm font-bold truncate ${th.tx}`}>{u.name}</p>
+                          {inactive && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-[#C4504A]/15 text-[#C4504A]">{t.accountInactive}</span>}
+                        </div>
+                        <p className={`text-[11px] truncate ${th.txm}`}>{u.email}{u.phone ? ` · ${u.phone}` : ""}</p>
+                      </div>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md shrink-0 ${
+                        u.role === "cashier"
+                          ? (th.dark ? "bg-[#5B8DEF]/15 text-[#5B8DEF]" : "bg-blue-50 text-[#5B8DEF]")
+                          : (th.dark ? "bg-[#6F9A4D]/15 text-[#6F9A4D]" : "bg-green-50 text-[#6F9A4D]")
+                      }`}>{(t.roles as Record<string, string>)[u.role]}</span>
+                      {expanded ? <ChevronUp size={14} className={th.txm} /> : <ChevronDown size={14} className={th.txm} />}
+                    </button>
+
+                    {expanded && (
+                      <div className={`px-5 pb-4 pt-1 border-t ${th.bdr} flex flex-col gap-3`}>
+                        {/* Detail info */}
+                        <div className="grid grid-cols-2 gap-2">
+                          {u.nik && <div><p className={`text-[10px] font-semibold ${th.txf}`}>{t.nik}</p><p className={`text-sm font-medium ${th.tx}`}>{u.nik}</p></div>}
+                          {u.phone && <div><p className={`text-[10px] font-semibold ${th.txf}`}>{t.msisdn}</p><p className={`text-sm font-medium ${th.tx}`}>{u.phone}</p></div>}
+                          {u.dateOfBirth && <div><p className={`text-[10px] font-semibold ${th.txf}`}>{t.dateOfBirth}</p><p className={`text-sm font-medium ${th.tx}`}>{u.dateOfBirth}</p></div>}
+                          <div><p className={`text-[10px] font-semibold ${th.txf}`}>{t.email}</p><p className={`text-sm font-medium ${th.tx}`}>{u.email}</p></div>
+                        </div>
+
+                        {/* Reset Password */}
+                        <div className={`rounded-xl border p-3 ${th.card2} ${th.bdr}`}>
+                          <div className="flex items-center gap-2 mb-2">
+                            <Key size={12} className={th.txm} />
+                            <p className={`text-[11px] font-bold ${th.tx}`}>{t.resetPassword}</p>
+                          </div>
+                          <div className="flex gap-2">
+                            <input value={newPasswordInput} onChange={e => setNewPasswordInput(e.target.value)}
+                              placeholder={t.newPassword as string} type="text"
+                              className={`flex-1 px-3 py-2 text-sm rounded-xl border ${th.inp}`} />
+                            <button onClick={() => {
+                              if (!newPasswordInput.trim()) return;
+                              updateUser(u.id, { password: newPasswordInput.trim() });
+                              auditLog("password_reset", user!.id, user!.name, u.name);
+                              setNewPasswordInput("");
+                              toast.success(t.passwordUpdated as string);
+                            }} disabled={!newPasswordInput.trim()}
+                              className="px-3 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-[#E8B088] to-[#A0673C] disabled:opacity-40">{t.save}</button>
+                          </div>
+                        </div>
+
+                        {/* Action buttons */}
+                        <div className="flex gap-2">
+                          <button onClick={() => {
+                            toggleUserActive(u.id);
+                            const willDeactivate = u.isActive !== false;
+                            auditLog("user_toggled", user!.id, user!.name, `${u.name} → ${willDeactivate ? "inactive" : "active"}`);
+                            toast.success((willDeactivate ? t.userDeactivated : t.userActivated) as string);
+                          }}
+                            className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-bold border ${th.bdr} ${inactive ? "text-[#4A8B3F]" : "text-[#E89B48]"}`}>
+                            <Power size={12} />
+                            {inactive ? t.activateUser : t.deactivateUser}
+                          </button>
+
+                          {confirmDeleteId === u.id ? (
+                            <div className="flex-1 flex gap-1.5">
+                              <button onClick={() => setConfirmDeleteId(null)}
+                                className={`flex-1 py-2.5 rounded-xl text-xs font-bold border ${th.bdr} ${th.txm}`}>{t.cancel}</button>
+                              <button onClick={() => {
+                                deleteUser(u.id);
+                                auditLog("user_deleted", user!.id, user!.name, u.name);
+                                setExpandedUserId(null);
+                                setConfirmDeleteId(null);
+                                toast.success(t.userDeleted as string);
+                              }}
+                                className="flex-1 py-2.5 rounded-xl text-xs font-bold text-white bg-[#C4504A]">{t.confirm}</button>
+                            </div>
+                          ) : (
+                            <button onClick={() => setConfirmDeleteId(u.id)}
+                              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-bold text-[#C4504A] border border-[#C4504A]/20">
+                              <Trash2 size={12} />
+                              {t.deleteUser}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className={`text-sm font-bold truncate ${th.tx}`}>{u.name}</p>
-                    <p className={`text-[11px] truncate ${th.txm}`}>{u.email}{u.phone ? ` \u00b7 ${u.phone}` : ""}</p>
-                  </div>
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md shrink-0 ${
-                    u.role === "cashier"
-                      ? (th.dark ? "bg-[#5B8DEF]/15 text-[#5B8DEF]" : "bg-blue-50 text-[#5B8DEF]")
-                      : (th.dark ? "bg-[#6F9A4D]/15 text-[#6F9A4D]" : "bg-green-50 text-[#6F9A4D]")
-                  }`}>{(t.roles as Record<string, string>)[u.role]}</span>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -421,7 +559,7 @@ export function SettingsPage() {
             <div className={`flex items-center justify-between px-6 py-4 border-b ${th.bdr}`}>
               <h3 className={`font-extrabold text-base tracking-tight ${th.tx}`}>{t.addBankAccount}</h3>
               <button onClick={() => { setShowAddBank(false); setBankForm({ bankName: "", accountNumber: "", accountHolder: "" }); setBankQuery(""); setShowBankDropdown(false); }}
-                className={`p-1.5 rounded-lg ${th.elev} ${th.txm}`}><X size={14} strokeWidth={2.5} /></button>
+                aria-label="Close" className={`p-1.5 rounded-lg ${th.elev} ${th.txm}`}><X size={14} strokeWidth={2.5} /></button>
             </div>
             <div className="px-6 py-5 flex flex-col gap-3">
               {/* Searchable bank dropdown */}
@@ -432,14 +570,14 @@ export function SettingsPage() {
                     <Search size={14} className={`absolute left-3.5 top-1/2 -translate-y-1/2 ${th.txf}`} />
                     <input
                       value={bankForm.bankName || bankQuery}
-                      onChange={e => { setBankQuery(e.target.value); setBankForm(f => ({ ...f, bankName: "" })); setShowBankDropdown(true); }}
+                      onChange={e => { setBankQuery(e.target.value); setBankForm(f => ({ ...f, bankName: "" })); setShowBankDropdown(true); setBankFormErrors(p => ({ ...p, bankName: false })); }}
                       onFocus={() => setShowBankDropdown(true)}
                       placeholder={t.searchBank as string}
-                      className={`w-full pl-9 pr-9 py-3 text-sm rounded-2xl border ${th.inp}`}
+                      className={`w-full pl-9 pr-9 py-3 text-sm rounded-2xl border ${th.inp} ${bankFormErrors.bankName ? "!border-red-400" : ""}`}
                     />
                     {bankForm.bankName && (
                       <button onClick={() => { setBankForm(f => ({ ...f, bankName: "" })); setBankQuery(""); }}
-                        className={`absolute right-3 top-1/2 -translate-y-1/2 ${th.txf}`}><X size={14} /></button>
+                        aria-label="Clear" className={`absolute right-3 top-1/2 -translate-y-1/2 ${th.txf}`}><X size={14} /></button>
                     )}
                   </div>
                   {showBankDropdown && !bankForm.bankName && (
@@ -455,20 +593,23 @@ export function SettingsPage() {
                     </div>
                   )}
                 </div>
+                {bankFormErrors.bankName && <p className="text-red-400 text-[10px] mt-1 font-medium">{t.required}</p>}
               </div>
               <div>
                 <p className={`text-[11px] font-semibold mb-1.5 ${th.txm}`}>{t.accountNumber}</p>
                 <input value={bankForm.accountNumber}
-                  onChange={e => setBankForm(f => ({ ...f, accountNumber: e.target.value }))}
+                  onChange={e => { setBankForm(f => ({ ...f, accountNumber: e.target.value })); setBankFormErrors(p => ({ ...p, accountNumber: false })); }}
                   placeholder="1234567890" inputMode="numeric"
-                  className={`w-full px-4 py-3 text-sm rounded-2xl border ${th.inp}`} />
+                  className={`w-full px-4 py-3 text-sm rounded-2xl border ${th.inp} ${bankFormErrors.accountNumber ? "!border-red-400" : ""}`} />
+                {bankFormErrors.accountNumber && <p className="text-red-400 text-[10px] mt-1 font-medium">{t.required}</p>}
               </div>
               <div>
                 <p className={`text-[11px] font-semibold mb-1.5 ${th.txm}`}>{t.accountHolder}</p>
                 <input value={bankForm.accountHolder}
-                  onChange={e => setBankForm(f => ({ ...f, accountHolder: e.target.value }))}
+                  onChange={e => { setBankForm(f => ({ ...f, accountHolder: e.target.value })); setBankFormErrors(p => ({ ...p, accountHolder: false })); }}
                   placeholder={t.accountHolder as string}
-                  className={`w-full px-4 py-3 text-sm rounded-2xl border ${th.inp}`} />
+                  className={`w-full px-4 py-3 text-sm rounded-2xl border ${th.inp} ${bankFormErrors.accountHolder ? "!border-red-400" : ""}`} />
+                {bankFormErrors.accountHolder && <p className="text-red-400 text-[10px] mt-1 font-medium">{t.required}</p>}
               </div>
               <div className="flex gap-2 mt-1">
                 <button onClick={() => { setShowAddBank(false); setBankForm({ bankName: "", accountNumber: "", accountHolder: "" }); setBankQuery(""); setShowBankDropdown(false); }}
@@ -491,16 +632,23 @@ export function SettingsPage() {
           <div className={`relative w-full max-w-md rounded-t-3xl sm:rounded-3xl border p-5 max-h-[85vh] overflow-y-auto ${th.card} ${th.bdr}`}>
             <div className="flex items-center justify-between mb-4">
               <p className={`text-[15px] font-extrabold ${th.tx}`}>{t.registerStaff}</p>
-              <button onClick={() => setShowRegister(false)} className={`p-1.5 rounded-xl ${th.txm}`}><X size={18} /></button>
+              <button onClick={() => setShowRegister(false)} aria-label="Close" className={`p-1.5 rounded-xl ${th.txm}`}><X size={18} /></button>
             </div>
 
             <div className="flex flex-col gap-2.5">
-              <input value={regForm.name} onChange={e => setRegForm(f => ({ ...f, name: e.target.value }))}
-                className={inp} placeholder={t.fullName as string} />
+              <div>
+                <input value={regForm.name} onChange={e => { setRegForm(f => ({ ...f, name: e.target.value })); setRegFormErrors(p => ({ ...p, name: false })); }}
+                  className={`${inp} ${regFormErrors.name ? "!border-red-400" : ""}`} placeholder={t.fullName as string} />
+                {regFormErrors.name && <p className="text-red-400 text-[10px] mt-1 font-medium">{t.required}</p>}
+              </div>
               <input value={regForm.nik} onChange={e => setRegForm(f => ({ ...f, nik: e.target.value }))}
                 className={inp} placeholder={t.nik as string} inputMode="numeric" />
-              <input value={regForm.email} onChange={e => setRegForm(f => ({ ...f, email: e.target.value }))}
-                className={inp} placeholder={t.email as string} type="email" />
+              <div>
+                <input value={regForm.email} onChange={e => { setRegForm(f => ({ ...f, email: e.target.value })); setRegFormErrors(p => ({ ...p, email: false, invalidEmail: false })); }}
+                  className={`${inp} ${regFormErrors.email || regFormErrors.invalidEmail ? "!border-red-400" : ""}`} placeholder={t.email as string} type="email" />
+                {regFormErrors.email && <p className="text-red-400 text-[10px] mt-1 font-medium">{t.required}</p>}
+                {regFormErrors.invalidEmail && <p className="text-red-400 text-[10px] mt-1 font-medium">{t.invalidEmail}</p>}
+              </div>
               <input value={regForm.phone} onChange={e => setRegForm(f => ({ ...f, phone: e.target.value }))}
                 className={inp} placeholder={t.msisdn as string} type="tel" inputMode="tel" />
               <input value={regForm.dateOfBirth} onChange={e => setRegForm(f => ({ ...f, dateOfBirth: e.target.value }))}

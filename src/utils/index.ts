@@ -72,7 +72,7 @@ function generateBarcodeSvg(value: string, opts?: { width?: number; height?: num
 
 export function printReceipt(order: Order, opts?: { cashierName?: string }) {
   const settings = JSON.parse(localStorage.getItem("bakeshop-settings") || "{}");
-  const name = settings?.state?.storeName || "BakeShop";
+  const name = settings?.state?.storeName || "Toko Bahan Kue Santi";
   const addr = settings?.state?.storeAddress || "Jl. Sudirman No. 123, Jakarta";
   const phone = settings?.state?.storePhone || "+62 812-3456-7890";
   const barcodeSvg = generateBarcodeSvg(order.id, { width: 1.2, height: 35, fontSize: 10 });
@@ -89,13 +89,15 @@ export function printReceipt(order: Order, opts?: { cashierName?: string }) {
   const html = `<!DOCTYPE html>
 <html><head><title>Receipt ${order.id}</title>
 <style>
-  body{font-family:'Courier New',monospace;font-size:12px;width:280px;margin:0 auto;padding:20px 0;color:#222}
+  @page{size:80mm auto;margin:0}
+  body{font-family:'Courier New',monospace;font-size:11px;width:72mm;margin:0 auto;padding:2mm 0;color:#222}
   .c{text-align:center} .b{font-weight:bold}
-  .ln{border-top:1px dashed #999;margin:8px 0}
-  .r{display:flex;justify-content:space-between}
-  h2{margin:0;font-size:16px} p{margin:2px 0}
-  .bc{text-align:center;margin:8px 0} .bc svg{max-width:100%}
-  @media print{body{width:100%}}
+  .ln{border-top:1px dashed #999;margin:6px 0}
+  .r{display:flex;justify-content:space-between;gap:4px}
+  .r span:last-child{text-align:right;white-space:nowrap}
+  h2{margin:0;font-size:14px} p{margin:2px 0}
+  .bc{text-align:center;margin:6px 0} .bc svg{max-width:100%}
+  @media print{body{width:72mm}}
 </style></head><body>
   <div class="c"><h2>${escapeHtml(name)}</h2><p>${escapeHtml(addr)}</p><p>${escapeHtml(phone)}</p></div>
   <div class="ln"></div>
@@ -123,7 +125,7 @@ export function printReceipt(order: Order, opts?: { cashierName?: string }) {
 
 export function printReport(orders: Order[], dateLabel: string) {
   const settings = JSON.parse(localStorage.getItem("bakeshop-settings") || "{}");
-  const storeName = settings?.state?.storeName || "BakeShop";
+  const storeName = settings?.state?.storeName || "Toko Bahan Kue Santi";
   const completed = orders.filter(o => o.status === "completed");
   const cancelled = orders.filter(o => o.status === "cancelled");
   const revenue = completed.reduce((s, o) => s + o.total, 0);
@@ -165,30 +167,73 @@ export function printReport(orders: Order[], dateLabel: string) {
   win.onload = () => win.print();
 }
 
-export function printBarcodeLabel(product: Product, lang: "en" | "id") {
-  const name = lang === "id" ? product.nameId : product.name;
-  const barcodeSvg = generateBarcodeSvg(product.sku, { width: 2, height: 50, fontSize: 13 });
-  if (!barcodeSvg) return;
+export interface LabelSize {
+  width: number;  // mm
+  height: number; // mm
+}
 
-  const win = window.open("", "_blank", "width=360,height=300");
+export const LABEL_PRESETS: Record<string, LabelSize> = {
+  "40x30": { width: 40, height: 30 },
+  "50x30": { width: 50, height: 30 },
+  "60x40": { width: 60, height: 40 },
+  "70x50": { width: 70, height: 50 },
+  "80x50": { width: 80, height: 50 },
+};
+
+function buildLabelHtml(product: Product, lang: "en" | "id", size: LabelSize) {
+  const name = lang === "id" ? product.nameId : product.name;
+  const barcodeW = Math.max(1.5, Math.min(2.5, size.width / 25));
+  const barcodeH = Math.max(30, Math.min(50, size.height * 0.55));
+  const barcodeSvg = generateBarcodeSvg(product.sku, { width: barcodeW, height: barcodeH, fontSize: 8, displayValue: true });
+  if (!barcodeSvg) return "";
+  return `<div class="label">
+    <div class="name">${escapeHtml(name)}</div>
+    <div class="price">Rp ${product.sellingPrice.toLocaleString("id-ID")} / ${escapeHtml(product.unit)}</div>
+    <div class="bc">${barcodeSvg}</div>
+  </div>`;
+}
+
+function labelCss(size: LabelSize) {
+  return `
+  *{margin:0;padding:0;box-sizing:border-box}
+  @page{size:portrait;margin:2mm 5mm 2mm 5mm}
+  body{font-family:'DM Sans',Arial,sans-serif;color:#000;text-align:center;-webkit-print-color-adjust:exact}
+  .label{padding:2mm 0;display:flex;flex-direction:column;justify-content:center;align-items:center;page-break-after:always}
+  .label:last-child{page-break-after:auto}
+  .name{font-size:${size.width <= 50 ? 9 : 11}px;font-weight:700;margin-bottom:1px}
+  .price{font-size:${size.width <= 50 ? 8 : 10}px;color:#333;margin-bottom:2px}
+  .bc svg{max-width:95%;height:auto}`;
+}
+
+export function printBarcodeLabel(product: Product, lang: "en" | "id", size?: LabelSize) {
+  const s = size || { width: 40, height: 30 };
+  const content = buildLabelHtml(product, lang, s);
+  if (!content) return;
+
+  const win = window.open("", "_blank", `width=${Math.max(300, s.width * 4)},height=${Math.max(250, s.height * 4)}`);
   if (!win) return;
 
   const html = `<!DOCTYPE html>
 <html><head><title>Label ${product.sku}</title>
-<style>
-  body{font-family:'DM Sans',sans-serif;margin:0;padding:16px;color:#222}
-  .label{border:1px dashed #ccc;padding:16px;width:240px;text-align:center}
-  .name{font-size:13px;font-weight:700;margin-bottom:4px}
-  .price{font-size:11px;color:#666;margin-bottom:10px}
-  .bc svg{max-width:100%}
-  @media print{body{padding:0}.label{border:none;width:100%}}
-</style></head><body>
-  <div class="label">
-    <div class="name">${escapeHtml(name)}</div>
-    <div class="price">Rp ${product.sellingPrice.toLocaleString("id-ID")} / ${escapeHtml(product.unit)}</div>
-    <div class="bc">${barcodeSvg}</div>
-  </div>
-</body></html>`;
+<style>${labelCss(s)}</style></head><body>${content}</body></html>`;
+
+  win.document.write(html);
+  win.document.close();
+  win.onload = () => win.print();
+}
+
+export function printBarcodeLabels(products: Product[], lang: "en" | "id", size?: LabelSize) {
+  if (products.length === 0) return;
+  const s = size || { width: 40, height: 30 };
+  const labels = products.map(p => buildLabelHtml(p, lang, s)).filter(Boolean).join("\n");
+  if (!labels) return;
+
+  const win = window.open("", "_blank", "width=800,height=600");
+  if (!win) return;
+
+  const html = `<!DOCTYPE html>
+<html><head><title>Batch Labels (${products.length})</title>
+<style>${labelCss(s)}</style></head><body>${labels}</body></html>`;
 
   win.document.write(html);
   win.document.close();

@@ -1,10 +1,13 @@
-import { lazy, Suspense, useState } from "react";
-import { useAuthStore, useLangStore } from "@/stores";
+import { lazy, Suspense, useCallback, useEffect, useState } from "react";
+import { useAuthStore, useLangStore, hydrateStores } from "@/stores";
+import { getToken } from "@/api/client";
 import { BakeryLogo } from "@/components/icons";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ROLE_PERMISSIONS } from "@/constants";
 import { useThemeClasses } from "@/hooks/useThemeClasses";
 import type { PageId } from "@/types";
 import { Toaster } from "react-hot-toast";
+import { NotificationBell } from "@/components/NotificationBell";
 import {
   Home, ShoppingBag, Package, FileText, Settings,
 } from "lucide-react";
@@ -39,17 +42,39 @@ export default function App() {
   const { t } = useLangStore();
   const { user, defaultPage } = useAuthStore();
   const [page, setPage] = useState<PageId>("pos");
+  const [initializing, setInitializing] = useState(true);
 
-  if (!user) return (
-    <>
-      <Suspense fallback={<PageLoader />}><LoginPage /></Suspense>
-      <Toaster position="top-center" toastOptions={{ className: "!rounded-2xl !text-sm !font-semibold", duration: 2500 }} />
-    </>
-  );
+  useEffect(() => {
+    (async () => {
+      if (getToken()) {
+        const valid = await useAuthStore.getState().checkSession();
+        if (valid) await hydrateStores();
+      }
+      setInitializing(false);
+    })();
+  }, []);
 
-  const perms = ROLE_PERMISSIONS[user.role] || [];
+  const perms = user ? (ROLE_PERMISSIONS[user.role] || []) : [];
   const navItems = (["dashboard", "pos", "inventory", "orders", "settings"] as PageId[]).filter(p => perms.includes(p));
-  const currentPage = perms.includes(page) ? page : defaultPage();
+  const currentPage = user ? (perms.includes(page) ? page : defaultPage()) : null;
+
+  // Dynamic page title
+  useEffect(() => {
+    const pageName = currentPage ? (t[currentPage as keyof typeof t] as string || t.appName) : t.signIn;
+    document.title = `${pageName} — Toko Bahan Kue Santi POS`;
+  }, [currentPage, t]);
+
+  // Keyboard nav for bottom nav (Arrow Left/Right cycles tabs)
+  const handleNavKeyDown = useCallback((e: React.KeyboardEvent, idx: number) => {
+    let next = -1;
+    if (e.key === "ArrowRight") next = (idx + 1) % navItems.length;
+    else if (e.key === "ArrowLeft") next = (idx - 1 + navItems.length) % navItems.length;
+    if (next >= 0) {
+      e.preventDefault();
+      setPage(navItems[next]);
+      (e.currentTarget.parentElement?.children[next] as HTMLElement)?.focus();
+    }
+  }, [navItems, setPage]);
 
   const renderPage = () => {
     switch (currentPage) {
@@ -62,6 +87,24 @@ export default function App() {
     }
   };
 
+  if (initializing) return (
+    <div className={`min-h-screen flex items-center justify-center ${th.bg}`}>
+      <div className="flex flex-col items-center gap-4">
+        <BakeryLogo size={56} />
+        <div className="w-6 h-6 border-2 border-[#A0673C] border-t-transparent rounded-full animate-spin" />
+      </div>
+    </div>
+  );
+
+  if (!user) return (
+    <>
+      <ErrorBoundary>
+        <Suspense fallback={<PageLoader />}><LoginPage /></Suspense>
+      </ErrorBoundary>
+      <Toaster position="top-center" toastOptions={{ className: "!rounded-2xl !text-sm !font-semibold", duration: 2500 }} />
+    </>
+  );
+
   return (
     <div className={`min-h-screen ${th.bg}`}>
       {/* Header */}
@@ -73,22 +116,28 @@ export default function App() {
             <p className={`text-[10px] ${th.txm}`}>{user.name} · {(t.roles as Record<string, string>)[user.role]}</p>
           </div>
         </div>
+        <NotificationBell />
       </header>
 
       {/* Content */}
       <main className="pt-[68px] pb-24 px-4 max-w-5xl mx-auto">
-        <Suspense fallback={<PageLoader />}>
-          {renderPage()}
-        </Suspense>
+        <ErrorBoundary onReset={() => setPage("dashboard")}>
+          <Suspense fallback={<PageLoader />}>
+            <div key={currentPage} className="animate-page-enter">
+              {renderPage()}
+            </div>
+          </Suspense>
+        </ErrorBoundary>
       </main>
 
       {/* Bottom Nav */}
-      <nav className={`fixed bottom-0 left-0 right-0 z-40 border-t backdrop-blur-xl pb-safe ${th.dark ? "bg-[#1C1916]/92" : "bg-white/92"} ${th.bdr}`}>
-        <div className="flex items-center justify-around max-w-md mx-auto h-16">
-          {navItems.map(id => {
+      <nav aria-label="Main navigation" className={`fixed bottom-0 left-0 right-0 z-40 border-t backdrop-blur-xl pb-safe ${th.dark ? "bg-[#1C1916]/92" : "bg-white/92"} ${th.bdr}`}>
+        <div role="tablist" className="flex items-center justify-around max-w-md mx-auto h-16">
+          {navItems.map((id, idx) => {
             const active = currentPage === id;
             return (
-              <button key={id} onClick={() => setPage(id)}
+              <button key={id} role="tab" aria-selected={active} tabIndex={active ? 0 : -1}
+                onClick={() => setPage(id)} onKeyDown={(e) => handleNavKeyDown(e, idx)}
                 className={`flex flex-col items-center gap-0.5 py-2 px-3 rounded-2xl transition-colors ${active ? th.acc : th.txf}`}>
                 <div className={`p-1.5 rounded-xl transition-colors ${active ? th.accBg : ""}`}>
                   {NAV_ICONS[id]}

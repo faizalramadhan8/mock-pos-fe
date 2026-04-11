@@ -264,7 +264,7 @@ export function OrderDetailModal({ orderId, onClose }: OrderDetailModalProps) {
               const selected = refundSelections[idx] !== undefined;
               return (
                 <div key={idx} className={`flex items-center gap-2.5 py-2 ${idx > 0 ? `border-t ${th.bdr}/30` : ""}`}>
-                  <button onClick={() => toggleRefundItem(idx)} className="shrink-0">
+                  <button onClick={() => toggleRefundItem(idx)} aria-label="Select item for refund" className="shrink-0">
                     {selected ? <CheckSquare size={16} className="text-[#E89B48]" /> : <Square size={16} className={th.txf} />}
                   </button>
                   <div className="flex-1 min-w-0">
@@ -273,10 +273,10 @@ export function OrderDetailModal({ orderId, onClose }: OrderDetailModalProps) {
                   </div>
                   {selected && (
                     <div className="flex items-center gap-1.5 shrink-0">
-                      <button onClick={() => setRefundQty(idx, (refundSelections[idx] || 1) - 1)}
+                      <button onClick={() => setRefundQty(idx, (refundSelections[idx] || 1) - 1)} aria-label="Decrease"
                         className={`w-6 h-6 rounded-md flex items-center justify-center text-xs font-bold ${th.elev} ${th.tx}`}>-</button>
                       <span className={`w-5 text-center text-xs font-bold ${th.tx}`}>{refundSelections[idx]}</span>
-                      <button onClick={() => setRefundQty(idx, (refundSelections[idx] || 1) + 1)}
+                      <button onClick={() => setRefundQty(idx, (refundSelections[idx] || 1) + 1)} aria-label="Increase"
                         className={`w-6 h-6 rounded-md flex items-center justify-center text-xs font-bold ${th.elev} ${th.tx}`}>+</button>
                     </div>
                   )}

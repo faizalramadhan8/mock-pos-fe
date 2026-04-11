@@ -1,6 +1,6 @@
 export const translations = {
   en: {
-    appName: "BakeShop",
+    appName: "Toko Bahan Kue Santi",
     // Auth
     signIn: "Sign In", email: "Email address", password: "Password",
     invalidCred: "Wrong email or password", quickAccess: "Quick demo login",
@@ -94,6 +94,11 @@ export const translations = {
     defaultPassword: "Default password", userRegistered: "User registered successfully",
     emailExists: "Email already registered", staffList: "Staff List",
     noStaff: "No staff registered yet", registered: "Registered",
+    staffDetail: "Staff Detail", resetPassword: "Reset Password", newPassword: "New Password",
+    passwordUpdated: "Password updated", deactivateUser: "Deactivate", activateUser: "Activate",
+    deleteUser: "Delete Staff", deleteUserConfirm: "Delete this staff member? This cannot be undone.",
+    userDeactivated: "User deactivated", userActivated: "User activated", userDeleted: "Staff deleted",
+    accountInactive: "Account inactive",
     // Supplier
     supplier: "Supplier", suppliers: "Suppliers", addSupplier: "Add Supplier",
     editSupplier: "Edit Supplier", supplierName: "Supplier name",
@@ -152,12 +157,18 @@ export const translations = {
     refundConfirm: "Confirm refund?", refundSuccess: "Refund processed",
     refundAll: "Refund All", selectItemsToRefund: "Select items to refund",
     refunded: "Refunded", totalRefunds: "Refunds", partialRefund: "Partial",
-    // EOD Cash
+    // Cash Register
+    openRegister: "Open Register", openingCash: "Opening Cash",
+    openingCashHint: "Count your starting cash before beginning",
+    registerOpened: "Register opened",
+    registerNotOpen: "Register not opened",
+    registerNotOpenHint: "You need to open the register and count your starting cash before processing transactions.",
     closeRegister: "Close Register", expectedCash: "Expected Cash",
     actualCash: "Actual Cash", cashDifference: "Difference",
     cashOver: "Over", cashShort: "Short", cashBalanced: "Balanced",
     registerNotes: "Notes", registerClosed: "Register closed",
     registerHistory: "Register History",
+    orderHistory: "Order History", noOrderHistory: "No orders yet this session",
     // Product edit
     editProduct: "Edit Product", productUpdated: "Product updated",
     // Audit log
@@ -166,9 +177,14 @@ export const translations = {
     // Data export
     exportData: "Export", exportCSV: "Export CSV", exportExcel: "Export Excel",
     exportSuccess: "Export downloaded",
+    // Error boundary
+    errorTitle: "Something went wrong", errorMessage: "An unexpected error occurred. Please try again.",
+    tryAgain: "Try Again", errorDetails: "Error Details",
+    // Form validation
+    required: "Required", invalidEmail: "Invalid email",
   },
   id: {
-    appName: "BakeShop",
+    appName: "Toko Bahan Kue Santi",
     signIn: "Masuk", email: "Alamat email", password: "Kata sandi",
     invalidCred: "Email atau sandi salah", quickAccess: "Login cepat (demo)",
     dashboard: "Beranda", pos: "Kasir", inventory: "Stok", orders: "Pesanan", settings: "Pengaturan",
@@ -250,6 +266,11 @@ export const translations = {
     defaultPassword: "Password default", userRegistered: "Pengguna berhasil didaftarkan",
     emailExists: "Email sudah terdaftar", staffList: "Daftar Staf",
     noStaff: "Belum ada staf terdaftar", registered: "Terdaftar",
+    staffDetail: "Detail Staf", resetPassword: "Reset Password", newPassword: "Password Baru",
+    passwordUpdated: "Password diperbarui", deactivateUser: "Nonaktifkan", activateUser: "Aktifkan",
+    deleteUser: "Hapus Staf", deleteUserConfirm: "Hapus staf ini? Tidak dapat dibatalkan.",
+    userDeactivated: "Pengguna dinonaktifkan", userActivated: "Pengguna diaktifkan", userDeleted: "Staf dihapus",
+    accountInactive: "Akun nonaktif",
     // Supplier
     supplier: "Pemasok", suppliers: "Pemasok", addSupplier: "Tambah Pemasok",
     editSupplier: "Edit Pemasok", supplierName: "Nama pemasok",
@@ -308,12 +329,18 @@ export const translations = {
     refundConfirm: "Konfirmasi refund?", refundSuccess: "Refund berhasil",
     refundAll: "Refund Semua", selectItemsToRefund: "Pilih item untuk refund",
     refunded: "Direfund", totalRefunds: "Refund", partialRefund: "Sebagian",
-    // EOD Cash
+    // Cash Register
+    openRegister: "Buka Kasir", openingCash: "Kas Awal",
+    openingCashHint: "Hitung uang modal awal sebelum memulai",
+    registerOpened: "Kasir dibuka",
+    registerNotOpen: "Kasir belum dibuka",
+    registerNotOpenHint: "Anda harus membuka kasir dan menghitung uang modal awal sebelum memproses transaksi.",
     closeRegister: "Tutup Kasir", expectedCash: "Kas Diharapkan",
     actualCash: "Kas Aktual", cashDifference: "Selisih",
     cashOver: "Lebih", cashShort: "Kurang", cashBalanced: "Seimbang",
     registerNotes: "Catatan", registerClosed: "Kasir ditutup",
     registerHistory: "Riwayat Kasir",
+    orderHistory: "Riwayat Pesanan", noOrderHistory: "Belum ada pesanan di sesi ini",
     // Product edit
     editProduct: "Edit Produk", productUpdated: "Produk diperbarui",
     // Audit log
@@ -322,6 +349,11 @@ export const translations = {
     // Data export
     exportData: "Ekspor", exportCSV: "Ekspor CSV", exportExcel: "Ekspor Excel",
     exportSuccess: "Ekspor berhasil",
+    // Error boundary
+    errorTitle: "Terjadi kesalahan", errorMessage: "Terjadi kesalahan yang tidak terduga. Silakan coba lagi.",
+    tryAgain: "Coba Lagi", errorDetails: "Detail Kesalahan",
+    // Form validation
+    required: "Wajib diisi", invalidEmail: "Email tidak valid",
   },
 } as const;
 

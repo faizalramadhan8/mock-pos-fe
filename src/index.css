@@ -18,6 +18,9 @@ body {
 .animate-fade-in { animation: fadeIn .2s ease-out; }
 .animate-spin { animation: spin 1s linear infinite; }
 
+@keyframes pageEnter { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+.animate-page-enter { animation: pageEnter .2s ease-out; }
+
 @media (hover: none) {
   button, a, [role="button"] { -webkit-tap-highlight-color: transparent; }
 }

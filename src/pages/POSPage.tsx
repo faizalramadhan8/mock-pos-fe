@@ -9,11 +9,12 @@ import { useThemeClasses } from "@/hooks/useThemeClasses";
 import { useDebounce } from "@/hooks/useDebounce";
 import { useBarcodeScanner } from "@/hooks/useBarcodeScanner";
 import { formatCurrency as $, printReceipt, compressImage, genId, formatTime } from "@/utils";
+import { calcItemDiscount } from "@/utils/calc";
 import Barcode from "react-barcode";
 import type { PaymentMethod, UnitType, DiscountType, Product, Order } from "@/types";
 import toast from "react-hot-toast";
 import {
-  Search, ScanLine, ShoppingBag, Minus, Plus, Trash2, ImagePlus, X, UserPlus, Tag, Percent, DollarSign,
+  Search, ScanLine, ShoppingBag, Minus, Plus, Trash2, ImagePlus, X, UserPlus, Tag, Percent, DollarSign, FileText,
 } from "lucide-react";
 
 export function POSPage() {
@@ -32,6 +33,7 @@ export function POSPage() {
   const setCustomer = useCartStore(s => s.setCustomer);
   const setPayment = useCartStore(s => s.setPayment);
   const addOrder = useOrderStore(s => s.addOrder);
+  const allOrders = useOrderStore(s => s.orders);
   const consumeFIFO = useBatchStore(s => s.consumeFIFO);
   const user = useAuthStore(s => s.user)!;
   const ppnRate = useSettingsStore(s => s.ppnRate);
@@ -68,9 +70,14 @@ export function POSPage() {
   const [closeRegisterOpen, setCloseRegisterOpen] = useState(false);
   const [actualCash, setActualCash] = useState("");
   const [registerNotes, setRegisterNotes] = useState("");
-  const addSession = useCashSessionStore(s => s.addSession);
+  const activeSession = useCashSessionStore(s => s.activeSession);
+  const openSession = useCashSessionStore(s => s.openSession);
+  const closeSession = useCashSessionStore(s => s.closeSession);
   const sessions = useCashSessionStore(s => s.sessions);
-  const canCloseRegister = user.role === "superadmin" || user.role === "admin" || user.role === "cashier";
+  const canManageRegister = user.role === "superadmin" || user.role === "admin" || user.role === "cashier";
+  const [openRegisterOpen, setOpenRegisterOpen] = useState(false);
+  const [openingCashInput, setOpeningCashInput] = useState("");
+  const [orderHistoryOpen, setOrderHistoryOpen] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
 
   // Keyboard shortcut: "/" to focus search
@@ -115,12 +122,6 @@ export function POSPage() {
   };
 
   // Discount-aware calculations
-  const calcItemDiscount = (ci: typeof cartItems[0]) => {
-    if (!ci.discountType || !ci.discountValue) return 0;
-    const gross = ci.unitPrice * ci.quantity;
-    return ci.discountType === "percent" ? Math.round(gross * ci.discountValue / 100) : Math.min(ci.discountValue, gross);
-  };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   const itemDiscountsTotal = useMemo(() => cartItems.reduce((s, i) => s + calcItemDiscount(i), 0), [cartItems]);
   const cartSubtotal = useMemo(() => cartItems.reduce((s, i) => s + i.unitPrice * i.quantity, 0), [cartItems]);
   const cartSubtotalAfterItemDisc = cartSubtotal - itemDiscountsTotal;
@@ -168,15 +169,37 @@ export function POSPage() {
 
   useBarcodeScanner({ onScan: handleBarcodeScan });
 
+  // Open Register
+  const doOpenRegister = () => {
+    const opening = parseFloat(openingCashInput) || 0;
+    const session: import("@/types").CashSession = {
+      id: genId(), date: new Date().toISOString(),
+      openingCash: opening, openedBy: user.id, openedAt: new Date().toISOString(),
+      expectedCash: 0, actualCash: 0, difference: 0,
+      notes: "", closedBy: "", closedAt: "",
+    };
+    openSession(session);
+    useAuditStore.getState().log("register_opened", user.id, user.name, `${t.openingCash}: ${$(opening)}`);
+    setOpenRegisterOpen(false);
+    setOpeningCashInput("");
+    toast.success(t.registerOpened as string);
+  };
+
   // Close Register
   const expectedCash = useMemo(() => {
-    const today = new Date();
-    const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-    return useOrderStore.getState().orders
-      .filter(o => o.status === "completed" && o.payment === "cash" && new Date(o.createdAt) >= startOfDay)
+    const sessionStart = activeSession ? new Date(activeSession.openedAt) : (() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), d.getDate()); })();
+    const cashFromOrders = useOrderStore.getState().orders
+      .filter(o => o.status === "completed" && o.payment === "cash" && new Date(o.createdAt) >= sessionStart)
       .reduce((s, o) => s + o.total, 0);
+    return (activeSession?.openingCash || 0) + cashFromOrders;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [closeRegisterOpen]);
+  }, [closeRegisterOpen, activeSession]);
+
+  const sessionOrders = useMemo(() => {
+    if (!activeSession) return [];
+    const sessionStart = new Date(activeSession.openedAt);
+    return allOrders.filter(o => new Date(o.createdAt) >= sessionStart);
+  }, [allOrders, activeSession]);
 
   const todaySessions = useMemo(() => {
     const today = new Date();
@@ -187,11 +210,9 @@ export function POSPage() {
   const doCloseRegister = () => {
     const actual = parseFloat(actualCash) || 0;
     const diff = actual - expectedCash;
-    addSession({
-      id: genId(), date: new Date().toISOString(),
+    closeSession({
       expectedCash, actualCash: actual, difference: diff,
       notes: registerNotes.trim(), closedBy: user.id,
-      closedAt: new Date().toISOString(),
     });
     useAuditStore.getState().log("register_closed", user.id, user.name, `Expected: ${$(expectedCash)} · Actual: ${$(actual)} · Diff: ${$(diff)}`);
     setCloseRegisterOpen(false);
@@ -293,7 +314,7 @@ export function POSPage() {
         <div className={`rounded-[18px] border p-4 ${th.card2} ${th.bdr}`}>
           <div className="flex items-center justify-between mb-3">
             <p className={`text-sm font-extrabold ${th.tx}`}>{t.addMember}</p>
-            <button onClick={() => setShowAddMember(false)} className={th.txm}><X size={14} /></button>
+            <button onClick={() => setShowAddMember(false)} aria-label="Close" className={th.txm}><X size={14} /></button>
           </div>
           <div className="flex flex-col gap-2">
             <input value={newMemberName} onChange={e => setNewMemberName(e.target.value)}
@@ -330,9 +351,9 @@ export function POSPage() {
               </div>
               <div className="flex items-center justify-between mt-2">
                 <div className="flex items-center gap-1.5">
-                  <button onClick={() => handleQtyUpdate(ci.id, -1)} className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold ${th.elev} ${th.tx}`}><Minus size={12} /></button>
+                  <button onClick={() => handleQtyUpdate(ci.id, -1)} aria-label="Decrease quantity" className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold ${th.elev} ${th.tx}`}><Minus size={12} /></button>
                   <span className={`w-6 text-center text-sm font-extrabold ${th.tx}`}>{ci.quantity}</span>
-                  <button onClick={() => handleQtyUpdate(ci.id, 1)} className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold ${th.elev} ${th.tx}`}><Plus size={12} /></button>
+                  <button onClick={() => handleQtyUpdate(ci.id, 1)} aria-label="Increase quantity" className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold ${th.elev} ${th.tx}`}><Plus size={12} /></button>
                 </div>
                 <div className="flex items-center gap-2">
                   {itemDisc > 0 ? (
@@ -344,22 +365,22 @@ export function POSPage() {
                     <span className={`text-sm font-extrabold ${th.tx}`}>{$(itemGross)}</span>
                   )}
                   <button onClick={() => { setDiscountItemId(discountItemId === ci.id ? null : ci.id); setDiscountMode(ci.discountType || "percent"); setDiscountInput(ci.discountValue ? String(ci.discountValue) : ""); }}
-                    className={`w-6 h-6 rounded-md flex items-center justify-center ${ci.discountType ? "text-[#E89B48]" : th.txf}`}><Tag size={11} /></button>
-                  <button onClick={() => removeItem(ci.id)} className="text-[#D4627A]/60 hover:text-[#D4627A]"><Trash2 size={14} /></button>
+                    aria-label="Toggle discount" className={`w-6 h-6 rounded-md flex items-center justify-center ${ci.discountType ? "text-[#E89B48]" : th.txf}`}><Tag size={11} /></button>
+                  <button onClick={() => removeItem(ci.id)} aria-label="Remove item" className="text-[#D4627A]/60 hover:text-[#D4627A]"><Trash2 size={14} /></button>
                 </div>
               </div>
               {discountItemId === ci.id && (
                 <div className="mt-2 flex items-center gap-1.5">
                   <div className="flex rounded-lg overflow-hidden border">
-                    <button onClick={() => setDiscountMode("percent")} className={`px-2 py-1 text-[10px] font-bold ${discountMode === "percent" ? "bg-[#E89B48] text-white" : `${th.elev} ${th.txm}`}`}><Percent size={10} /></button>
-                    <button onClick={() => setDiscountMode("fixed")} className={`px-2 py-1 text-[10px] font-bold ${discountMode === "fixed" ? "bg-[#E89B48] text-white" : `${th.elev} ${th.txm}`}`}>Rp</button>
+                    <button onClick={() => setDiscountMode("percent")} aria-label="Percent discount" className={`px-2 py-1 text-[10px] font-bold ${discountMode === "percent" ? "bg-[#E89B48] text-white" : `${th.elev} ${th.txm}`}`}><Percent size={10} /></button>
+                    <button onClick={() => setDiscountMode("fixed")} aria-label="Fixed discount" className={`px-2 py-1 text-[10px] font-bold ${discountMode === "fixed" ? "bg-[#E89B48] text-white" : `${th.elev} ${th.txm}`}`}>Rp</button>
                   </div>
                   <input value={discountInput} onChange={e => setDiscountInput(e.target.value)} type="number" placeholder="0"
                     className={`flex-1 px-2 py-1 text-xs rounded-lg border w-16 ${th.inp}`} />
                   <button onClick={() => { setItemDiscount(ci.id, discountMode, parseFloat(discountInput) || 0); setDiscountItemId(null); }}
                     className="px-2 py-1 rounded-lg text-[10px] font-bold text-white bg-[#E89B48]">{t.save}</button>
                   {ci.discountType && <button onClick={() => { setItemDiscount(ci.id, null, 0); setDiscountItemId(null); }}
-                    className="text-[10px] font-bold text-[#C4504A]"><X size={10} /></button>}
+                    aria-label="Remove discount" className="text-[10px] font-bold text-[#C4504A]"><X size={10} /></button>}
                 </div>
               )}
             </div>
@@ -398,14 +419,14 @@ export function POSPage() {
           {showOrderDiscount && (
             <div className="mt-2 flex items-center gap-1.5">
               <div className="flex rounded-lg overflow-hidden border">
-                <button onClick={() => setOrderDiscMode("percent")} className={`px-2 py-1 text-[10px] font-bold ${orderDiscMode === "percent" ? "bg-[#E89B48] text-white" : `${th.elev} ${th.txm}`}`}><Percent size={10} /></button>
-                <button onClick={() => setOrderDiscMode("fixed")} className={`px-2 py-1 text-[10px] font-bold ${orderDiscMode === "fixed" ? "bg-[#E89B48] text-white" : `${th.elev} ${th.txm}`}`}>Rp</button>
+                <button onClick={() => setOrderDiscMode("percent")} aria-label="Percent discount" className={`px-2 py-1 text-[10px] font-bold ${orderDiscMode === "percent" ? "bg-[#E89B48] text-white" : `${th.elev} ${th.txm}`}`}><Percent size={10} /></button>
+                <button onClick={() => setOrderDiscMode("fixed")} aria-label="Fixed discount" className={`px-2 py-1 text-[10px] font-bold ${orderDiscMode === "fixed" ? "bg-[#E89B48] text-white" : `${th.elev} ${th.txm}`}`}>Rp</button>
               </div>
               <input value={orderDiscInput} onChange={e => setOrderDiscInput(e.target.value)} type="number" placeholder="0"
                 className={`flex-1 px-2 py-1 text-xs rounded-lg border w-16 ${th.inp}`} />
               <button onClick={() => { setOrderDiscount(orderDiscMode, parseFloat(orderDiscInput) || 0); setShowOrderDiscount(false); }}
                 className="px-2 py-1 rounded-lg text-[10px] font-bold text-white bg-[#E89B48]">{t.save}</button>
-              <button onClick={() => setShowOrderDiscount(false)} className={th.txf}><X size={12} /></button>
+              <button onClick={() => setShowOrderDiscount(false)} aria-label="Close" className={th.txf}><X size={12} /></button>
             </div>
           )}
         </div>
@@ -427,6 +448,67 @@ export function POSPage() {
       </>}
     </div>
   );
+
+  // Show open register prompt if no active session (for roles that can manage register)
+  if (!activeSession && canManageRegister) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 px-4">
+        <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-5 ${th.accBg}`}>
+          <DollarSign size={28} className={th.acc} />
+        </div>
+        <p className={`text-lg font-black mb-2 ${th.tx}`}>{t.registerNotOpen}</p>
+        <p className={`text-sm text-center max-w-sm mb-6 ${th.txm}`}>{t.registerNotOpenHint}</p>
+        <button onClick={() => setOpenRegisterOpen(true)}
+          className="px-8 py-3.5 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-[#E8B088] to-[#A0673C]">
+          {t.openRegister}
+        </button>
+
+        {/* Open Register modal */}
+        <Modal open={openRegisterOpen} onClose={() => { setOpenRegisterOpen(false); setOpeningCashInput(""); }} title={t.openRegister as string}>
+          <div className="flex flex-col gap-4">
+            <div className={`rounded-[20px] p-6 text-center ${th.accBg}`}>
+              <DollarSign size={28} className={`mx-auto mb-2 ${th.acc}`} />
+              <p className={`text-sm font-semibold ${th.acc}`}>{t.openingCashHint}</p>
+            </div>
+            <div>
+              <p className={`text-sm font-bold mb-1.5 ${th.tx}`}>{t.openingCash}</p>
+              <input type="number" value={openingCashInput} onChange={e => setOpeningCashInput(e.target.value)}
+                placeholder="0" className={`w-full px-4 py-3 text-sm rounded-2xl border ${th.inp}`}
+                onKeyDown={e => { if (e.key === "Enter") doOpenRegister(); }} />
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => { setOpenRegisterOpen(false); setOpeningCashInput(""); }}
+                className={`flex-1 py-3 rounded-2xl text-sm font-bold border ${th.bdr} ${th.txm}`}>{t.cancel}</button>
+              <button onClick={doOpenRegister}
+                className="flex-1 py-3 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-[#E8B088] to-[#A0673C]">{t.confirm}</button>
+            </div>
+          </div>
+        </Modal>
+
+        {/* Today's register history */}
+        {todaySessions.length > 0 && (
+          <div className={`mt-8 w-full max-w-md rounded-[18px] border overflow-hidden ${th.card2} ${th.bdr}`}>
+            <div className={`px-4 py-3 border-b ${th.bdr}`}>
+              <p className={`text-xs font-extrabold tracking-tight ${th.tx}`}>{t.registerHistory}</p>
+            </div>
+            {todaySessions.map(s => {
+              const diffColor = s.difference === 0 ? "text-[#4A8B3F]" : s.difference > 0 ? "text-[#5B8DEF]" : "text-[#C4504A]";
+              return (
+                <div key={s.id} className={`px-4 py-2.5 border-b last:border-0 ${th.bdr}/50`}>
+                  <div className="flex justify-between">
+                    <span className={`text-sm font-bold ${th.tx}`}>{formatTime(s.closedAt)}</span>
+                    <span className={`text-sm font-black ${diffColor}`}>{s.difference >= 0 ? "+" : ""}{$(s.difference)}</span>
+                  </div>
+                  <p className={`text-[11px] ${th.txm}`}>{t.openingCash}: {$(s.openingCash)} · {t.expectedCash}: {$(s.expectedCash)} · {t.actualCash}: {$(s.actualCash)}</p>
+                  {s.notes && <p className={`text-[10px] mt-0.5 ${th.txf}`}>{s.notes}</p>}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="lg:flex lg:gap-5">
@@ -450,8 +532,12 @@ export function POSPage() {
             className={`w-full pl-10 pr-12 py-3 text-sm rounded-2xl border focus:outline-none focus:ring-2 focus:ring-[#A0673C]/20 font-medium ${th.inp}`} />
           <ScanLine size={16} className={`absolute right-3.5 top-1/2 -translate-y-1/2 ${th.txf}`} />
         </div>
-        {canCloseRegister && (
-          <button onClick={() => setCloseRegisterOpen(true)}
+        <button onClick={() => setOrderHistoryOpen(true)} aria-label={t.orderHistory as string}
+          className={`shrink-0 flex items-center justify-center w-11 py-3 rounded-2xl text-xs font-bold border ${th.bdr} ${th.txm}`}>
+          <FileText size={14} />
+        </button>
+        {canManageRegister && (
+          <button onClick={() => setCloseRegisterOpen(true)} aria-label={t.closeRegister as string}
             className={`shrink-0 flex items-center justify-center gap-1.5 w-11 sm:w-auto sm:px-3.5 py-3 rounded-2xl text-xs font-bold border ${th.bdr} ${th.txm}`}>
             <DollarSign size={14} /> <span className="hidden sm:inline">{t.closeRegister}</span>
           </button>
@@ -597,7 +683,7 @@ export function POSPage() {
               {proofImage ? (
                 <div className="relative">
                   <img src={proofImage} alt="proof" className="w-full rounded-2xl border object-cover max-h-48" />
-                  <button onClick={() => setProofImage("")}
+                  <button onClick={() => setProofImage("")} aria-label="Remove image"
                     className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/50 text-white flex items-center justify-center">
                     <X size={14} />
                   </button>
@@ -704,17 +790,55 @@ export function POSPage() {
           </div>
         )}
       </Modal>
+      {/* Order History modal */}
+      <Modal open={orderHistoryOpen} onClose={() => setOrderHistoryOpen(false)} title={t.orderHistory as string}>
+        <div className="flex flex-col gap-2">
+          {sessionOrders.length === 0 ? (
+            <div className={`text-center py-10 ${th.txm}`}>
+              <FileText size={36} className="mx-auto opacity-20 mb-3" />
+              <p className="font-semibold text-sm">{t.noOrderHistory}</p>
+            </div>
+          ) : sessionOrders.map(o => {
+            const statusColor = o.status === "completed" ? "text-[#4A8B3F]" : o.status === "cancelled" ? "text-[#C4504A]" : o.status === "refunded" ? "text-[#E89B48]" : th.txm;
+            const statusLabel = t[o.status as keyof typeof t] as string || o.status;
+            return (
+              <div key={o.id} className={`rounded-[16px] border p-3.5 ${th.card2} ${th.bdr}`}>
+                <div className="flex items-center justify-between mb-1">
+                  <span className={`text-xs font-mono font-bold ${th.tx}`}>{o.id}</span>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${statusColor}`}>{statusLabel}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className={`text-[11px] ${th.txm}`}>{formatTime(o.createdAt)} · {o.customer}</span>
+                  <span className={`text-sm font-black ${th.acc}`}>{$(o.total)}</span>
+                </div>
+                <div className={`mt-1.5 pt-1.5 border-t ${th.bdr}/50`}>
+                  {o.items.map((item, i) => (
+                    <p key={i} className={`text-[11px] ${th.txm}`}>{item.name} ×{item.quantity} — {$(item.unitPrice * item.quantity)}</p>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </Modal>
+
       <ProductDetailModal productId={detailProductId} onClose={() => setDetailProductId(null)} />
 
       {/* Close Register modal */}
       <Modal open={closeRegisterOpen} onClose={() => { setCloseRegisterOpen(false); setActualCash(""); setRegisterNotes(""); }} title={t.closeRegister as string}>
         <div className="flex flex-col gap-4">
           <div className={`rounded-[18px] border p-4 ${th.card2} ${th.bdr}`}>
+            {activeSession && (
+              <div className={`flex justify-between mb-1.5 pb-1.5 border-b ${th.bdr}/50`}>
+                <span className={`text-sm ${th.txm}`}>{t.openingCash}</span>
+                <span className={`text-sm font-bold ${th.tx}`}>{$(activeSession.openingCash)}</span>
+              </div>
+            )}
             <div className="flex justify-between mb-1">
               <span className={`text-sm ${th.txm}`}>{t.expectedCash}</span>
               <span className={`text-sm font-black ${th.tx}`}>{$(expectedCash)}</span>
             </div>
-            <p className={`text-[10px] ${th.txf}`}>{t.cash} orders {t.today?.toString().toLowerCase()}</p>
+            <p className={`text-[10px] ${th.txf}`}>{activeSession ? `${t.openingCash} + ${t.cash} orders` : `${t.cash} orders ${t.today?.toString().toLowerCase()}`}</p>
           </div>
           <div>
             <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>{t.actualCash}</p>
@@ -758,7 +882,7 @@ export function POSPage() {
                       <span className={`text-sm font-bold ${th.tx}`}>{formatTime(s.closedAt)}</span>
                       <span className={`text-sm font-black ${diffColor}`}>{s.difference >= 0 ? "+" : ""}{$(s.difference)}</span>
                     </div>
-                    <p className={`text-[11px] ${th.txm}`}>{t.expectedCash}: {$(s.expectedCash)} · {t.actualCash}: {$(s.actualCash)}</p>
+                    <p className={`text-[11px] ${th.txm}`}>{t.openingCash}: {$(s.openingCash)} · {t.expectedCash}: {$(s.expectedCash)} · {t.actualCash}: {$(s.actualCash)}</p>
                     {s.notes && <p className={`text-[10px] mt-0.5 ${th.txf}`}>{s.notes}</p>}
                   </div>
                 );

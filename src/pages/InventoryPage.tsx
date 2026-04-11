@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { useCategoryStore, useProductStore, useInventoryStore, useBatchStore, useAuthStore, useLangStore, useSupplierStore } from "@/stores";
+import { useCategoryStore, useProductStore, useInventoryStore, useBatchStore, useAuthStore, useLangStore, useSupplierStore, useSettingsStore } from "@/stores";
 import { INVENTORY_WRITE_ROLES, UNIT_OPTIONS, PAYMENT_TERMS_OPTIONS } from "@/constants";
 import { Modal } from "@/components/Modal";
 import { ProductImage } from "@/components/ProductImage";
@@ -7,13 +7,13 @@ import { ProductDetailModal } from "@/components/ProductDetailModal";
 import { SupplierDetailModal } from "@/components/SupplierDetailModal";
 import { useThemeClasses } from "@/hooks/useThemeClasses";
 import { useDebounce } from "@/hooks/useDebounce";
-import { formatCurrency as $, formatTime, formatDate, genId, genBatchNumber, calcDueDate, compressImage, printBarcodeLabel } from "@/utils";
+import { formatCurrency as $, formatTime, formatDate, genId, genBatchNumber, calcDueDate, compressImage, printBarcodeLabel, printBarcodeLabels } from "@/utils";
 import { exportProducts, exportInventory } from "@/utils/export";
 import type { UnitType, StockType, StockMovement, PaymentTerms, PaymentStatus, UnitOfMeasure } from "@/types";
 import toast from "react-hot-toast";
 import {
   Package, Plus, ChevronDown, ArrowDownCircle, ArrowUpCircle, Barcode,
-  LayoutGrid, Clock, AlertTriangle, Truck, X, Check, CircleDollarSign, Pencil, Download, Search,
+  LayoutGrid, Clock, AlertTriangle, Truck, X, Check, CircleDollarSign, Pencil, Download, Search, Printer,
 } from "lucide-react";
 
 type InventoryTab = "overview" | "stockIn" | "stockOut" | "expiry" | "history" | "suppliers";
@@ -27,6 +27,17 @@ function getDateLabel(dateStr: string, t: Record<string, any>): string {
   if (date.toDateString() === today.toDateString()) return t.today as string;
   if (date.toDateString() === yesterday.toDateString()) return t.yesterday as string;
   return date.toLocaleDateString("en", { day: "numeric", month: "short", year: "numeric" });
+}
+
+function generateSku(categoryId: string, products: { sku: string }[], categories: { id: string; name: string }[]): string {
+  const cat = categories.find(c => c.id === categoryId);
+  const prefix = cat ? cat.name.replace(/[^A-Za-z]/g, "").slice(0, 3).toUpperCase() : "GEN";
+  const existing = products
+    .filter(p => p.sku.startsWith(prefix + "-"))
+    .map(p => parseInt(p.sku.split("-")[1], 10))
+    .filter(n => !isNaN(n));
+  const next = existing.length > 0 ? Math.max(...existing) + 1 : 1;
+  return `${prefix}-${String(next).padStart(3, "0")}`;
 }
 
 export function InventoryPage() {
@@ -44,6 +55,7 @@ export function InventoryPage() {
   const user = useAuthStore(s => s.user)!;
   const canWrite = INVENTORY_WRITE_ROLES.includes(user.role);
   const { suppliers, addSupplier, updateSupplier, deleteSupplier } = useSupplierStore();
+  const { labelWidth, labelHeight } = useSettingsStore();
 
   const [detailProductId, setDetailProductId] = useState<string | null>(null);
   const [detailSupplierId, setDetailSupplierId] = useState<string | null>(null);
@@ -54,8 +66,9 @@ export function InventoryPage() {
     supplierId: "", paymentTerms: "COD" as PaymentTerms, paymentStatus: "unpaid" as PaymentStatus,
   });
   const [addProdOpen, setAddProdOpen] = useState(false);
+  const defaultCatId = categories.length > 0 ? categories[0].id : "";
   const [newProd, setNewProd] = useState({
-    name: "", nameId: "", sku: "", category: "c1",
+    name: "", nameId: "", sku: "", category: defaultCatId,
     purchasePrice: "", sellingPrice: "",
     qtyPerBox: "12", stock: "0", unit: "kg" as UnitOfMeasure, image: "", minStock: "10",
   });
@@ -63,15 +76,17 @@ export function InventoryPage() {
   const [newCat, setNewCat] = useState({ name: "", nameId: "", color: "#C4884A" });
   const catColors = ["#C4884A", "#D4627A", "#5B8DEF", "#7D5A44", "#8B6FC0", "#6F9A4D", "#E89B48", "#2BA5B5", "#9B59B6", "#E74C3C"];
   const [overviewFilter, setOverviewFilter] = useState<"all" | "low" | "out" | "inactive">("all");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [productSearch, setProductSearch] = useState("");
   const debouncedProductSearch = useDebounce(productSearch, 150);
   const [confirmDeleteSupplierId, setConfirmDeleteSupplierId] = useState<string | null>(null);
+  const [prodFormErrors, setProdFormErrors] = useState<Record<string, boolean>>({});
   const [editProdOpen, setEditProdOpen] = useState(false);
   const [editProdId, setEditProdId] = useState<string | null>(null);
   const [editProd, setEditProd] = useState({
-    name: "", nameId: "", sku: "", category: "c1",
+    name: "", nameId: "", sku: "", category: defaultCatId,
     purchasePrice: "", sellingPrice: "",
-    qtyPerBox: "12", unit: "kg" as UnitOfMeasure, image: "", minStock: "10",
+    qtyPerBox: "12", stock: "0", unit: "kg" as UnitOfMeasure, image: "", minStock: "10",
   });
 
   // Supplier modal state
@@ -149,7 +164,12 @@ export function InventoryPage() {
   };
 
   const doAddProduct = () => {
-    if (!newProd.name || !newProd.nameId || !newProd.sku) return;
+    const errs: Record<string, boolean> = {};
+    if (!newProd.name.trim()) errs.name = true;
+    if (!newProd.nameId.trim()) errs.nameId = true;
+    if (!newProd.sku.trim()) errs.sku = true;
+    if (Object.keys(errs).length) { setProdFormErrors(errs); return; }
+    setProdFormErrors({});
     addProduct({
       id: genId(), sku: newProd.sku, name: newProd.name, nameId: newProd.nameId,
       category: newProd.category, purchasePrice: parseInt(newProd.purchasePrice) || 0,
@@ -159,7 +179,8 @@ export function InventoryPage() {
       createdAt: new Date().toISOString(),
     });
     setAddProdOpen(false);
-    setNewProd({ name: "", nameId: "", sku: "", category: "c1", purchasePrice: "", sellingPrice: "", qtyPerBox: "12", stock: "0", unit: "kg", image: "", minStock: "10" });
+    setNewProd({ name: "", nameId: "", sku: "", category: defaultCatId, purchasePrice: "", sellingPrice: "", qtyPerBox: "12", stock: "0", unit: "kg", image: "", minStock: "10" });
+    setProdFormErrors({});
     toast.success(t.productAdded as string);
   };
 
@@ -170,7 +191,7 @@ export function InventoryPage() {
     setEditProd({
       name: p.name, nameId: p.nameId, sku: p.sku, category: p.category,
       purchasePrice: String(p.purchasePrice), sellingPrice: String(p.sellingPrice),
-      qtyPerBox: String(p.qtyPerBox), unit: p.unit, image: p.image, minStock: String(p.minStock),
+      qtyPerBox: String(p.qtyPerBox), stock: String(p.stock), unit: p.unit, image: p.image, minStock: String(p.minStock),
     });
     setEditProdOpen(true);
   };
@@ -181,7 +202,7 @@ export function InventoryPage() {
       name: editProd.name, nameId: editProd.nameId, sku: editProd.sku,
       category: editProd.category, purchasePrice: parseInt(editProd.purchasePrice) || 0,
       sellingPrice: parseInt(editProd.sellingPrice) || 0, qtyPerBox: parseInt(editProd.qtyPerBox) || 12,
-      unit: editProd.unit, image: editProd.image || "", minStock: parseInt(editProd.minStock) || 10,
+      stock: parseInt(editProd.stock) || 0, unit: editProd.unit, image: editProd.image || "", minStock: parseInt(editProd.minStock) || 10,
     });
     setEditProdOpen(false);
     setEditProdId(null);
@@ -350,11 +371,11 @@ export function InventoryPage() {
         <div className="flex gap-1.5 shrink-0">
           {activeTab === "overview" && (
             <>
-              <button onClick={() => { exportProducts(products, "csv"); toast.success(t.exportSuccess as string); }}
+              <button onClick={async () => { await exportProducts(products, "csv"); toast.success(t.exportSuccess as string); }}
                 className={`flex items-center gap-1 px-2 py-1.5 rounded-xl text-[10px] font-bold ${th.elev} ${th.txm}`}>
                 <Download size={11} /> CSV
               </button>
-              <button onClick={() => { exportProducts(products, "xlsx"); toast.success(t.exportSuccess as string); }}
+              <button onClick={async () => { await exportProducts(products, "xlsx"); toast.success(t.exportSuccess as string); }}
                 className={`flex items-center gap-1 px-2 py-1.5 rounded-xl text-[10px] font-bold ${th.elev} ${th.txm}`}>
                 <Download size={11} /> Excel
               </button>
@@ -362,11 +383,11 @@ export function InventoryPage() {
           )}
           {activeTab === "history" && (
             <>
-              <button onClick={() => { exportInventory(movements, products, "csv"); toast.success(t.exportSuccess as string); }}
+              <button onClick={async () => { await exportInventory(movements, products, "csv"); toast.success(t.exportSuccess as string); }}
                 className={`flex items-center gap-1 px-2 py-1.5 rounded-xl text-[10px] font-bold ${th.elev} ${th.txm}`}>
                 <Download size={11} /> CSV
               </button>
-              <button onClick={() => { exportInventory(movements, products, "xlsx"); toast.success(t.exportSuccess as string); }}
+              <button onClick={async () => { await exportInventory(movements, products, "xlsx"); toast.success(t.exportSuccess as string); }}
                 className={`flex items-center gap-1 px-2 py-1.5 rounded-xl text-[10px] font-bold ${th.elev} ${th.txm}`}>
                 <Download size={11} /> Excel
               </button>
@@ -395,7 +416,7 @@ export function InventoryPage() {
       {/* Admin-only action buttons */}
       {canWrite && activeTab === "overview" && (
         <div className="grid grid-cols-2 gap-2.5">
-          <button onClick={() => setAddProdOpen(true)}
+          <button onClick={() => { const catId = categories.length > 0 ? categories[0].id : ""; setNewProd(p => ({ ...p, category: catId, sku: generateSku(catId, products, categories) })); setAddProdOpen(true); }}
             className={`py-3 rounded-2xl text-sm font-bold border-2 border-dashed flex items-center justify-center gap-2 ${th.bdr} ${th.acc}`}>
             <Plus size={16} /> {t.addProduct}
           </button>
@@ -437,10 +458,30 @@ export function InventoryPage() {
 
           {/* Product list */}
           <div className={`rounded-[22px] border overflow-hidden ${th.card} ${th.bdr}`}>
-            <div className={`px-5 py-3.5 border-b ${th.bdr}`}>
-              <p className={`text-sm font-extrabold tracking-tight ${th.tx}`}>
-                {t.product} ({filteredProducts.length})
-              </p>
+            <div className={`px-5 py-3.5 border-b flex items-center justify-between ${th.bdr}`}>
+              <div className="flex items-center gap-3">
+                {canWrite && (
+                  <input type="checkbox"
+                    checked={filteredProducts.length > 0 && selectedIds.size === filteredProducts.length}
+                    onChange={(e) => {
+                      if (e.target.checked) setSelectedIds(new Set(filteredProducts.map(p => p.id)));
+                      else setSelectedIds(new Set());
+                    }}
+                    className="w-4 h-4 rounded accent-[#A0673C]" />
+                )}
+                <p className={`text-sm font-extrabold tracking-tight ${th.tx}`}>
+                  {t.product} ({filteredProducts.length})
+                </p>
+              </div>
+              {canWrite && selectedIds.size > 0 && (
+                <button onClick={() => {
+                  const selected = products.filter(p => selectedIds.has(p.id));
+                  printBarcodeLabels(selected, lang, { width: labelWidth, height: labelHeight });
+                }}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold ${th.accBg} ${th.acc}`}>
+                  <Printer size={12} /> Print {selectedIds.size} Label
+                </button>
+              )}
             </div>
             {filteredProducts.length === 0 ? (
               <div className={`py-10 text-center ${th.txm}`}>
@@ -451,6 +492,17 @@ export function InventoryPage() {
               <div key={product.id} onClick={() => setDetailProductId(product.id)}
                 className={`flex items-center justify-between px-4 py-3 border-b last:border-0 cursor-pointer active:opacity-70 ${th.bdr}/50`}>
                 <div className="flex items-center gap-3 min-w-0 flex-1">
+                  {canWrite && (
+                    <input type="checkbox" checked={selectedIds.has(product.id)}
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={(e) => {
+                        const next = new Set(selectedIds);
+                        if (e.target.checked) next.add(product.id);
+                        else next.delete(product.id);
+                        setSelectedIds(next);
+                      }}
+                      className="w-4 h-4 rounded accent-[#A0673C] shrink-0" />
+                  )}
                   <ProductImage product={product} size={36} />
                   <div className="min-w-0">
                     <p className={`text-sm font-bold truncate ${th.tx} ${!product.isActive ? "line-through opacity-50" : ""}`}>
@@ -476,6 +528,7 @@ export function InventoryPage() {
                     <div className="flex items-center gap-1.5">
                       <button
                         onClick={(e) => { e.stopPropagation(); openEditProduct(product.id); }}
+                        aria-label="Edit product"
                         className={`w-7 h-7 rounded-lg flex items-center justify-center ${th.dark ? "bg-[#5B8DEF]/15 text-[#5B8DEF]" : "bg-blue-50 text-[#5B8DEF]"}`}
                       >
                         <Pencil size={12} />
@@ -489,6 +542,7 @@ export function InventoryPage() {
                         className={`w-10 h-6 rounded-full transition-colors relative ${
                           product.isActive ? "bg-[#4A8B3F]" : (th.dark ? "bg-[#352E28]" : "bg-[#E8DDD2]")
                         }`}
+                        aria-label={product.isActive ? t.hideFromPOS as string : t.showInPOS as string}
                         title={product.isActive ? t.hideFromPOS as string : t.showInPOS as string}
                       >
                         <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-transform ${
@@ -855,7 +909,7 @@ export function InventoryPage() {
               className={`w-full px-4 py-2.5 text-sm rounded-xl border resize-none ${th.inp}`} />
           </div>
           {form.prod && (
-            <button onClick={() => { const p = products.find(pr => pr.id === form.prod); if (p) printBarcodeLabel(p, lang); }}
+            <button onClick={() => { const p = products.find(pr => pr.id === form.prod); if (p) printBarcodeLabel(p, lang, { width: labelWidth, height: labelHeight }); }}
               className={`w-full py-2.5 rounded-2xl text-xs font-bold border flex items-center justify-center gap-2 ${th.bdr} ${th.txm}`}>
               <Barcode size={14} /> {t.printLabel}
             </button>
@@ -873,23 +927,30 @@ export function InventoryPage() {
         <div className="flex flex-col gap-3">
           <div>
             <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>{t.productName}</p>
-            <input value={newProd.name} onChange={e => setNewProd({ ...newProd, name: e.target.value })}
-              className={inp} />
+            <input value={newProd.name} onChange={e => { setNewProd({ ...newProd, name: e.target.value }); setProdFormErrors(p => ({ ...p, name: false })); }}
+              className={`${inp} ${prodFormErrors.name ? "!border-red-400" : ""}`} />
+            {prodFormErrors.name && <p className="text-red-400 text-[10px] mt-1 font-medium">{t.required}</p>}
           </div>
           <div>
             <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>{t.productNameId}</p>
-            <input value={newProd.nameId} onChange={e => setNewProd({ ...newProd, nameId: e.target.value })}
-              className={inp} />
+            <input value={newProd.nameId} onChange={e => { setNewProd({ ...newProd, nameId: e.target.value }); setProdFormErrors(p => ({ ...p, nameId: false })); }}
+              className={`${inp} ${prodFormErrors.nameId ? "!border-red-400" : ""}`} />
+            {prodFormErrors.nameId && <p className="text-red-400 text-[10px] mt-1 font-medium">{t.required}</p>}
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>{t.sku}</p>
-              <input value={newProd.sku} onChange={e => setNewProd({ ...newProd, sku: e.target.value })}
-                className={inp} />
+              <input value={newProd.sku} onChange={e => { setNewProd({ ...newProd, sku: e.target.value }); setProdFormErrors(p => ({ ...p, sku: false })); }}
+                className={`${inp} ${prodFormErrors.sku ? "!border-red-400" : ""}`} />
+              {prodFormErrors.sku && <p className="text-red-400 text-[10px] mt-1 font-medium">{t.required}</p>}
             </div>
             <div className="relative">
               <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>{lang === "id" ? "Kategori" : "Category"}</p>
-              <select value={newProd.category} onChange={e => setNewProd({ ...newProd, category: e.target.value })}
+              <select value={newProd.category} onChange={e => {
+                  const cat = e.target.value;
+                  const sku = generateSku(cat, products, categories);
+                  setNewProd({ ...newProd, category: cat, sku });
+                }}
                 className={`w-full px-4 py-2.5 text-sm rounded-xl border appearance-none ${th.inp}`}>
                 {categories.map(c => <option key={c.id} value={c.id}>{lang === "id" ? c.nameId : c.name}</option>)}
               </select>
@@ -915,7 +976,7 @@ export function InventoryPage() {
               {t.boxPrice}: {$((parseInt(newProd.sellingPrice) || 0) * (parseInt(newProd.qtyPerBox) || 0))}
             </p>
           )}
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <div>
               <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>{t.qtyPerBox}</p>
               <input type="number" value={newProd.qtyPerBox} onChange={e => setNewProd({ ...newProd, qtyPerBox: e.target.value })}
@@ -928,6 +989,13 @@ export function InventoryPage() {
                 {UNIT_OPTIONS.map(u => <option key={u} value={u}>{u}</option>)}
               </select>
               <ChevronDown size={14} className={`absolute right-4 bottom-3 ${th.txf}`} />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>{lang === "id" ? "Stok Awal" : "Initial Stock"}</p>
+              <input type="number" value={newProd.stock} onChange={e => setNewProd({ ...newProd, stock: e.target.value })}
+                className={inp} min="0" />
             </div>
             <div>
               <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>{t.minStockLabel}</p>
@@ -946,7 +1014,7 @@ export function InventoryPage() {
               {newProd.image && (
                 <div className="relative">
                   <img src={newProd.image} alt="preview" className="w-12 h-12 rounded-xl object-cover" />
-                  <button onClick={() => setNewProd({ ...newProd, image: "" })}
+                  <button onClick={() => setNewProd({ ...newProd, image: "" })} aria-label="Remove image"
                     className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-[#C4504A] text-white flex items-center justify-center">
                     <X size={10} />
                   </button>
@@ -1071,7 +1139,7 @@ export function InventoryPage() {
               {t.boxPrice}: {$((parseInt(editProd.sellingPrice) || 0) * (parseInt(editProd.qtyPerBox) || 0))}
             </p>
           )}
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <div>
               <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>{t.qtyPerBox}</p>
               <input type="number" value={editProd.qtyPerBox} onChange={e => setEditProd({ ...editProd, qtyPerBox: e.target.value })}
@@ -1084,6 +1152,13 @@ export function InventoryPage() {
                 {UNIT_OPTIONS.map(u => <option key={u} value={u}>{u}</option>)}
               </select>
               <ChevronDown size={14} className={`absolute right-4 bottom-3 ${th.txf}`} />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>{lang === "id" ? "Stok" : "Stock"}</p>
+              <input type="number" value={editProd.stock} onChange={e => setEditProd({ ...editProd, stock: e.target.value })}
+                className={inp} min="0" />
             </div>
             <div>
               <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>{t.minStockLabel}</p>
@@ -1101,7 +1176,7 @@ export function InventoryPage() {
               {editProd.image && (
                 <div className="relative">
                   <img src={editProd.image} alt="preview" className="w-12 h-12 rounded-xl object-cover" />
-                  <button onClick={() => setEditProd({ ...editProd, image: "" })}
+                  <button onClick={() => setEditProd({ ...editProd, image: "" })} aria-label="Remove image"
                     className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-[#C4504A] text-white flex items-center justify-center">
                     <X size={10} />
                   </button>

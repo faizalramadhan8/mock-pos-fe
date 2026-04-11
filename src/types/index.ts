@@ -4,7 +4,7 @@ export type Role = "superadmin" | "admin" | "cashier" | "staff" | "user";
 export type PaymentMethod = "cash" | "card" | "transfer" | "qris";
 export type OrderStatus = "completed" | "pending" | "cancelled" | "refunded";
 export type DiscountType = "percent" | "fixed";
-export type AuditAction = "order_created" | "order_voided" | "order_refunded" | "stock_adjusted" | "product_added" | "product_edited" | "settings_changed" | "user_registered" | "register_closed";
+export type AuditAction = "order_created" | "order_voided" | "order_refunded" | "stock_adjusted" | "product_added" | "product_edited" | "settings_changed" | "user_registered" | "user_toggled" | "user_deleted" | "password_reset" | "register_opened" | "register_closed";
 export type UnitType = "individual" | "box";
 export type StockType = "in" | "out";
 export type PageId = "dashboard" | "pos" | "inventory" | "orders" | "settings";
@@ -22,6 +22,7 @@ export interface User {
   nik?: string;
   phone?: string;
   dateOfBirth?: string;
+  isActive?: boolean;
 }
 
 export interface Category {
@@ -165,6 +166,9 @@ export interface RefundItem {
 export interface CashSession {
   id: string;
   date: string;
+  openingCash: number;
+  openedBy: string;
+  openedAt: string;
   expectedCash: number;
   actualCash: number;
   difference: number;
@@ -179,5 +183,18 @@ export interface AuditEntry {
   userId: string;
   userName: string;
   details: string;
+  createdAt: string;
+}
+
+export type NotifType = "stock_low" | "stock_out" | "expiry_soon" | "expired" | "invoice_due" | "register_open";
+export type NotifPriority = "critical" | "high" | "medium" | "low";
+
+export interface AppNotification {
+  id: string;
+  type: NotifType;
+  priority: NotifPriority;
+  title: string;
+  message: string;
+  productId?: string;
   createdAt: string;
 }
