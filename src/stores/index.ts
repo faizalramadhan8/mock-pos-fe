@@ -263,7 +263,7 @@ export const useProductStore = create<ProductState>((set, get) => ({
   products: [],
   fetchProducts: async () => {
     try {
-      const res = await productApi.getAll({ limit: 500 });
+      const res = await productApi.getAll({ limit: 10000 });
       set({ products: (res.body || []).map(mapProduct) });
     } catch { /* ignore */ }
   },
