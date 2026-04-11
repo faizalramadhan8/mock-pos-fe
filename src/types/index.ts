@@ -45,6 +45,7 @@ export interface Supplier {
 export interface Product {
   id: string;
   sku: string;
+  barcode?: string;
   name: string;
   nameId: string;
   category: string;

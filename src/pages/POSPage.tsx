@@ -155,9 +155,15 @@ export function POSPage() {
     addItem(product, unitType, lang);
   }, [addItem, lang, t.insufficientStock]);
 
-  // Barcode scanner: auto-add product by SKU
+  // Barcode scanner: match barcode first, then fall back to SKU
   const handleBarcodeScan = useCallback((scannedCode: string) => {
-    const product = products.find(p => p.sku.toUpperCase() === scannedCode.toUpperCase() && p.isActive);
+    const code = scannedCode.toUpperCase();
+    const product = products.find(p =>
+      p.isActive && (
+        (p.barcode && p.barcode.toUpperCase() === code) ||
+        p.sku.toUpperCase() === code
+      )
+    );
     if (product) {
       handleAddToCart(product, "individual");
       toast.success(`${t.productScanned}: ${lang === "id" ? product.nameId : product.name}`);

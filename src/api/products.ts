@@ -3,6 +3,7 @@ import { api } from './client';
 export interface ProductRes {
   id: string;
   sku: string;
+  barcode?: string;
   name: string;
   name_id: string;
   category_id: string;
@@ -54,6 +55,7 @@ export const productApi = {
 
   create: (data: {
     sku: string;
+    barcode?: string;
     name: string;
     name_id?: string;
     category_id: string;
@@ -70,6 +72,7 @@ export const productApi = {
     name: string;
     name_id: string;
     sku: string;
+    barcode: string;
     category_id: string;
     purchase_price: number;
     selling_price: number;

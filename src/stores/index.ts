@@ -16,7 +16,7 @@ const mapUser = (u: any): User => ({
 });
 
 const mapProduct = (p: any): Product => ({
-  id: p.id, sku: p.sku, name: p.name, nameId: p.name_id || '',
+  id: p.id, sku: p.sku, barcode: p.barcode || '', name: p.name, nameId: p.name_id || '',
   category: p.category_id, purchasePrice: p.purchase_price, sellingPrice: p.selling_price,
   qtyPerBox: p.qty_per_box || 1, stock: p.stock, unit: p.unit,
   image: p.image || '', minStock: p.min_stock || 0, isActive: p.is_active !== false,
