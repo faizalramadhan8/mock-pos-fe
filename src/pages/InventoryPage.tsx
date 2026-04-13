@@ -5,6 +5,7 @@ import { Modal } from "@/components/Modal";
 import { ProductImage } from "@/components/ProductImage";
 import { ProductDetailModal } from "@/components/ProductDetailModal";
 import { SupplierDetailModal } from "@/components/SupplierDetailModal";
+import { SearchableSelect } from "@/components/SearchableSelect";
 import { useThemeClasses } from "@/hooks/useThemeClasses";
 import { useDebounce } from "@/hooks/useDebounce";
 import { formatCurrency as $, formatTime, formatDate, genId, genBatchNumber, calcDueDate, compressImage, printBarcodeLabel, printBarcodeLabels } from "@/utils";
@@ -75,7 +76,7 @@ export function InventoryPage() {
   const [addCatOpen, setAddCatOpen] = useState(false);
   const [newCat, setNewCat] = useState({ name: "", nameId: "", color: "#C4884A" });
   const catColors = ["#C4884A", "#D4627A", "#5B8DEF", "#7D5A44", "#8B6FC0", "#6F9A4D", "#E89B48", "#2BA5B5", "#9B59B6", "#E74C3C"];
-  const [overviewFilter, setOverviewFilter] = useState<"all" | "low" | "out" | "inactive">("all");
+  const [overviewFilter, setOverviewFilter] = useState<"all" | "low" | "out" | "inactive" | "member">("all");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [productSearch, setProductSearch] = useState("");
   const debouncedProductSearch = useDebounce(productSearch, 150);
@@ -116,6 +117,10 @@ export function InventoryPage() {
   const lowStockCount = useMemo(() => products.filter(p => p.stock > 0 && p.stock <= p.minStock).length, [products]);
   const outOfStockCount = useMemo(() => products.filter(p => p.stock === 0).length, [products]);
   const inactiveCount = useMemo(() => products.filter(p => !p.isActive).length, [products]);
+  const memberPriceCount = useMemo(() =>
+    products.filter(p => typeof p.memberPrice === "number" && p.memberPrice > 0 && p.memberPrice < p.sellingPrice).length,
+    [products]
+  );
 
   const filteredProducts = useMemo(() => {
     let list = products;
@@ -123,6 +128,7 @@ export function InventoryPage() {
       case "low": list = list.filter(p => p.stock > 0 && p.stock <= p.minStock); break;
       case "out": list = list.filter(p => p.stock === 0); break;
       case "inactive": list = list.filter(p => !p.isActive); break;
+      case "member": list = list.filter(p => typeof p.memberPrice === "number" && p.memberPrice > 0 && p.memberPrice < p.sellingPrice); break;
     }
     if (debouncedProductSearch.trim()) {
       const q = debouncedProductSearch.toLowerCase();
@@ -455,12 +461,13 @@ export function InventoryPage() {
       {activeTab === "overview" && (
         <>
           {/* Stats */}
-          <div className="grid grid-cols-4 gap-2">
+          <div className="grid grid-cols-5 gap-2">
             {[
               { l: t.all, v: products.length, clr: "#5B8DEF", f: "all" as const },
               { l: t.lowStock, v: lowStockCount, clr: "#E89B48", f: "low" as const },
               { l: t.outOfStock, v: outOfStockCount, clr: "#C4504A", f: "out" as const },
               { l: t.inactive, v: inactiveCount, clr: "#8A7E73", f: "inactive" as const },
+              { l: "💎 Member", v: memberPriceCount, clr: "#A0673C", f: "member" as const },
             ].map(s => (
               <button key={s.f} onClick={() => setOverviewFilter(s.f)}
                 className={`rounded-[14px] border p-2.5 text-left transition-all ${
@@ -530,6 +537,14 @@ export function InventoryPage() {
                       {lang === "id" ? product.nameId : product.name}
                     </p>
                     <p className={`text-[10px] font-mono ${th.txf}`}>{product.sku}</p>
+                    {typeof product.memberPrice === "number" && product.memberPrice > 0 && product.memberPrice < product.sellingPrice && (
+                      <p className={`text-[10px] mt-0.5 ${th.acc}`}>
+                        💎 {$(product.sellingPrice)} → <b>{$(product.memberPrice)}</b>
+                        <span className={`ml-1 ${th.txm}`}>
+                          (-{Math.round((1 - product.memberPrice / product.sellingPrice) * 100)}%)
+                        </span>
+                      </p>
+                    )}
                   </div>
                 </div>
                 <div className="flex items-center gap-2.5 shrink-0">
@@ -845,8 +860,9 @@ export function InventoryPage() {
       <Modal open={!!stockModal} onClose={() => setStockModal(null)} title={(stockModal === "in" ? t.stockIn : t.stockOut) as string}>
         <div className="flex flex-col gap-3.5">
           <div className="relative">
-            <select value={form.prod} onChange={e => {
-                const prodId = e.target.value;
+            <SearchableSelect
+              value={form.prod}
+              onChange={(prodId) => {
                 if (stockModal === "out") {
                   const sp = products.find(p => p.id === prodId);
                   setForm({ ...form, prod: prodId, price: sp ? String(form.unit === "box" ? sp.sellingPrice * sp.qtyPerBox : sp.sellingPrice) : "" });
@@ -854,11 +870,13 @@ export function InventoryPage() {
                   setForm({ ...form, prod: prodId });
                 }
               }}
-              className={`w-full px-4 py-3 text-sm rounded-2xl border appearance-none ${th.inp}`}>
-              <option value="">{t.selectProduct}</option>
-              {products.map(p => <option key={p.id} value={p.id}>{lang === "id" ? p.nameId : p.name} ({p.stock})</option>)}
-            </select>
-            <ChevronDown size={14} className={`absolute right-4 top-1/2 -translate-y-1/2 ${th.txf}`} />
+              placeholder={t.selectProduct as string}
+              options={products.map(p => ({
+                id: p.id,
+                label: lang === "id" ? p.nameId : p.name,
+                subtitle: `SKU ${p.sku} · Stok ${p.stock}`,
+              }))}
+            />
           </div>
 
           {/* Supplier & Payment (stock-in only) */}
@@ -993,17 +1011,20 @@ export function InventoryPage() {
                 className={`${inp} ${prodFormErrors.sku ? "!border-red-400" : ""}`} />
               {prodFormErrors.sku && <p className="text-red-400 text-[10px] mt-1 font-medium">{t.required}</p>}
             </div>
-            <div className="relative">
+            <div>
               <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>{lang === "id" ? "Kategori" : "Category"}</p>
-              <select value={newProd.category} onChange={e => {
-                  const cat = e.target.value;
+              <SearchableSelect
+                value={newProd.category}
+                onChange={(cat) => {
                   const sku = generateSku(cat, products, categories);
                   setNewProd({ ...newProd, category: cat, sku });
                 }}
-                className={`w-full px-4 py-2.5 text-sm rounded-xl border appearance-none ${th.inp}`}>
-                {categories.map(c => <option key={c.id} value={c.id}>{lang === "id" ? c.nameId : c.name}</option>)}
-              </select>
-              <ChevronDown size={14} className={`absolute right-4 bottom-3 ${th.txf}`} />
+                placeholder={lang === "id" ? "Pilih kategori" : "Select category"}
+                options={categories.map(c => ({
+                  id: c.id,
+                  label: lang === "id" ? c.nameId : c.name,
+                }))}
+              />
             </div>
           </div>
           {/* Pricing */}
@@ -1180,13 +1201,17 @@ export function InventoryPage() {
               <input value={editProd.sku} onChange={e => setEditProd({ ...editProd, sku: e.target.value })}
                 className={inp} />
             </div>
-            <div className="relative">
+            <div>
               <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>{lang === "id" ? "Kategori" : "Category"}</p>
-              <select value={editProd.category} onChange={e => setEditProd({ ...editProd, category: e.target.value })}
-                className={`w-full px-4 py-2.5 text-sm rounded-xl border appearance-none ${th.inp}`}>
-                {categories.map(c => <option key={c.id} value={c.id}>{lang === "id" ? c.nameId : c.name}</option>)}
-              </select>
-              <ChevronDown size={14} className={`absolute right-4 bottom-3 ${th.txf}`} />
+              <SearchableSelect
+                value={editProd.category}
+                onChange={(cat) => setEditProd({ ...editProd, category: cat })}
+                placeholder={lang === "id" ? "Pilih kategori" : "Select category"}
+                options={categories.map(c => ({
+                  id: c.id,
+                  label: lang === "id" ? c.nameId : c.name,
+                }))}
+              />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
