@@ -292,14 +292,16 @@ export function POSPage() {
       ...((payment === "qris" || payment === "transfer") && proofImage ? { paymentProof: proofImage } : {}),
       ...(orderDiscountType ? { orderDiscountType, orderDiscountValue, orderDiscount: orderDiscAmount } : {}),
     };
-    addOrder(order);
     cartItems.forEach(ci => {
       const delta = ci.unitType === "box" ? ci.quantity * ci.qtyPerBox : ci.quantity;
       adjustStock(ci.productId, -delta);
       consumeFIFO(ci.productId, delta);
     });
-    useAuditStore.getState().log("order_created", user.id, user.name, `${order.id} · ${$(order.total)}`);
-    setLastOrder(order);
+    addOrder(order).then(saved => {
+      // Use backend-assigned ID for audit log so it matches the real order
+      useAuditStore.getState().log("order_created", user.id, user.name, `${saved.id} · ${$(saved.total)}`);
+      setLastOrder(saved);
+    });
     clearCart();
     setCashRcv("");
     setProofImage("");

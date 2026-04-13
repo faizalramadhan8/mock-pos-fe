@@ -226,11 +226,13 @@ export function InventoryPage() {
   const doEditProduct = () => {
     if (!editProdId || !editProd.name || !editProd.nameId || !editProd.sku) return;
     const memberPriceVal = parseInt(editProd.memberPrice);
+    // 0 (or invalid) signals BE to clear member_price; positive number sets it
+    const memberPriceToSend = Number.isFinite(memberPriceVal) && memberPriceVal > 0 ? memberPriceVal : 0;
     updateProduct(editProdId, {
       name: editProd.name, nameId: editProd.nameId, sku: editProd.sku,
       category: editProd.category, purchasePrice: parseInt(editProd.purchasePrice) || 0,
       sellingPrice: parseInt(editProd.sellingPrice) || 0,
-      memberPrice: Number.isFinite(memberPriceVal) && memberPriceVal > 0 ? memberPriceVal : undefined,
+      memberPrice: memberPriceToSend,
       qtyPerBox: parseInt(editProd.qtyPerBox) || 12,
       stock: parseInt(editProd.stock) || 0, unit: editProd.unit, image: editProd.image || "", minStock: parseInt(editProd.minStock) || 10,
     });

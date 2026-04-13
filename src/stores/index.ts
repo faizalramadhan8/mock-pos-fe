@@ -427,7 +427,7 @@ export const useCartStore = create<CartState>()(
 interface OrderState {
   orders: Order[];
   fetchOrders: () => Promise<void>;
-  addOrder: (order: Order) => Promise<void>;
+  addOrder: (order: Order) => Promise<Order>;
   cancelOrder: (id: string) => void;
   refundOrder: (id: string) => void;
 }
@@ -455,18 +455,17 @@ export const useOrderStore = create<OrderState>((set, get) => ({
         order_discount_type: order.orderDiscountType, order_discount_value: order.orderDiscountValue,
         order_discount: order.orderDiscount,
       });
-      if (res.body) {
-        set(s => ({ orders: [mapOrder(res.body), ...s.orders] }));
-      } else {
-        set(s => ({ orders: [order, ...s.orders] }));
-      }
+      const saved = res.body ? mapOrder(res.body) : order;
+      set(s => ({ orders: [saved, ...s.orders] }));
       // Refresh products and batches (stock was updated by BE)
       await useProductStore.getState().fetchProducts();
       await useBatchStore.getState().fetchBatches();
+      return saved;
     } catch (e: any) {
       // Fallback: add locally
       set(s => ({ orders: [order, ...s.orders] }));
       toast.error(e.message || 'Failed to create order');
+      return order;
     }
   },
   cancelOrder: (id) => {
