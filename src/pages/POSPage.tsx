@@ -46,6 +46,8 @@ export function POSPage() {
   const orderDiscountValue = useCartStore(s => s.orderDiscountValue);
 
   const [query, setQuery] = useState("");
+  const PAGE_SIZE = 60;
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [discountItemId, setDiscountItemId] = useState<string | null>(null);
   const [discountInput, setDiscountInput] = useState("");
   const [discountMode, setDiscountMode] = useState<DiscountType>("percent");
@@ -140,6 +142,11 @@ export function POSPage() {
     return p.isActive && (name.includes(debouncedQuery.toLowerCase()) || p.sku.toLowerCase().includes(debouncedQuery.toLowerCase()))
       && (catFilter === "all" || p.category === catFilter);
   }), [products, debouncedQuery, catFilter, lang]);
+
+  // Reset pagination whenever filters change
+  useEffect(() => { setVisibleCount(PAGE_SIZE); }, [debouncedQuery, catFilter]);
+
+  const visibleProducts = useMemo(() => filtered.slice(0, visibleCount), [filtered, visibleCount]);
 
   // Cart quantity validation
   const handleAddToCart = useCallback((product: Product, unitType: UnitType) => {
@@ -581,19 +588,31 @@ export function POSPage() {
             <p className="font-semibold text-sm">{t.noResults}</p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-3 pb-28 lg:pb-4">
-            {filtered.map(p => (
-              <ProductCard
-                key={p.id}
-                product={p}
-                inCart={cartItems.some(c => c.productId === p.id)}
-                lang={lang}
-                t={t}
-                onAdd={handleAddToCart}
-                onDetail={setDetailProductId}
-              />
-            ))}
-          </div>
+          <>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-3 pb-4">
+              {visibleProducts.map(p => (
+                <ProductCard
+                  key={p.id}
+                  product={p}
+                  inCart={cartItems.some(c => c.productId === p.id)}
+                  lang={lang}
+                  t={t}
+                  onAdd={handleAddToCart}
+                  onDetail={setDetailProductId}
+                />
+              ))}
+            </div>
+            {visibleCount < filtered.length && (
+              <div className="flex justify-center pb-28 lg:pb-4">
+                <button
+                  onClick={() => setVisibleCount(v => v + PAGE_SIZE)}
+                  className={`px-6 py-2.5 rounded-full text-sm font-semibold ${th.card} ${th.bdr} border ${th.tx} hover:opacity-80 transition`}
+                >
+                  Load more ({filtered.length - visibleCount} remaining)
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
 

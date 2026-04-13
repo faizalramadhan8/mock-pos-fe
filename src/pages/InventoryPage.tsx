@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useCategoryStore, useProductStore, useInventoryStore, useBatchStore, useAuthStore, useLangStore, useSupplierStore, useSettingsStore } from "@/stores";
 import { INVENTORY_WRITE_ROLES, UNIT_OPTIONS, PAYMENT_TERMS_OPTIONS } from "@/constants";
 import { Modal } from "@/components/Modal";
@@ -79,6 +79,8 @@ export function InventoryPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [productSearch, setProductSearch] = useState("");
   const debouncedProductSearch = useDebounce(productSearch, 150);
+  const INV_PAGE_SIZE = 50;
+  const [invPage, setInvPage] = useState(1);
   const [confirmDeleteSupplierId, setConfirmDeleteSupplierId] = useState<string | null>(null);
   const [prodFormErrors, setProdFormErrors] = useState<Record<string, boolean>>({});
   const [editProdOpen, setEditProdOpen] = useState(false);
@@ -124,6 +126,15 @@ export function InventoryPage() {
     }
     return list;
   }, [products, overviewFilter, debouncedProductSearch]);
+
+  // Reset page when filter or search changes
+  useEffect(() => { setInvPage(1); }, [overviewFilter, debouncedProductSearch]);
+
+  const totalInvPages = Math.max(1, Math.ceil(filteredProducts.length / INV_PAGE_SIZE));
+  const paginatedProducts = useMemo(
+    () => filteredProducts.slice((invPage - 1) * INV_PAGE_SIZE, invPage * INV_PAGE_SIZE),
+    [filteredProducts, invPage]
+  );
 
   // Expiry data
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -488,7 +499,7 @@ export function InventoryPage() {
                 <Package size={36} className="mx-auto opacity-20 mb-2" />
                 <p className="text-sm font-semibold">{t.noResults}</p>
               </div>
-            ) : filteredProducts.map(product => (
+            ) : paginatedProducts.map(product => (
               <div key={product.id} onClick={() => setDetailProductId(product.id)}
                 className={`flex items-center justify-between px-4 py-3 border-b last:border-0 cursor-pointer active:opacity-70 ${th.bdr}/50`}>
                 <div className="flex items-center gap-3 min-w-0 flex-1">
@@ -555,6 +566,33 @@ export function InventoryPage() {
               </div>
             ))}
           </div>
+
+          {filteredProducts.length > INV_PAGE_SIZE && (
+            <div className={`flex items-center justify-between mt-3 px-4 py-2.5 rounded-[18px] border ${th.card} ${th.bdr}`}>
+              <p className={`text-xs font-semibold ${th.txm}`}>
+                {(invPage - 1) * INV_PAGE_SIZE + 1}–{Math.min(invPage * INV_PAGE_SIZE, filteredProducts.length)} / {filteredProducts.length}
+              </p>
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => setInvPage(p => Math.max(1, p - 1))}
+                  disabled={invPage === 1}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold disabled:opacity-30 ${th.bdr} border ${th.tx}`}
+                >
+                  Prev
+                </button>
+                <span className={`px-3 py-1.5 text-xs font-bold ${th.tx}`}>
+                  {invPage} / {totalInvPages}
+                </span>
+                <button
+                  onClick={() => setInvPage(p => Math.min(totalInvPages, p + 1))}
+                  disabled={invPage >= totalInvPages}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold disabled:opacity-30 ${th.bdr} border ${th.tx}`}
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
         </>
       )}
 
