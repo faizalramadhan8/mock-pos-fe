@@ -320,6 +320,7 @@ export function POSPage() {
             <div className="min-w-0">
               <p className={`text-xs font-extrabold truncate ${th.acc}`}>{activeMember.name}</p>
               <p className={`text-[10px] ${th.txm}`}>{activeMember.phone} · Member price aktif</p>
+              <p className={`text-[10px] ${th.txm} mt-0.5`}>📱 Struk akan dikirim ke WhatsApp</p>
             </div>
           </div>
           <button onClick={() => setMember(null)} className={`text-[10px] font-bold px-2 py-1 rounded-lg ${th.txm} hover:opacity-70`}>

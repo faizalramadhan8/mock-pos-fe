@@ -93,6 +93,8 @@ export const orderApi = {
   }) => api.post<OrderRes>('/orders/', data),
 
   cancel: (id: string) => api.patch<OrderRes>(`/orders/${id}/cancel`),
+
+  resendWA: (id: string) => api.post<null>(`/orders/${id}/send-wa`, {}),
 };
 
 export const refundApi = {

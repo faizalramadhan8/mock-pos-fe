@@ -5,7 +5,8 @@ import { ProductDetailModal } from "./ProductDetailModal";
 import { useOrderStore, useProductStore, useAuthStore, useLangStore, useRefundStore, useAuditStore } from "@/stores";
 import { useThemeClasses } from "@/hooks/useThemeClasses";
 import { formatCurrency as $, formatDate, formatTime, printReceipt } from "@/utils";
-import { Printer, Ban, RotateCcw, CheckSquare, Square } from "lucide-react";
+import { Printer, Ban, RotateCcw, CheckSquare, Square, MessageCircle } from "lucide-react";
+import { orderApi } from "@/api/orders";
 import Barcode from "react-barcode";
 import toast from "react-hot-toast";
 import { genId } from "@/utils";
@@ -28,6 +29,7 @@ export function OrderDetailModal({ orderId, onClose }: OrderDetailModalProps) {
   const [detailProductId, setDetailProductId] = useState<string | null>(null);
   const [showVoidConfirm, setShowVoidConfirm] = useState(false);
   const [showRefund, setShowRefund] = useState(false);
+  const [waSending, setWaSending] = useState(false);
   const [refundSelections, setRefundSelections] = useState<Record<number, number>>({});
   const [refundReason, setRefundReason] = useState("");
   const canVoid = user && ["superadmin", "admin", "cashier"].includes(user.role);
@@ -250,17 +252,40 @@ export function OrderDetailModal({ orderId, onClose }: OrderDetailModalProps) {
           </div>
         </div>
 
-        {/* Barcode + Print */}
+        {/* Barcode + Actions */}
         <div className="flex flex-col items-center gap-3">
           <Barcode value={order.id} format="CODE128" width={1.2} height={35} displayValue={true}
             fontSize={10} font="DM Sans" background="transparent" margin={0} />
-          <button
-            onClick={() => printReceipt(order, { cashierName: order.createdBy ? (users.find(u => u.id === order.createdBy)?.name) : undefined })}
-            className={`flex items-center gap-1.5 text-[11px] font-bold px-4 py-2 rounded-xl ${th.accBg} ${th.acc}`}
-          >
-            <Printer size={12} />
-            {t.printReceipt}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => printReceipt(order, { cashierName: order.createdBy ? (users.find(u => u.id === order.createdBy)?.name) : undefined })}
+              className={`flex items-center gap-1.5 text-[11px] font-bold px-4 py-2 rounded-xl ${th.accBg} ${th.acc}`}
+            >
+              <Printer size={12} />
+              {t.printReceipt}
+            </button>
+            {order.member && order.member.phone && (
+              <button
+                onClick={async () => {
+                  if (waSending) return;
+                  setWaSending(true);
+                  try {
+                    await orderApi.resendWA(order.id);
+                    toast.success(`Struk terkirim ke WhatsApp ${order.member!.phone}`);
+                  } catch (e: any) {
+                    toast.error(e.message || "Gagal kirim ke WhatsApp");
+                  } finally {
+                    setWaSending(false);
+                  }
+                }}
+                disabled={waSending}
+                className={`flex items-center gap-1.5 text-[11px] font-bold px-4 py-2 rounded-xl text-white bg-[#25D366] disabled:opacity-50`}
+              >
+                <MessageCircle size={12} />
+                {waSending ? "Mengirim…" : "Kirim via WA"}
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Refund Order */}
