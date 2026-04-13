@@ -166,7 +166,7 @@ export function OrdersPage() {
           </div>
         ) : visibleOrders.map(o => (
           <div key={o.id} onClick={() => setDetailOrderId(o.id)}
-            className={`px-5 py-4 border-b last:border-0 cursor-pointer active:opacity-70 ${th.bdr}/50`}>
+            className={`px-5 py-4 border-b last:border-0 cursor-pointer active:opacity-70 ${th.bdrSoft}`}>
             <div className="flex items-center justify-between mb-1.5">
               <div className="flex items-center gap-2.5">
                 <div className={`w-2 h-2 rounded-full ${o.status === "completed" ? "bg-[#4A8B3F]" : o.status === "pending" ? "bg-[#E8B088]" : o.status === "refunded" ? "bg-[#E89B48]" : "bg-[#C4504A]"}`} />

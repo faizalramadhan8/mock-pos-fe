@@ -528,7 +528,7 @@ export function SettingsPage() {
                   : th.txm;
                 const actionLabel = entry.action.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
                 return (
-                  <div key={entry.id} className={`px-5 py-3 ${i > 0 ? `border-t ${th.bdr}/50` : ""}`}>
+                  <div key={entry.id} className={`px-5 py-3 ${i > 0 ? `border-t ${th.bdrSoft}` : ""}`}>
                     <div className="flex items-center justify-between">
                       <span className={`text-[11px] font-bold uppercase tracking-wider ${actionColor}`}>{actionLabel}</span>
                       <span className={`text-[10px] ${th.txf}`}>{formatDate(entry.createdAt)} · {formatTime(entry.createdAt)}</span>
@@ -586,7 +586,7 @@ export function SettingsPage() {
                         <p className={`px-4 py-3 text-sm ${th.txm}`}>{t.noResults}</p>
                       ) : filteredBanks.map(bank => (
                         <button key={bank} onClick={() => { setBankForm(f => ({ ...f, bankName: bank })); setBankQuery(""); setShowBankDropdown(false); }}
-                          className={`w-full text-left px-4 py-2.5 text-sm hover:opacity-70 ${th.tx} border-b last:border-0 ${th.bdr}/50`}>
+                          className={`w-full text-left px-4 py-2.5 text-sm hover:opacity-70 ${th.tx} border-b last:border-0 ${th.bdrSoft}`}>
                           {bank}
                         </button>
                       ))}

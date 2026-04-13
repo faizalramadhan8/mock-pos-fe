@@ -9,6 +9,7 @@ export function useThemeClasses() {
     card: dark ? "bg-[#1C1916]" : "bg-white",
     card2: dark ? "bg-[#241F1B]" : "bg-[#FBF7F2]",
     bdr: dark ? "border-[#352E28]" : "border-[#E8DDD2]",
+    bdrSoft: dark ? "border-[#241F1B]" : "border-[#F3ECE3]",
     tx: dark ? "text-[#EDE4D9]" : "text-[#2E1F14]",
     txm: dark ? "text-[#8A7E73]" : "text-[#8B7560]",
     txf: dark ? "text-[#5E5449]" : "text-[#B8A594]",

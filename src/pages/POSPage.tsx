@@ -344,7 +344,7 @@ export function POSPage() {
           <div className={`absolute top-full left-0 right-0 z-20 mt-1 rounded-xl border shadow-lg overflow-hidden ${th.card} ${th.bdr}`}>
             {filteredMembers.length > 0 && filteredMembers.map(m => (
               <div key={m.id}
-                className={`w-full px-4 py-2.5 flex items-center justify-between border-b last:border-0 ${th.bdr}/50`}>
+                className={`w-full px-4 py-2.5 flex items-center justify-between border-b last:border-0 ${th.bdrSoft}`}>
                 <button onClick={() => { setMember({ id: m.id, name: m.name, phone: m.phone }); setMemberQuery(""); setShowMemberDropdown(false); }}
                   className="text-left flex-1 hover:opacity-70">
                   <p className={`text-sm font-bold ${th.tx}`}>{m.name}</p>
@@ -564,7 +564,7 @@ export function POSPage() {
             {todaySessions.map(s => {
               const diffColor = s.difference === 0 ? "text-[#4A8B3F]" : s.difference > 0 ? "text-[#5B8DEF]" : "text-[#C4504A]";
               return (
-                <div key={s.id} className={`px-4 py-2.5 border-b last:border-0 ${th.bdr}/50`}>
+                <div key={s.id} className={`px-4 py-2.5 border-b last:border-0 ${th.bdrSoft}`}>
                   <div className="flex justify-between">
                     <span className={`text-sm font-bold ${th.tx}`}>{formatTime(s.closedAt)}</span>
                     <span className={`text-sm font-black ${diffColor}`}>{s.difference >= 0 ? "+" : ""}{$(s.difference)}</span>
@@ -893,7 +893,7 @@ export function POSPage() {
                   <span className={`text-[11px] ${th.txm}`}>{formatTime(o.createdAt)} · {o.customer}</span>
                   <span className={`text-sm font-black ${th.acc}`}>{$(o.total)}</span>
                 </div>
-                <div className={`mt-1.5 pt-1.5 border-t ${th.bdr}/50`}>
+                <div className={`mt-1.5 pt-1.5 border-t ${th.bdrSoft}`}>
                   {o.items.map((item, i) => (
                     <p key={i} className={`text-[11px] ${th.txm}`}>{item.name} ×{item.quantity} — {$(item.unitPrice * item.quantity)}</p>
                   ))}
@@ -913,7 +913,7 @@ export function POSPage() {
         <div className="flex flex-col gap-4">
           <div className={`rounded-[18px] border p-4 ${th.card2} ${th.bdr}`}>
             {activeSession && (
-              <div className={`flex justify-between mb-1.5 pb-1.5 border-b ${th.bdr}/50`}>
+              <div className={`flex justify-between mb-1.5 pb-1.5 border-b ${th.bdrSoft}`}>
                 <span className={`text-sm ${th.txm}`}>{t.openingCash}</span>
                 <span className={`text-sm font-bold ${th.tx}`}>{$(activeSession.openingCash)}</span>
               </div>
@@ -961,7 +961,7 @@ export function POSPage() {
               {todaySessions.map(s => {
                 const diffColor = s.difference === 0 ? "text-[#4A8B3F]" : s.difference > 0 ? "text-[#5B8DEF]" : "text-[#C4504A]";
                 return (
-                  <div key={s.id} className={`px-4 py-2.5 border-b last:border-0 ${th.bdr}/50`}>
+                  <div key={s.id} className={`px-4 py-2.5 border-b last:border-0 ${th.bdrSoft}`}>
                     <div className="flex justify-between">
                       <span className={`text-sm font-bold ${th.tx}`}>{formatTime(s.closedAt)}</span>
                       <span className={`text-sm font-black ${diffColor}`}>{s.difference >= 0 ? "+" : ""}{$(s.difference)}</span>

@@ -189,16 +189,33 @@ export const LABEL_PRESETS: Record<string, LabelSize> = {
   "80x50": { width: 80, height: 50 },
 };
 
-function buildLabelHtml(product: Product, lang: "en" | "id", size: LabelSize) {
+export interface LabelExtras {
+  expiryDate?: string; // YYYY-MM-DD or any formatted string
+}
+
+function formatExpiry(d: string) {
+  // Accept YYYY-MM-DD → DD-MM-YYYY for readability on sticker
+  if (/^\d{4}-\d{2}-\d{2}$/.test(d)) {
+    const [y, m, dd] = d.split("-");
+    return `${dd}-${m}-${y}`;
+  }
+  return d;
+}
+
+function buildLabelHtml(product: Product, lang: "en" | "id", size: LabelSize, extras?: LabelExtras) {
   const name = lang === "id" ? product.nameId : product.name;
   const barcodeW = Math.max(1.5, Math.min(2.5, size.width / 25));
   const barcodeH = Math.max(30, Math.min(50, size.height * 0.55));
   const barcodeSvg = generateBarcodeSvg(product.sku, { width: barcodeW, height: barcodeH, fontSize: 8, displayValue: true });
   if (!barcodeSvg) return "";
+  const exp = extras?.expiryDate
+    ? `<div class="exp">EXP: ${escapeHtml(formatExpiry(extras.expiryDate))}</div>`
+    : "";
   return `<div class="label">
     <div class="name">${escapeHtml(name)}</div>
     <div class="price">Rp ${product.sellingPrice.toLocaleString("id-ID")} / ${escapeHtml(product.unit)}</div>
     <div class="bc">${barcodeSvg}</div>
+    ${exp}
   </div>`;
 }
 
@@ -211,12 +228,13 @@ function labelCss(size: LabelSize) {
   .label:last-child{page-break-after:auto}
   .name{font-size:${size.width <= 50 ? 9 : 11}px;font-weight:700;margin-bottom:1px}
   .price{font-size:${size.width <= 50 ? 8 : 10}px;color:#333;margin-bottom:2px}
-  .bc svg{max-width:95%;height:auto}`;
+  .bc svg{max-width:95%;height:auto}
+  .exp{font-size:${size.width <= 50 ? 8 : 9}px;color:#000;font-weight:700;margin-top:2px;letter-spacing:0.5px}`;
 }
 
-export function printBarcodeLabel(product: Product, lang: "en" | "id", size?: LabelSize) {
+export function printBarcodeLabel(product: Product, lang: "en" | "id", size?: LabelSize, extras?: LabelExtras) {
   const s = size || { width: 40, height: 30 };
-  const content = buildLabelHtml(product, lang, s);
+  const content = buildLabelHtml(product, lang, s, extras);
   if (!content) return;
 
   const win = window.open("", "_blank", `width=${Math.max(300, s.width * 4)},height=${Math.max(250, s.height * 4)}`);
@@ -231,10 +249,10 @@ export function printBarcodeLabel(product: Product, lang: "en" | "id", size?: La
   win.onload = () => win.print();
 }
 
-export function printBarcodeLabels(products: Product[], lang: "en" | "id", size?: LabelSize) {
+export function printBarcodeLabels(products: Product[], lang: "en" | "id", size?: LabelSize, extras?: LabelExtras) {
   if (products.length === 0) return;
   const s = size || { width: 40, height: 30 };
-  const labels = products.map(p => buildLabelHtml(p, lang, s)).filter(Boolean).join("\n");
+  const labels = products.map(p => buildLabelHtml(p, lang, s, extras)).filter(Boolean).join("\n");
   if (!labels) return;
 
   const win = window.open("", "_blank", "width=800,height=600");

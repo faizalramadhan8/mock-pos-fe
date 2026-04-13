@@ -174,7 +174,7 @@ export function OrderDetailModal({ orderId, onClose }: OrderDetailModalProps) {
             return (
               <div key={i}
                 onClick={() => prod && setDetailProductId(item.productId)}
-                className={`px-4 py-2.5 border-b last:border-0 ${prod ? "cursor-pointer active:opacity-70" : ""} ${th.bdr}/50`}>
+                className={`px-4 py-2.5 border-b last:border-0 ${prod ? "cursor-pointer active:opacity-70" : ""} ${th.bdrSoft}`}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2.5 min-w-0">
                     {prod && <ProductImage product={prod} size={28} />}

@@ -81,6 +81,12 @@ export function InventoryPage() {
   const debouncedProductSearch = useDebounce(productSearch, 150);
   const INV_PAGE_SIZE = 50;
   const [invPage, setInvPage] = useState(1);
+  const [labelModalOpen, setLabelModalOpen] = useState(false);
+  const [labelIncludeExpiry, setLabelIncludeExpiry] = useState(false);
+  const [labelExpiryDate, setLabelExpiryDate] = useState(() => {
+    const d = new Date(); d.setMonth(d.getMonth() + 3);
+    return d.toISOString().slice(0, 10);
+  });
   const [confirmDeleteSupplierId, setConfirmDeleteSupplierId] = useState<string | null>(null);
   const [prodFormErrors, setProdFormErrors] = useState<Record<string, boolean>>({});
   const [editProdOpen, setEditProdOpen] = useState(false);
@@ -331,7 +337,7 @@ export function InventoryPage() {
               const prod = products.find(p => p.id === m.productId);
               return (
                 <div key={m.id} onClick={() => setDetailProductId(m.productId)}
-                  className={`flex items-center justify-between px-5 py-3 border-b last:border-0 cursor-pointer active:opacity-70 ${th.bdr}/50`}>
+                  className={`flex items-center justify-between px-5 py-3 border-b last:border-0 cursor-pointer active:opacity-70 ${th.bdrSoft}`}>
                   <div className="flex items-center gap-2.5">
                     <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${
                       m.type === "in" ? (th.dark ? "bg-[#4A8B3F]/15" : "bg-green-50") : (th.dark ? "bg-[#C4504A]/15" : "bg-red-50")
@@ -492,10 +498,7 @@ export function InventoryPage() {
                 </p>
               </div>
               {canWrite && selectedIds.size > 0 && (
-                <button onClick={() => {
-                  const selected = products.filter(p => selectedIds.has(p.id));
-                  printBarcodeLabels(selected, lang, { width: labelWidth, height: labelHeight });
-                }}
+                <button onClick={() => setLabelModalOpen(true)}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold ${th.accBg} ${th.acc}`}>
                   <Printer size={12} /> Print {selectedIds.size} Label
                 </button>
@@ -508,7 +511,7 @@ export function InventoryPage() {
               </div>
             ) : paginatedProducts.map(product => (
               <div key={product.id} onClick={() => setDetailProductId(product.id)}
-                className={`flex items-center justify-between px-4 py-3 border-b last:border-0 cursor-pointer active:opacity-70 ${th.bdr}/50`}>
+                className={`flex items-center justify-between px-4 py-3 border-b last:border-0 cursor-pointer active:opacity-70 ${th.bdrSoft}`}>
                 <div className="flex items-center gap-3 min-w-0 flex-1">
                   {canWrite && (
                     <input type="checkbox" checked={selectedIds.has(product.id)}
@@ -664,7 +667,7 @@ export function InventoryPage() {
 
                 return (
                   <div key={batch.id} onClick={() => product && setDetailProductId(product.id)}
-                    className={`flex items-center justify-between px-4 py-3 border-b last:border-0 cursor-pointer active:opacity-70 ${th.bdr}/50`}>
+                    className={`flex items-center justify-between px-4 py-3 border-b last:border-0 cursor-pointer active:opacity-70 ${th.bdrSoft}`}>
                     <div className="flex items-center gap-3 min-w-0 flex-1">
                       {product && <ProductImage product={product} size={32} />}
                       <div className="min-w-0">
@@ -737,7 +740,7 @@ export function InventoryPage() {
                 const sup = suppliers.find(s => s.id === inv.supplierId);
                 const isOverdue = inv.dueDate ? new Date(inv.dueDate) < new Date() : false;
                 return (
-                  <div key={inv.id} className={`flex items-center justify-between px-4 py-3 border-b last:border-0 ${th.bdr}/50`}>
+                  <div key={inv.id} className={`flex items-center justify-between px-4 py-3 border-b last:border-0 ${th.bdrSoft}`}>
                     <div className="min-w-0 flex-1">
                       <p className={`text-sm font-bold truncate ${th.tx}`}>{sup?.name || "\u2014"}</p>
                       <p className={`text-[11px] ${th.txf}`}>
@@ -1274,6 +1277,53 @@ export function InventoryPage() {
       </Modal>
       <ProductDetailModal productId={detailProductId} onClose={() => setDetailProductId(null)} />
       <SupplierDetailModal supplierId={detailSupplierId} onClose={() => setDetailSupplierId(null)} />
+
+      {/* Print Labels Modal — option to include expiry date */}
+      <Modal open={labelModalOpen} onClose={() => setLabelModalOpen(false)} title="Print Barcode Label">
+        <div className="flex flex-col gap-3">
+          <p className={`text-xs ${th.txm}`}>
+            {selectedIds.size} produk akan dicetak.
+          </p>
+
+          <label className={`flex items-center gap-2 cursor-pointer px-3 py-2.5 rounded-xl border ${th.bdr}`}>
+            <input type="checkbox" checked={labelIncludeExpiry}
+              onChange={e => setLabelIncludeExpiry(e.target.checked)}
+              className="w-4 h-4 rounded accent-[#A0673C]" />
+            <span className={`text-sm font-bold ${th.tx}`}>Tampilkan tanggal kadaluarsa</span>
+          </label>
+
+          {labelIncludeExpiry && (
+            <div>
+              <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>Tanggal kadaluarsa</p>
+              <input type="date" value={labelExpiryDate}
+                onChange={e => setLabelExpiryDate(e.target.value)}
+                className={`w-full px-3 py-2.5 text-sm rounded-xl border ${th.inp}`} />
+              <p className={`text-[10px] mt-1 ${th.txm}`}>
+                Berlaku untuk semua {selectedIds.size} label yang dicetak.
+              </p>
+            </div>
+          )}
+
+          <div className="flex gap-2 mt-2">
+            <button onClick={() => setLabelModalOpen(false)}
+              className={`flex-1 py-2.5 rounded-xl text-sm font-bold border ${th.bdr} ${th.txm}`}>
+              Batal
+            </button>
+            <button onClick={() => {
+              const selected = products.filter(p => selectedIds.has(p.id));
+              printBarcodeLabels(
+                selected, lang,
+                { width: labelWidth, height: labelHeight },
+                labelIncludeExpiry && labelExpiryDate ? { expiryDate: labelExpiryDate } : undefined
+              );
+              setLabelModalOpen(false);
+            }}
+              className={`flex-1 py-2.5 rounded-xl text-sm font-bold text-white bg-[#A0673C]`}>
+              Print
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

@@ -139,7 +139,7 @@ export function ProductDetailModal({ productId, onClose }: ProductDetailModalPro
               const isExpired = days <= 0;
               const isUrgent = days > 0 && days <= 14;
               return (
-                <div key={batch.id} className={`flex items-center justify-between py-1.5 border-b last:border-0 ${th.bdr}/50`}>
+                <div key={batch.id} className={`flex items-center justify-between py-1.5 border-b last:border-0 ${th.bdrSoft}`}>
                   <div>
                     <p className={`text-[11px] font-mono ${th.txm}`}>{batch.batchNumber}</p>
                     <p className={`text-[10px] ${th.txf}`}>{batch.quantity} {product.unit} · {t.expires} {formatDate(batch.expiryDate)}</p>
@@ -173,7 +173,7 @@ export function ProductDetailModal({ productId, onClose }: ProductDetailModalPro
             {recentMovements.map(m => {
               const sup = m.supplierId ? suppliers.find(s => s.id === m.supplierId) : null;
               return (
-                <div key={m.id} className={`flex items-center justify-between py-1.5 border-b last:border-0 ${th.bdr}/50`}>
+                <div key={m.id} className={`flex items-center justify-between py-1.5 border-b last:border-0 ${th.bdrSoft}`}>
                   <div className="flex items-center gap-2 min-w-0">
                     {m.type === "in"
                       ? <ArrowDownCircle size={14} className="shrink-0 text-[#4A8B3F]" />

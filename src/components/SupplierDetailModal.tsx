@@ -86,7 +86,7 @@ export function SupplierDetailModal({ supplierId, onClose }: SupplierDetailModal
             const prod = products.find(p => p.id === inv.productId);
             const isOverdue = inv.dueDate ? new Date(inv.dueDate).getTime() < now : false;
             return (
-              <div key={inv.id} className={`flex items-center justify-between px-4 py-2.5 border-b last:border-0 ${th.bdr}/50`}>
+              <div key={inv.id} className={`flex items-center justify-between px-4 py-2.5 border-b last:border-0 ${th.bdrSoft}`}>
                 <div className="min-w-0 flex-1">
                   <p className={`text-[12px] font-bold truncate ${th.tx}`}>
                     {lang === "id" ? prod?.nameId : prod?.name}
@@ -130,7 +130,7 @@ export function SupplierDetailModal({ supplierId, onClose }: SupplierDetailModal
           supplierMovements.slice(0, 10).map(m => {
             const prod = products.find(p => p.id === m.productId);
             return (
-              <div key={m.id} className={`flex items-center justify-between px-4 py-2.5 border-b last:border-0 ${th.bdr}/50`}>
+              <div key={m.id} className={`flex items-center justify-between px-4 py-2.5 border-b last:border-0 ${th.bdrSoft}`}>
                 <div className="flex items-center gap-2 min-w-0">
                   <ArrowDownCircle size={13} className="shrink-0 text-[#4A8B3F]" />
                   <div className="min-w-0">
