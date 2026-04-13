@@ -18,6 +18,7 @@ const mapUser = (u: any): User => ({
 const mapProduct = (p: any): Product => ({
   id: p.id, sku: p.sku, barcode: p.barcode || '', name: p.name, nameId: p.name_id || '',
   category: p.category_id, purchasePrice: p.purchase_price, sellingPrice: p.selling_price,
+  memberPrice: typeof p.member_price === 'number' ? p.member_price : undefined,
   qtyPerBox: p.qty_per_box || 1, stock: p.stock, unit: p.unit,
   image: p.image || '', minStock: p.min_stock || 0, isActive: p.is_active !== false,
   createdAt: p.created_at,
@@ -35,6 +36,7 @@ const mapSupplier = (s: any): Supplier => ({
 const mapOrderItem = (i: any): OrderItem => ({
   productId: i.product_id, name: i.name, quantity: i.quantity,
   unitType: i.unit_type || 'individual', unitPrice: i.unit_price,
+  regularPrice: typeof i.regular_price === 'number' ? i.regular_price : undefined,
   discountType: i.discount_type, discountValue: i.discount_value,
   discountAmount: i.discount_amount,
 });
@@ -43,6 +45,9 @@ const mapOrder = (o: any): Order => ({
   id: o.id, items: (o.items || []).map(mapOrderItem),
   subtotal: o.subtotal, ppnRate: o.ppn_rate, ppn: o.ppn, total: o.total,
   payment: o.payment, status: o.status, customer: o.customer || '',
+  memberId: o.member_id || undefined,
+  member: o.member ? { id: o.member.id, name: o.member.name, phone: o.member.phone } : undefined,
+  memberSavings: o.member_savings || 0,
   createdAt: o.created_at, createdBy: o.created_by,
   paymentProof: o.payment_proof, orderDiscountType: o.order_discount_type,
   orderDiscountValue: o.order_discount_value, orderDiscount: o.order_discount,
@@ -272,7 +277,9 @@ export const useProductStore = create<ProductState>((set, get) => ({
       await productApi.create({
         sku: product.sku, name: product.name, name_id: product.nameId,
         category_id: product.category, purchase_price: product.purchasePrice,
-        selling_price: product.sellingPrice, qty_per_box: product.qtyPerBox,
+        selling_price: product.sellingPrice,
+        member_price: product.memberPrice ?? null,
+        qty_per_box: product.qtyPerBox,
         stock: product.stock, unit: product.unit, image: product.image,
         min_stock: product.minStock,
       });
@@ -291,6 +298,7 @@ export const useProductStore = create<ProductState>((set, get) => ({
       if (data.category !== undefined) send.category_id = data.category;
       if (data.purchasePrice !== undefined) send.purchase_price = data.purchasePrice;
       if (data.sellingPrice !== undefined) send.selling_price = data.sellingPrice;
+      if (data.memberPrice !== undefined) send.member_price = data.memberPrice ?? null;
       if (data.qtyPerBox !== undefined) send.qty_per_box = data.qtyPerBox;
       if (data.unit !== undefined) send.unit = data.unit;
       if (data.image !== undefined) send.image = data.image;
@@ -316,14 +324,18 @@ export const useProductStore = create<ProductState>((set, get) => ({
 }));
 
 // ─── Cart (persisted, client-only — UNCHANGED) ───
+interface ActiveMember { id: string; name: string; phone: string; }
+
 interface CartState {
   items: CartItem[];
   customer: string;
   payment: PaymentMethod;
+  member: ActiveMember | null;
   orderDiscountType: DiscountType | null;
   orderDiscountValue: number;
   setCustomer: (n: string) => void;
   setPayment: (p: PaymentMethod) => void;
+  setMember: (m: ActiveMember | null) => void;
   addItem: (product: Product, unitType: UnitType, lang: Lang) => void;
   updateQty: (id: string, delta: number) => void;
   removeItem: (id: string) => void;
@@ -333,28 +345,58 @@ interface CartState {
   total: () => number;
   count: () => number;
 }
+
+// Helper: compute unit price for an item given member status and product.
+// Returns { unitPrice, regularPrice } where regularPrice is the non-member
+// price snapshot (for showing savings).
+function computePrices(product: Product, unitType: UnitType, isMember: boolean) {
+  const boxMultiplier = unitType === "box" ? product.qtyPerBox : 1;
+  const regular = product.sellingPrice * boxMultiplier;
+  const hasMemberPrice = typeof product.memberPrice === "number" && product.memberPrice > 0;
+  const memberTotal = hasMemberPrice ? (product.memberPrice as number) * boxMultiplier : null;
+  const unitPrice = isMember && memberTotal !== null && memberTotal < regular ? memberTotal : regular;
+  return { unitPrice, regularPrice: regular };
+}
+
 export const useCartStore = create<CartState>()(
   persist(
     (set, get) => ({
       items: [],
       customer: "",
       payment: "cash",
+      member: null,
       orderDiscountType: null,
       orderDiscountValue: 0,
       setCustomer: (n) => set({ customer: n }),
       setPayment: (p) => set({ payment: p }),
+      setMember: (m) => {
+        const isMember = m !== null;
+        // Recompute existing cart items based on new member status
+        const products = useProductStore.getState().products;
+        set(s => ({
+          member: m,
+          customer: m ? m.name : s.customer,
+          items: s.items.map(i => {
+            const product = products.find(p => p.id === i.productId);
+            if (!product) return i;
+            const { unitPrice, regularPrice } = computePrices(product, i.unitType, isMember);
+            return { ...i, unitPrice, regularPrice };
+          }),
+        }));
+      },
       addItem: (product, unitType, lang) => {
         set(s => {
           const existing = s.items.find(i => i.productId === product.id && i.unitType === unitType);
           if (existing) {
             return { items: s.items.map(i => i.productId === product.id && i.unitType === unitType ? { ...i, quantity: i.quantity + 1 } : i) };
           }
+          const { unitPrice, regularPrice } = computePrices(product, unitType, s.member !== null);
           const item: CartItem = {
             id: genId(), productId: product.id,
             name: lang === "id" ? product.nameId : product.name,
             category: product.category, image: product.image,
             quantity: 1, unitType,
-            unitPrice: unitType === "box" ? product.sellingPrice * product.qtyPerBox : product.sellingPrice,
+            unitPrice, regularPrice,
             qtyPerBox: product.qtyPerBox, unit: product.unit,
           };
           return { items: [...s.items, item] };
@@ -368,15 +410,15 @@ export const useCartStore = create<CartState>()(
         items: s.items.map(i => i.id === id ? { ...i, discountType: type || undefined, discountValue: type ? value : undefined } : i),
       })),
       setOrderDiscount: (type, value) => set({ orderDiscountType: type, orderDiscountValue: type ? value : 0 }),
-      clearCart: () => set({ items: [], customer: "", payment: "cash", orderDiscountType: null, orderDiscountValue: 0 }),
+      clearCart: () => set({ items: [], customer: "", payment: "cash", member: null, orderDiscountType: null, orderDiscountValue: 0 }),
       total: () => get().items.reduce((s, i) => s + i.unitPrice * i.quantity, 0),
       count: () => get().items.reduce((s, i) => s + i.quantity, 0),
     }),
     {
       name: "bakeshop-cart",
-      version: 3,
-      migrate: () => ({ items: [], customer: "", payment: "cash" as PaymentMethod, orderDiscountType: null, orderDiscountValue: 0 }),
-      partialize: (state) => ({ items: state.items, customer: state.customer, payment: state.payment, orderDiscountType: state.orderDiscountType, orderDiscountValue: state.orderDiscountValue }),
+      version: 4,
+      migrate: () => ({ items: [], customer: "", payment: "cash" as PaymentMethod, member: null, orderDiscountType: null, orderDiscountValue: 0 }),
+      partialize: (state) => ({ items: state.items, customer: state.customer, payment: state.payment, member: state.member, orderDiscountType: state.orderDiscountType, orderDiscountValue: state.orderDiscountValue }),
     }
   )
 );
@@ -403,11 +445,13 @@ export const useOrderStore = create<OrderState>((set, get) => ({
         items: order.items.map(i => ({
           product_id: i.productId, name: i.name, quantity: i.quantity,
           unit_type: i.unitType || 'individual', unit_price: i.unitPrice,
+          regular_price: i.regularPrice,
           discount_type: i.discountType, discount_value: i.discountValue,
           discount_amount: i.discountAmount,
         })),
         subtotal: order.subtotal, ppn_rate: order.ppnRate, ppn: order.ppn, total: order.total,
-        payment: order.payment, customer: order.customer, payment_proof: order.paymentProof,
+        payment: order.payment, customer: order.customer, member_id: order.memberId,
+        payment_proof: order.paymentProof,
         order_discount_type: order.orderDiscountType, order_discount_value: order.orderDiscountValue,
         order_discount: order.orderDiscount,
       });

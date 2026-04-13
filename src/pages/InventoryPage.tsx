@@ -69,7 +69,7 @@ export function InventoryPage() {
   const defaultCatId = categories.length > 0 ? categories[0].id : "";
   const [newProd, setNewProd] = useState({
     name: "", nameId: "", sku: "", category: defaultCatId,
-    purchasePrice: "", sellingPrice: "",
+    purchasePrice: "", sellingPrice: "", memberPrice: "",
     qtyPerBox: "12", stock: "0", unit: "kg" as UnitOfMeasure, image: "", minStock: "10",
   });
   const [addCatOpen, setAddCatOpen] = useState(false);
@@ -87,7 +87,7 @@ export function InventoryPage() {
   const [editProdId, setEditProdId] = useState<string | null>(null);
   const [editProd, setEditProd] = useState({
     name: "", nameId: "", sku: "", category: defaultCatId,
-    purchasePrice: "", sellingPrice: "",
+    purchasePrice: "", sellingPrice: "", memberPrice: "",
     qtyPerBox: "12", stock: "0", unit: "kg" as UnitOfMeasure, image: "", minStock: "10",
   });
 
@@ -181,16 +181,19 @@ export function InventoryPage() {
     if (!newProd.sku.trim()) errs.sku = true;
     if (Object.keys(errs).length) { setProdFormErrors(errs); return; }
     setProdFormErrors({});
+    const memberPriceVal = parseInt(newProd.memberPrice);
     addProduct({
       id: genId(), sku: newProd.sku, name: newProd.name, nameId: newProd.nameId,
       category: newProd.category, purchasePrice: parseInt(newProd.purchasePrice) || 0,
-      sellingPrice: parseInt(newProd.sellingPrice) || 0, qtyPerBox: parseInt(newProd.qtyPerBox) || 12,
+      sellingPrice: parseInt(newProd.sellingPrice) || 0,
+      ...(Number.isFinite(memberPriceVal) && memberPriceVal > 0 ? { memberPrice: memberPriceVal } : {}),
+      qtyPerBox: parseInt(newProd.qtyPerBox) || 12,
       stock: parseInt(newProd.stock) || 0, unit: newProd.unit,
       image: newProd.image || "", minStock: parseInt(newProd.minStock) || 10, isActive: true,
       createdAt: new Date().toISOString(),
     });
     setAddProdOpen(false);
-    setNewProd({ name: "", nameId: "", sku: "", category: defaultCatId, purchasePrice: "", sellingPrice: "", qtyPerBox: "12", stock: "0", unit: "kg", image: "", minStock: "10" });
+    setNewProd({ name: "", nameId: "", sku: "", category: defaultCatId, purchasePrice: "", sellingPrice: "", memberPrice: "", qtyPerBox: "12", stock: "0", unit: "kg", image: "", minStock: "10" });
     setProdFormErrors({});
     toast.success(t.productAdded as string);
   };
@@ -202,6 +205,7 @@ export function InventoryPage() {
     setEditProd({
       name: p.name, nameId: p.nameId, sku: p.sku, category: p.category,
       purchasePrice: String(p.purchasePrice), sellingPrice: String(p.sellingPrice),
+      memberPrice: typeof p.memberPrice === "number" && p.memberPrice > 0 ? String(p.memberPrice) : "",
       qtyPerBox: String(p.qtyPerBox), stock: String(p.stock), unit: p.unit, image: p.image, minStock: String(p.minStock),
     });
     setEditProdOpen(true);
@@ -209,10 +213,13 @@ export function InventoryPage() {
 
   const doEditProduct = () => {
     if (!editProdId || !editProd.name || !editProd.nameId || !editProd.sku) return;
+    const memberPriceVal = parseInt(editProd.memberPrice);
     updateProduct(editProdId, {
       name: editProd.name, nameId: editProd.nameId, sku: editProd.sku,
       category: editProd.category, purchasePrice: parseInt(editProd.purchasePrice) || 0,
-      sellingPrice: parseInt(editProd.sellingPrice) || 0, qtyPerBox: parseInt(editProd.qtyPerBox) || 12,
+      sellingPrice: parseInt(editProd.sellingPrice) || 0,
+      memberPrice: Number.isFinite(memberPriceVal) && memberPriceVal > 0 ? memberPriceVal : undefined,
+      qtyPerBox: parseInt(editProd.qtyPerBox) || 12,
       stock: parseInt(editProd.stock) || 0, unit: editProd.unit, image: editProd.image || "", minStock: parseInt(editProd.minStock) || 10,
     });
     setEditProdOpen(false);
@@ -1008,6 +1015,24 @@ export function InventoryPage() {
                 className={inp} min="0" />
             </div>
           </div>
+          {/* Member price */}
+          <div>
+            <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>💎 Harga Member <span className={`font-normal ${th.txm}`}>(opsional)</span></p>
+            <input type="number" value={newProd.memberPrice} onChange={e => setNewProd({ ...newProd, memberPrice: e.target.value })}
+              className={inp} min="0" placeholder="Kosongkan = sama dengan harga jual" />
+            {newProd.memberPrice && newProd.sellingPrice && parseInt(newProd.memberPrice) > 0 && (() => {
+              const purchase = parseInt(newProd.purchasePrice) || 0;
+              const member = parseInt(newProd.memberPrice) || 0;
+              const sell = parseInt(newProd.sellingPrice) || 0;
+              const memberMargin = purchase > 0 ? ((member - purchase) / purchase * 100) : 0;
+              const memberDiscount = sell > 0 ? ((sell - member) / sell * 100) : 0;
+              return (
+                <p className={`text-[11px] mt-1 font-medium ${memberMargin < 0 ? "text-red-500" : memberMargin < 10 ? "text-[#E89B48]" : th.acc}`}>
+                  Diskon member: {memberDiscount.toFixed(1)}% · Margin member: {memberMargin.toFixed(1)}%
+                </p>
+              );
+            })()}
+          </div>
           {/* Box price hint */}
           {newProd.sellingPrice && newProd.qtyPerBox && (
             <p className={`text-[11px] -mt-1 font-medium ${th.acc}`}>
@@ -1171,6 +1196,24 @@ export function InventoryPage() {
               <input type="number" value={editProd.sellingPrice} onChange={e => setEditProd({ ...editProd, sellingPrice: e.target.value })}
                 className={inp} min="0" />
             </div>
+          </div>
+          {/* Member price */}
+          <div>
+            <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>💎 Harga Member <span className={`font-normal ${th.txm}`}>(opsional)</span></p>
+            <input type="number" value={editProd.memberPrice} onChange={e => setEditProd({ ...editProd, memberPrice: e.target.value })}
+              className={inp} min="0" placeholder="Kosongkan = sama dengan harga jual" />
+            {editProd.memberPrice && editProd.sellingPrice && parseInt(editProd.memberPrice) > 0 && (() => {
+              const purchase = parseInt(editProd.purchasePrice) || 0;
+              const member = parseInt(editProd.memberPrice) || 0;
+              const sell = parseInt(editProd.sellingPrice) || 0;
+              const memberMargin = purchase > 0 ? ((member - purchase) / purchase * 100) : 0;
+              const memberDiscount = sell > 0 ? ((sell - member) / sell * 100) : 0;
+              return (
+                <p className={`text-[11px] mt-1 font-medium ${memberMargin < 0 ? "text-red-500" : memberMargin < 10 ? "text-[#E89B48]" : th.acc}`}>
+                  Diskon member: {memberDiscount.toFixed(1)}% · Margin member: {memberMargin.toFixed(1)}%
+                </p>
+              );
+            })()}
           </div>
           {editProd.sellingPrice && editProd.qtyPerBox && (
             <p className={`text-[11px] -mt-1 font-medium ${th.acc}`}>

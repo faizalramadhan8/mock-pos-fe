@@ -51,6 +51,7 @@ export interface Product {
   category: string;
   purchasePrice: number;
   sellingPrice: number;
+  memberPrice?: number;
   qtyPerBox: number;
   stock: number;
   unit: UnitOfMeasure;
@@ -69,6 +70,7 @@ export interface CartItem {
   quantity: number;
   unitType: UnitType;
   unitPrice: number;
+  regularPrice?: number;
   qtyPerBox: number;
   unit: string;
   discountType?: DiscountType;
@@ -85,6 +87,9 @@ export interface Order {
   payment: PaymentMethod;
   status: OrderStatus;
   customer: string;
+  memberId?: string;
+  member?: { id: string; name: string; phone: string };
+  memberSavings?: number;
   createdAt: string;
   createdBy: string;
   paymentProof?: string;
@@ -99,9 +104,25 @@ export interface OrderItem {
   quantity: number;
   unitType: UnitType;
   unitPrice: number;
+  regularPrice?: number;
   discountType?: DiscountType;
   discountValue?: number;
   discountAmount?: number;
+}
+
+export interface MemberStats {
+  memberId: string;
+  from: string;
+  to: string;
+  totalSpend: number;
+  orderCount: number;
+  avgBasket: number;
+  totalSavings: number;
+  lastVisit?: string;
+  lifetimeSpend: number;
+  lifetimeOrders: number;
+  monthlyBreakdown: { month: string; spend: number; orders: number; savings: number }[];
+  topProducts: { productId: string; name: string; quantity: number; spend: number }[];
 }
 
 export interface StockMovement {

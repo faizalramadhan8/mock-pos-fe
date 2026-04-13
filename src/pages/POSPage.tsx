@@ -4,6 +4,7 @@ import { Modal } from "@/components/Modal";
 import { ProductImage } from "@/components/ProductImage";
 import { ProductCard } from "@/components/ProductCard";
 import { ProductDetailModal } from "@/components/ProductDetailModal";
+import { MemberStatsModal } from "@/components/MemberStatsModal";
 import { CategoryIconMap } from "@/components/icons";
 import { useThemeClasses } from "@/hooks/useThemeClasses";
 import { useDebounce } from "@/hooks/useDebounce";
@@ -32,6 +33,8 @@ export function POSPage() {
   const clearCart = useCartStore(s => s.clearCart);
   const setCustomer = useCartStore(s => s.setCustomer);
   const setPayment = useCartStore(s => s.setPayment);
+  const activeMember = useCartStore(s => s.member);
+  const setMember = useCartStore(s => s.setMember);
   const addOrder = useOrderStore(s => s.addOrder);
   const allOrders = useOrderStore(s => s.orders);
   const consumeFIFO = useBatchStore(s => s.consumeFIFO);
@@ -48,6 +51,7 @@ export function POSPage() {
   const [query, setQuery] = useState("");
   const PAGE_SIZE = 60;
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const [statsMember, setStatsMember] = useState<{ id: string; name: string; phone: string } | null>(null);
   const [discountItemId, setDiscountItemId] = useState<string | null>(null);
   const [discountInput, setDiscountInput] = useState("");
   const [discountMode, setDiscountMode] = useState<DiscountType>("percent");
@@ -126,6 +130,13 @@ export function POSPage() {
   // Discount-aware calculations
   const itemDiscountsTotal = useMemo(() => cartItems.reduce((s, i) => s + calcItemDiscount(i), 0), [cartItems]);
   const cartSubtotal = useMemo(() => cartItems.reduce((s, i) => s + i.unitPrice * i.quantity, 0), [cartItems]);
+  const memberSavings = useMemo(() =>
+    activeMember
+      ? cartItems.reduce((s, i) =>
+          s + (i.regularPrice && i.regularPrice > i.unitPrice ? (i.regularPrice - i.unitPrice) * i.quantity : 0), 0)
+      : 0,
+    [cartItems, activeMember]
+  );
   const cartSubtotalAfterItemDisc = cartSubtotal - itemDiscountsTotal;
   const orderDiscAmount = useMemo(() => {
     if (!orderDiscountType || !orderDiscountValue) return 0;
@@ -255,19 +266,30 @@ export function POSPage() {
   }, [cartItems, products, updateQty, t.insufficientStock]);
 
   const doCheckout = () => {
+    let totalSavings = 0;
+    const orderItems = cartItems.map(ci => {
+      const disc = calcItemDiscount(ci);
+      if (activeMember && ci.regularPrice && ci.regularPrice > ci.unitPrice) {
+        totalSavings += (ci.regularPrice - ci.unitPrice) * ci.quantity;
+      }
+      return {
+        productId: ci.productId, name: ci.name, quantity: ci.quantity,
+        unitType: ci.unitType, unitPrice: ci.unitPrice,
+        ...(ci.regularPrice !== undefined ? { regularPrice: ci.regularPrice } : {}),
+        ...(ci.discountType ? { discountType: ci.discountType, discountValue: ci.discountValue, discountAmount: disc } : {}),
+      };
+    });
     const order: Order = {
       id: `ORD-${Date.now().toString(36).toUpperCase()}`,
-      items: cartItems.map(ci => {
-        const disc = calcItemDiscount(ci);
-        return {
-          productId: ci.productId, name: ci.name, quantity: ci.quantity,
-          unitType: ci.unitType, unitPrice: ci.unitPrice,
-          ...(ci.discountType ? { discountType: ci.discountType, discountValue: ci.discountValue, discountAmount: disc } : {}),
-        };
-      }),
+      items: orderItems,
       subtotal: discountedSubtotal, ppnRate, ppn: ppnAmount, total: cartTotal,
       payment, status: "completed" as const,
-      customer: customer || (t.walkIn as string),
+      customer: activeMember ? activeMember.name : (customer || (t.walkIn as string)),
+      ...(activeMember ? {
+        memberId: activeMember.id,
+        member: activeMember,
+        memberSavings: totalSavings,
+      } : {}),
       createdAt: new Date().toISOString(), createdBy: user.id,
       ...((payment === "qris" || payment === "transfer") && proofImage ? { paymentProof: proofImage } : {}),
       ...(orderDiscountType ? { orderDiscountType, orderDiscountValue, orderDiscount: orderDiscAmount } : {}),
@@ -292,26 +314,50 @@ export function POSPage() {
   // Shared cart content renderer
   const renderCartContent = (isPanel: boolean) => (
     <div className="flex flex-col gap-3">
+      {/* Active member badge — shown when member is selected */}
+      {activeMember && (
+        <div className={`flex items-center justify-between px-3 py-2 rounded-xl ${th.dark ? "bg-[#A0673C]/15" : "bg-[#FFF5EC]"}`}>
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-base">💎</span>
+            <div className="min-w-0">
+              <p className={`text-xs font-extrabold truncate ${th.acc}`}>{activeMember.name}</p>
+              <p className={`text-[10px] ${th.txm}`}>{activeMember.phone} · Member price aktif</p>
+            </div>
+          </div>
+          <button onClick={() => setMember(null)} className={`text-[10px] font-bold px-2 py-1 rounded-lg ${th.txm} hover:opacity-70`}>
+            Lepas
+          </button>
+        </div>
+      )}
+
       {/* Member / Customer selector */}
       <div className="relative" ref={memberDropdownRef}>
         <input
           value={customer}
           onChange={e => { setCustomer(e.target.value); setMemberQuery(e.target.value); setShowMemberDropdown(true); }}
           onFocus={() => setShowMemberDropdown(true)}
-          placeholder={t.searchMemberPhone as string || t.searchMember as string}
+          placeholder={activeMember ? "Tambah catatan pelanggan…" : (t.searchMemberPhone as string || t.searchMember as string)}
           type="tel" inputMode="tel"
           className={`w-full px-4 py-3 text-sm rounded-2xl border ${th.inp}`}
         />
         {showMemberDropdown && (
           <div className={`absolute top-full left-0 right-0 z-20 mt-1 rounded-xl border shadow-lg overflow-hidden ${th.card} ${th.bdr}`}>
             {filteredMembers.length > 0 && filteredMembers.map(m => (
-              <button key={m.id} onClick={() => { setCustomer(m.name + (m.phone ? ` (${m.phone})` : "")); setMemberQuery(""); setShowMemberDropdown(false); }}
-                className={`w-full text-left px-4 py-2.5 flex items-center justify-between hover:opacity-70 border-b last:border-0 ${th.bdr}/50`}>
-                <div>
+              <div key={m.id}
+                className={`w-full px-4 py-2.5 flex items-center justify-between border-b last:border-0 ${th.bdr}/50`}>
+                <button onClick={() => { setMember({ id: m.id, name: m.name, phone: m.phone }); setMemberQuery(""); setShowMemberDropdown(false); }}
+                  className="text-left flex-1 hover:opacity-70">
                   <p className={`text-sm font-bold ${th.tx}`}>{m.name}</p>
                   {m.phone && <p className={`text-[11px] ${th.txm}`}>{m.phone}</p>}
-                </div>
-              </button>
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); setStatsMember({ id: m.id, name: m.name, phone: m.phone }); setShowMemberDropdown(false); }}
+                  title="Lihat statistik member"
+                  className={`ml-2 px-2 py-1 rounded-md text-[10px] font-bold ${th.accBg} ${th.acc} hover:opacity-70`}
+                >
+                  📊 Stats
+                </button>
+              </div>
             ))}
             <button onClick={() => { setShowAddMember(true); setShowMemberDropdown(false); setNewMemberName(memberQuery || customer); }}
               className={`w-full text-left px-4 py-2.5 flex items-center gap-2 ${th.acc}`}>
@@ -359,7 +405,15 @@ export function POSPage() {
                 <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md ${th.accBg} ${th.acc}`}>
                   {ci.unitType === "box" ? `${t.box}(${ci.qtyPerBox})` : t.individual}
                 </span>
-                <span className={`text-[11px] ${th.txm}`}>{$(ci.unitPrice)}</span>
+                {ci.regularPrice && ci.regularPrice > ci.unitPrice ? (
+                  <>
+                    <span className={`text-[11px] line-through ${th.txf}`}>{$(ci.regularPrice)}</span>
+                    <span className={`text-[11px] font-bold ${th.acc}`}>{$(ci.unitPrice)}</span>
+                    <span className="text-[9px] font-bold px-1 py-0.5 rounded bg-[#A0673C]/15 text-[#A0673C]">💎 Member</span>
+                  </>
+                ) : (
+                  <span className={`text-[11px] ${th.txm}`}>{$(ci.unitPrice)}</span>
+                )}
                 {ci.discountType && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-[#E89B48]/15 text-[#E89B48]">-{ci.discountType === "percent" ? `${ci.discountValue}%` : $(ci.discountValue || 0)}</span>}
               </div>
               <div className="flex items-center justify-between mt-2">
@@ -404,6 +458,9 @@ export function POSPage() {
       {cartItems.length > 0 && <>
         <div className={`p-4 rounded-[18px] ${th.elev}`}>
           <div className="flex justify-between text-sm"><span className={th.txm}>{t.subtotal}</span><span className={`font-semibold ${th.tx}`}>{$(cartSubtotal)}</span></div>
+          {memberSavings > 0 && (
+            <div className="flex justify-between text-sm mt-1"><span className={th.acc}>💎 Hemat sebagai member</span><span className={`font-semibold ${th.acc}`}>-{$(memberSavings)}</span></div>
+          )}
           {itemDiscountsTotal > 0 && (
             <div className="flex justify-between text-sm mt-1"><span className="text-[#E89B48]">{t.itemDiscount}</span><span className="font-semibold text-[#E89B48]">-{$(itemDiscountsTotal)}</span></div>
           )}
@@ -848,6 +905,8 @@ export function POSPage() {
       </Modal>
 
       <ProductDetailModal productId={detailProductId} onClose={() => setDetailProductId(null)} />
+
+      <MemberStatsModal member={statsMember} onClose={() => setStatsMember(null)} />
 
       {/* Close Register modal */}
       <Modal open={closeRegisterOpen} onClose={() => { setCloseRegisterOpen(false); setActualCash(""); setRegisterNotes(""); }} title={t.closeRegister as string}>

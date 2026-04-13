@@ -139,8 +139,13 @@ export function OrderDetailModal({ orderId, onClose }: OrderDetailModalProps) {
         <div className={`rounded-2xl border p-4 mb-3 ${th.bdr} ${th.card2}`}>
           <div className="flex items-center justify-between">
             <div>
-              <p className={`text-[10px] uppercase tracking-wider ${th.txf}`}>{t.customer}</p>
-              <p className={`text-sm font-bold ${th.tx}`}>{order.customer || t.walkIn}</p>
+              <p className={`text-[10px] uppercase tracking-wider ${th.txf}`}>{order.member ? "Member" : t.customer}</p>
+              <p className={`text-sm font-bold ${th.tx}`}>
+                {order.member ? <>💎 {order.member.name}</> : (order.customer || t.walkIn)}
+              </p>
+              {order.member && (
+                <p className={`text-[11px] ${th.txm}`}>{order.member.phone}</p>
+              )}
             </div>
             <span className={`text-[10px] font-bold px-2.5 py-1 rounded-md ${paymentColor}`}>
               {t[order.payment]}
@@ -176,7 +181,16 @@ export function OrderDetailModal({ orderId, onClose }: OrderDetailModalProps) {
                     <div className="min-w-0">
                       <p className={`text-[12px] font-bold truncate ${th.tx}`}>{item.name}</p>
                       <p className={`text-[10px] ${th.txf}`}>
-                        {item.quantity} × {$(item.unitPrice)}
+                        {item.quantity} ×{" "}
+                        {item.regularPrice && item.regularPrice > item.unitPrice ? (
+                          <>
+                            <span className="line-through opacity-60">{$(item.regularPrice)}</span>{" "}
+                            <span className={th.acc}>{$(item.unitPrice)}</span>{" "}
+                            <span className="text-[9px] font-bold px-1 py-0.5 rounded bg-[#A0673C]/15 text-[#A0673C]">💎</span>
+                          </>
+                        ) : (
+                          <span>{$(item.unitPrice)}</span>
+                        )}
                         {item.unitType === "box" ? ` (${t.box})` : ""}
                       </p>
                     </div>
@@ -198,12 +212,18 @@ export function OrderDetailModal({ orderId, onClose }: OrderDetailModalProps) {
 
         {/* Pricing */}
         <div className={`rounded-2xl border p-4 mb-4 ${th.bdr} ${th.card2}`}>
-          {(hasDiscounts || order.ppnRate > 0) && (
+          {(hasDiscounts || order.ppnRate > 0 || (order.memberSavings || 0) > 0) && (
             <>
               <div className="flex justify-between mb-1.5">
                 <span className={`text-[12px] ${th.txm}`}>{t.subtotal}</span>
-                <span className={`text-[13px] ${th.tx}`}>{$(grossSubtotal)}</span>
+                <span className={`text-[13px] ${th.tx}`}>{$(grossSubtotal + (order.memberSavings || 0))}</span>
               </div>
+              {(order.memberSavings || 0) > 0 && (
+                <div className="flex justify-between mb-1.5">
+                  <span className={`text-[12px] ${th.acc}`}>💎 Hemat sebagai member</span>
+                  <span className={`text-[13px] font-semibold ${th.acc}`}>-{$(order.memberSavings || 0)}</span>
+                </div>
+              )}
               {itemDiscTotal > 0 && (
                 <div className="flex justify-between mb-1.5">
                   <span className="text-[12px] text-[#E89B48]">{t.itemDiscount}</span>

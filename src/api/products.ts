@@ -10,6 +10,7 @@ export interface ProductRes {
   category?: { id: string; name: string; name_id: string; icon?: string; color?: string };
   purchase_price: number;
   selling_price: number;
+  member_price?: number;
   qty_per_box: number;
   stock: number;
   unit: string;
@@ -61,6 +62,7 @@ export const productApi = {
     category_id: string;
     purchase_price: number;
     selling_price: number;
+    member_price?: number | null;
     qty_per_box?: number;
     stock?: number;
     unit: string;
@@ -76,6 +78,7 @@ export const productApi = {
     category_id: string;
     purchase_price: number;
     selling_price: number;
+    member_price: number | null;
     qty_per_box: number;
     unit: string;
     image: string;

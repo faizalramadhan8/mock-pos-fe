@@ -51,6 +51,21 @@ export interface DashboardRes {
   expiring_batches?: any[];
 }
 
+export interface MemberStatsRes {
+  member_id: string;
+  from: string;
+  to: string;
+  total_spend: number;
+  order_count: number;
+  avg_basket: number;
+  total_savings: number;
+  last_visit?: string;
+  lifetime_spend: number;
+  lifetime_orders: number;
+  monthly_breakdown: { month: string; spend: number; orders: number; savings: number }[];
+  top_products: { product_id: string; name: string; quantity: number; spend: number }[];
+}
+
 export const memberApi = {
   getAll: (params?: { search?: string; page?: number; limit?: number }) => {
     const q = new URLSearchParams();
@@ -62,6 +77,14 @@ export const memberApi = {
   },
 
   searchByPhone: (phone: string) => api.get<MemberRes>(`/members/search?phone=${phone}`),
+
+  getStats: (id: string, params?: { from?: string; to?: string }) => {
+    const q = new URLSearchParams();
+    if (params?.from) q.set('from', params.from);
+    if (params?.to) q.set('to', params.to);
+    const qs = q.toString();
+    return api.get<MemberStatsRes>(`/members/${id}/stats${qs ? '?' + qs : ''}`);
+  },
 
   create: (data: { name: string; phone: string }) => api.post<MemberRes>('/members/', data),
 
