@@ -68,10 +68,14 @@ export function MemberStatsModal({ member, onClose }: Props) {
     return ({ "7d": "7 hari", "30d": "30 hari", "3m": "3 bulan", "year": "Tahun ini" } as Record<string, string>)[period];
   }, [period, from, to]);
 
+  // Normalize nullable arrays from API (backend may return null for empty)
+  const monthly = stats?.monthly_breakdown ?? [];
+  const topProducts = stats?.top_products ?? [];
+
   const maxBarSpend = useMemo(() => {
-    if (!stats?.monthly_breakdown?.length) return 0;
-    return Math.max(...stats.monthly_breakdown.map(m => m.spend));
-  }, [stats]);
+    if (monthly.length === 0) return 0;
+    return Math.max(...monthly.map(m => m.spend));
+  }, [monthly]);
 
   if (!member) return null;
 
@@ -153,11 +157,11 @@ export function MemberStatsModal({ member, onClose }: Props) {
           </div>
 
           {/* Monthly bar chart */}
-          {stats.monthly_breakdown.length > 0 && (
+          {monthly.length > 0 && (
             <div className={`rounded-2xl p-3 mb-3 border ${th.bdr} ${th.card2}`}>
               <p className={`text-[11px] font-bold mb-2 ${th.txm}`}>Per Bulan</p>
               <div className="space-y-2">
-                {stats.monthly_breakdown.map(m => {
+                {monthly.map(m => {
                   const pct = maxBarSpend > 0 ? (m.spend / maxBarSpend) * 100 : 0;
                   return (
                     <div key={m.month}>
@@ -176,11 +180,11 @@ export function MemberStatsModal({ member, onClose }: Props) {
           )}
 
           {/* Top products */}
-          {stats.top_products.length > 0 && (
+          {topProducts.length > 0 && (
             <div className={`rounded-2xl p-3 border ${th.bdr} ${th.card2}`}>
               <p className={`text-[11px] font-bold mb-2 ${th.txm}`}>Top Produk</p>
               <div className="space-y-1.5">
-                {stats.top_products.map(p => (
+                {topProducts.map(p => (
                   <div key={p.product_id} className="flex justify-between items-center">
                     <span className={`text-[12px] font-medium truncate flex-1 ${th.tx}`}>{p.name}</span>
                     <span className={`text-[10px] font-bold ml-2 ${th.txm}`}>{p.quantity}x · {$(p.spend)}</span>
