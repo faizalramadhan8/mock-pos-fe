@@ -802,19 +802,27 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   },
 }));
 
-// ─── Hydrate all stores from API (call after login) ───
+// ─── Hydrate stores from API after login ───
+// Critical data fetched first (blocks UI); non-critical deferred after paint.
 export async function hydrateStores() {
+  // Critical: needed for Dashboard & POS to render
   await Promise.allSettled([
     useCategoryStore.getState().fetchCategories(),
     useProductStore.getState().fetchProducts(),
-    useSupplierStore.getState().fetchSuppliers(),
-    useOrderStore.getState().fetchOrders(),
-    useInventoryStore.getState().fetchMovements(),
-    useBatchStore.getState().fetchBatches(),
-    useMemberStore.getState().fetchMembers(),
-    useCashSessionStore.getState().fetchSessions(),
-    useAuditStore.getState().fetchEntries(),
     useSettingsStore.getState().fetchSettings(),
-    useAuthStore.getState().fetchUsers(),
+    useOrderStore.getState().fetchOrders(),
   ]);
+
+  // Non-critical: fetch in background after first paint
+  setTimeout(() => {
+    Promise.allSettled([
+      useSupplierStore.getState().fetchSuppliers(),
+      useInventoryStore.getState().fetchMovements(),
+      useBatchStore.getState().fetchBatches(),
+      useMemberStore.getState().fetchMembers(),
+      useCashSessionStore.getState().fetchSessions(),
+      useAuditStore.getState().fetchEntries(),
+      useAuthStore.getState().fetchUsers(),
+    ]);
+  }, 100);
 }
