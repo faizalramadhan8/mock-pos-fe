@@ -4,7 +4,6 @@ import { Modal } from "@/components/Modal";
 import { ProductImage } from "@/components/ProductImage";
 import { ProductCard } from "@/components/ProductCard";
 import { ProductDetailModal } from "@/components/ProductDetailModal";
-import { MemberStatsModal } from "@/components/MemberStatsModal";
 import { CategoryIconMap } from "@/components/icons";
 import { useThemeClasses } from "@/hooks/useThemeClasses";
 import { useDebounce } from "@/hooks/useDebounce";
@@ -51,7 +50,6 @@ export function POSPage() {
   const [query, setQuery] = useState("");
   const PAGE_SIZE = 60;
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
-  const [statsMember, setStatsMember] = useState<{ id: string; name: string; phone: string } | null>(null);
   const [discountItemId, setDiscountItemId] = useState<string | null>(null);
   const [discountInput, setDiscountInput] = useState("");
   const [discountMode, setDiscountMode] = useState<DiscountType>("percent");
@@ -343,21 +341,13 @@ export function POSPage() {
         {showMemberDropdown && (
           <div className={`absolute top-full left-0 right-0 z-20 mt-1 rounded-xl border shadow-lg overflow-hidden ${th.card} ${th.bdr}`}>
             {filteredMembers.length > 0 && filteredMembers.map(m => (
-              <div key={m.id}
-                className={`w-full px-4 py-2.5 flex items-center justify-between border-b last:border-0 ${th.bdrSoft}`}>
-                <button onClick={() => { setMember({ id: m.id, name: m.name, phone: m.phone }); setMemberQuery(""); setShowMemberDropdown(false); }}
-                  className="text-left flex-1 hover:opacity-70">
+              <button key={m.id} onClick={() => { setMember({ id: m.id, name: m.name, phone: m.phone }); setMemberQuery(""); setShowMemberDropdown(false); }}
+                className={`w-full text-left px-4 py-2.5 flex items-center justify-between hover:opacity-70 border-b last:border-0 ${th.bdrSoft}`}>
+                <div>
                   <p className={`text-sm font-bold ${th.tx}`}>{m.name}</p>
                   {m.phone && <p className={`text-[11px] ${th.txm}`}>{m.phone}</p>}
-                </button>
-                <button
-                  onClick={(e) => { e.stopPropagation(); setStatsMember({ id: m.id, name: m.name, phone: m.phone }); setShowMemberDropdown(false); }}
-                  title="Lihat statistik member"
-                  className={`ml-2 px-2 py-1 rounded-md text-[10px] font-bold ${th.accBg} ${th.acc} hover:opacity-70`}
-                >
-                  📊 Stats
-                </button>
-              </div>
+                </div>
+              </button>
             ))}
             <button onClick={() => { setShowAddMember(true); setShowMemberDropdown(false); setNewMemberName(memberQuery || customer); }}
               className={`w-full text-left px-4 py-2.5 flex items-center gap-2 ${th.acc}`}>
@@ -905,8 +895,6 @@ export function POSPage() {
       </Modal>
 
       <ProductDetailModal productId={detailProductId} onClose={() => setDetailProductId(null)} />
-
-      <MemberStatsModal member={statsMember} onClose={() => setStatsMember(null)} />
 
       {/* Close Register modal */}
       <Modal open={closeRegisterOpen} onClose={() => { setCloseRegisterOpen(false); setActualCash(""); setRegisterNotes(""); }} title={t.closeRegister as string}>

@@ -838,6 +838,7 @@ export function InventoryPage() {
         </>
       )}
 
+
       {/* ======= MODALS ======= */}
 
       {/* Stock In/Out modal */}
