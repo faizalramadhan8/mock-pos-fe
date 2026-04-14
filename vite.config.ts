@@ -12,20 +12,21 @@ export default defineConfig({
     VitePWA({
       registerType: "autoUpdate",
       manifest: {
-        name: "BakeShop POS",
-        short_name: "BakeShop",
-        description: "Bakery ingredient point-of-sale system",
+        name: "TBK Santi - Baking Ingredients Depot",
+        short_name: "TBK Santi",
+        description: "Baking ingredients depot point-of-sale system",
         theme_color: "#A0673C",
         background_color: "#FBF7F2",
         display: "standalone",
         scope: "/",
         start_url: "/",
         icons: [
-          { src: "/favicon.svg", sizes: "any", type: "image/svg+xml", purpose: "any" },
+          { src: "/main_logo.jpeg", sizes: "any", type: "image/jpeg", purpose: "any" },
+          { src: "/main_logo.jpeg", sizes: "512x512", type: "image/jpeg", purpose: "maskable" },
         ],
       },
       workbox: {
-        globPatterns: ["**/*.{js,css,html,svg,png,jpg,woff2}"],
+        globPatterns: ["**/*.{js,css,html,svg,png,jpg,jpeg,woff2}"],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/fonts\.(googleapis|gstatic)\.com/,

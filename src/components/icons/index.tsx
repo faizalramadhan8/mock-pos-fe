@@ -100,13 +100,17 @@ export const CategoryIconMap: Record<string, React.FC<IconProps>> = {
   flavor: FlavorIcon,
 };
 
-// Logo
-export const BakeryLogo = ({ size = 40 }: { size?: number }) => (
-  <svg width={size} height={size} viewBox="0 0 48 48" fill="none">
-    <rect width="48" height="48" rx="14" fill="url(#logoG)"/>
-    <path d="M14 30c0-3 2-5 4-6s4-4 4-7c0 3 2 6 4 7s4 3 4 6" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
-    <path d="M18 30c0-1.5 1.5-3 3-3.5s3-2.5 3-4.5c0 2 1.5 4 3 4.5s3 2 3 3.5" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" opacity=".5" fill="none"/>
-    <ellipse cx="24" cy="32" rx="10" ry="3" fill="#fff" opacity=".15"/>
-    <defs><linearGradient id="logoG" x1="0" y1="0" x2="48" y2="48"><stop stopColor="#D4956B"/><stop offset="1" stopColor="#8B5E3C"/></linearGradient></defs>
-  </svg>
+// Logo — served from /public/main_logo.jpeg. Size prop controls the rendered
+// pixel size; border-radius scales proportionally so it looks good at any size.
+export const BakeryLogo = ({ size = 40, className = "" }: { size?: number; className?: string }) => (
+  <img
+    src="/main_logo.jpeg"
+    alt="TBK Santi"
+    width={size}
+    height={size}
+    loading="eager"
+    decoding="async"
+    style={{ width: size, height: size, borderRadius: Math.round(size * 0.22) }}
+    className={`object-cover shrink-0 ${className}`}
+  />
 );

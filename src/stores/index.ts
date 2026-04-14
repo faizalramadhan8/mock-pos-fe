@@ -263,6 +263,7 @@ interface ProductState {
   updateProduct: (id: string, data: Partial<Omit<Product, "id" | "createdAt">>) => Promise<void>;
   adjustStock: (id: string, delta: number) => void;
   toggleActive: (id: string) => Promise<void>;
+  deleteProduct: (id: string) => Promise<void>;
 }
 export const useProductStore = create<ProductState>((set, get) => ({
   products: [],
@@ -320,6 +321,14 @@ export const useProductStore = create<ProductState>((set, get) => ({
       await productApi.toggleActive(id);
       set(s => ({ products: s.products.map(p => p.id === id ? { ...p, isActive: !p.isActive } : p) }));
     } catch (e: any) { toast.error(e.message); }
+  },
+  deleteProduct: async (id) => {
+    try {
+      await productApi.delete(id);
+      set(s => ({ products: s.products.filter(p => p.id !== id) }));
+    } catch (e: any) {
+      toast.error(e.message || "Failed to delete product");
+    }
   },
 }));
 

@@ -47,9 +47,9 @@ export function LoginPage() {
         </div>
 
         <div className="flex flex-col items-center mb-8">
-          <BakeryLogo size={56} />
+          <BakeryLogo size={96} />
           <h1 className={`text-[28px] font-black tracking-tighter mt-4 ${th.tx}`}>{t.appName}</h1>
-          <p className={`text-sm mt-1 ${th.txm}`}>Baking Ingredients POS</p>
+          <p className={`text-sm mt-1 ${th.txm}`}>Baking Ingredients Depot</p>
         </div>
 
         <div className={`rounded-3xl border p-6 ${th.card} ${th.bdr} ${th.dark ? "" : "shadow-xl shadow-[#8B5E3C]/[0.04]"}`}>

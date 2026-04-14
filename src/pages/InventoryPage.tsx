@@ -14,7 +14,7 @@ import type { UnitType, StockType, StockMovement, PaymentTerms, PaymentStatus, U
 import toast from "react-hot-toast";
 import {
   Package, Plus, ChevronDown, ArrowDownCircle, ArrowUpCircle, Barcode,
-  LayoutGrid, Clock, AlertTriangle, Truck, X, Check, CircleDollarSign, Pencil, Download, Search, Printer,
+  LayoutGrid, Clock, AlertTriangle, Truck, X, Check, CircleDollarSign, Pencil, Download, Search, Printer, Trash2,
 } from "lucide-react";
 
 type InventoryTab = "overview" | "stockIn" | "stockOut" | "expiry" | "history" | "suppliers";
@@ -56,6 +56,8 @@ export function InventoryPage() {
   const user = useAuthStore(s => s.user)!;
   const canWrite = INVENTORY_WRITE_ROLES.includes(user.role);
   const { suppliers, addSupplier, updateSupplier, deleteSupplier } = useSupplierStore();
+  const deleteProduct = useProductStore(s => s.deleteProduct);
+  const canDeleteProduct = user.role === "superadmin" || user.role === "admin";
   const { labelWidth, labelHeight } = useSettingsStore();
 
   const [detailProductId, setDetailProductId] = useState<string | null>(null);
@@ -83,6 +85,7 @@ export function InventoryPage() {
   const INV_PAGE_SIZE = 50;
   const [invPage, setInvPage] = useState(1);
   const [labelModalOpen, setLabelModalOpen] = useState(false);
+  const [confirmDeleteProductId, setConfirmDeleteProductId] = useState<string | null>(null);
   const [labelIncludeExpiry, setLabelIncludeExpiry] = useState(false);
   const [labelExpiryDate, setLabelExpiryDate] = useState(() => {
     const d = new Date(); d.setMonth(d.getMonth() + 3);
@@ -571,6 +574,16 @@ export function InventoryPage() {
                       >
                         <Pencil size={12} />
                       </button>
+                      {canDeleteProduct && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setConfirmDeleteProductId(product.id); }}
+                          aria-label="Delete product"
+                          title="Hapus produk"
+                          className={`w-7 h-7 rounded-lg flex items-center justify-center ${th.dark ? "bg-[#D4627A]/15 text-[#D4627A]" : "bg-red-50 text-[#D4627A]"}`}
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      )}
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -1307,6 +1320,43 @@ export function InventoryPage() {
       <SupplierDetailModal supplierId={detailSupplierId} onClose={() => setDetailSupplierId(null)} />
 
       {/* Print Labels Modal — option to include expiry date */}
+      {/* Confirm Delete Product */}
+      <Modal open={!!confirmDeleteProductId} onClose={() => setConfirmDeleteProductId(null)} title="Hapus Produk?">
+        {(() => {
+          const p = products.find(pr => pr.id === confirmDeleteProductId);
+          return (
+            <div className="flex flex-col gap-3">
+              <p className={`text-sm ${th.tx}`}>
+                {p ? <>Produk <b>{lang === "id" ? p.nameId : p.name}</b> (SKU {p.sku}) akan dihapus.</> : "Produk akan dihapus."}
+              </p>
+              <div className={`rounded-xl border px-3 py-2.5 text-[11px] ${th.dark ? "border-[#E89B48]/30 bg-[#E89B48]/5 text-[#E89B48]" : "border-amber-200 bg-amber-50 text-amber-700"}`}>
+                ⚠️ Produk akan hilang dari daftar dan POS. Riwayat transaksi lama tetap aman (nama & harga sudah tersimpan di order).
+                <br />
+                <span className="opacity-70">Kalau ragu, pakai toggle "Sembunyikan dari POS" saja.</span>
+              </div>
+              <div className="flex gap-2 mt-1">
+                <button onClick={() => setConfirmDeleteProductId(null)}
+                  className={`flex-1 py-2.5 rounded-xl text-sm font-bold border ${th.bdr} ${th.txm}`}>
+                  Batal
+                </button>
+                <button
+                  onClick={async () => {
+                    if (confirmDeleteProductId) {
+                      await deleteProduct(confirmDeleteProductId);
+                      toast.success("Produk dihapus");
+                    }
+                    setConfirmDeleteProductId(null);
+                  }}
+                  className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white bg-[#C4504A]"
+                >
+                  Hapus
+                </button>
+              </div>
+            </div>
+          );
+        })()}
+      </Modal>
+
       <Modal open={labelModalOpen} onClose={() => setLabelModalOpen(false)} title="Print Barcode Label">
         <div className="flex flex-col gap-3">
           <p className={`text-xs ${th.txm}`}>

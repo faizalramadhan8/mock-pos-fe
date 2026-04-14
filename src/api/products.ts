@@ -89,6 +89,8 @@ export const productApi = {
     api.patch<ProductRes>(`/products/${id}/stock`, { delta }),
 
   toggleActive: (id: string) => api.patch<ProductRes>(`/products/${id}/toggle-active`),
+
+  delete: (id: string) => api.del(`/products/${id}`),
 };
 
 export const categoryApi = {
