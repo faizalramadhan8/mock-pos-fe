@@ -214,34 +214,63 @@ function formatExpiry(d: string) {
   return d;
 }
 
+function getStoreNameForLabel(): string {
+  try {
+    const raw = localStorage.getItem("bakeshop-settings");
+    if (!raw) return "";
+    const parsed = JSON.parse(raw);
+    const n = parsed?.state?.storeName || "";
+    return String(n).toUpperCase();
+  } catch {
+    return "";
+  }
+}
+
 function buildLabelHtml(product: Product, lang: "en" | "id", size: LabelSize, extras?: LabelExtras) {
   const name = lang === "id" ? product.nameId : product.name;
-  const barcodeW = Math.max(1.5, Math.min(2.5, size.width / 25));
-  const barcodeH = Math.max(30, Math.min(50, size.height * 0.55));
-  const barcodeSvg = generateBarcodeSvg(product.sku, { width: barcodeW, height: barcodeH, fontSize: 8, displayValue: true });
+  // Barcode sizing — tuned so it fits snugly in the label without overflow
+  const barcodeW = size.width <= 40 ? 1.2 : size.width <= 50 ? 1.4 : 1.8;
+  const barcodeH = Math.round(size.height * 0.32);
+  const barcodeSvg = generateBarcodeSvg(product.sku, { width: barcodeW, height: barcodeH, fontSize: 0, displayValue: false });
   if (!barcodeSvg) return "";
-  const exp = extras?.expiryDate
-    ? `<div class="exp">EXP: ${escapeHtml(formatExpiry(extras.expiryDate))}</div>`
+  const expDate = extras?.expiryDate ? formatExpiry(extras.expiryDate) : "";
+  const storeName = getStoreNameForLabel();
+  const hasFooter = expDate || storeName;
+  const footer = hasFooter
+    ? `<div class="foot"><span>${expDate ? "ED. " + escapeHtml(expDate) : ""}</span><span>${escapeHtml(storeName)}</span></div>`
     : "";
   return `<div class="label">
-    <div class="name">${escapeHtml(name)}</div>
-    <div class="price">Rp ${product.sellingPrice.toLocaleString("id-ID")} / ${escapeHtml(product.unit)}</div>
-    <div class="bc">${barcodeSvg}</div>
-    ${exp}
+    <div class="top">
+      <div class="name">${escapeHtml(name.toUpperCase())}</div>
+      <div class="bc">${barcodeSvg}</div>
+      <div class="price">Rp ${product.sellingPrice.toLocaleString("id-ID")}</div>
+    </div>
+    ${footer}
   </div>`;
 }
 
 function labelCss(size: LabelSize) {
+  // Scale font based on label size. 40x30 uses smaller, 60x40 larger
+  const nameFont = size.width <= 40 ? 7.5 : size.width <= 50 ? 9 : 10;
+  const priceFont = size.width <= 40 ? 8 : size.width <= 50 ? 9.5 : 11;
+  const footFont = size.width <= 40 ? 6 : 7;
+  // Use the SHORTER side as page width so the output stays portrait-oriented
+  // (label exits the printer with content reading top-to-bottom).
+  const pageW = Math.min(size.width, size.height);
+  const pageH = Math.max(size.width, size.height);
   return `
   *{margin:0;padding:0;box-sizing:border-box}
-  @page{size:portrait;margin:2mm 5mm 2mm 5mm}
-  body{font-family:'DM Sans',Arial,sans-serif;color:#000;text-align:center;-webkit-print-color-adjust:exact}
-  .label{padding:2mm 0;display:flex;flex-direction:column;justify-content:center;align-items:center;page-break-after:always}
+  @page{size:${pageW}mm ${pageH}mm;margin:0}
+  html,body{width:${pageW}mm;height:${pageH}mm}
+  body{font-family:Arial,sans-serif;color:#000;text-align:center;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .label{width:${pageW}mm;height:${pageH}mm;display:flex;flex-direction:column;justify-content:space-between;page-break-after:always;overflow:hidden}
   .label:last-child{page-break-after:auto}
-  .name{font-size:${size.width <= 50 ? 9 : 11}px;font-weight:700;margin-bottom:1px}
-  .price{font-size:${size.width <= 50 ? 8 : 10}px;color:#333;margin-bottom:2px}
-  .bc svg{max-width:95%;height:auto}
-  .exp{font-size:${size.width <= 50 ? 8 : 9}px;color:#000;font-weight:700;margin-top:2px;letter-spacing:0.5px}`;
+  .top{flex:1;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:1mm 1mm 0.5mm;gap:0.3mm}
+  .name{font-size:${nameFont}px;font-weight:800;line-height:1.05;letter-spacing:-0.2px;max-height:${nameFont * 2.2}px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;word-break:break-word}
+  .bc{width:100%;display:flex;justify-content:center}
+  .bc svg{max-width:92%;height:auto;display:block}
+  .price{font-size:${priceFont}px;font-weight:800;letter-spacing:-0.2px}
+  .foot{background:#000;color:#fff;font-size:${footFont}px;font-weight:700;display:flex;justify-content:space-between;padding:0.5mm 1.5mm;letter-spacing:0.2px}`;
 }
 
 export function printBarcodeLabel(product: Product, lang: "en" | "id", size?: LabelSize, extras?: LabelExtras) {

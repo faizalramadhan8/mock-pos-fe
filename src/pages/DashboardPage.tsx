@@ -13,14 +13,18 @@ export function DashboardPage() {
   const orders = useOrderStore(s => s.orders);
   const products = useProductStore(s => s.products);
 
-  const revenue = useMemo(() =>
-    orders.filter(o => o.status === "completed").reduce((s, o) => s + o.total, 0),
-    [orders]
-  );
-  const lowStock = useMemo(() =>
-    products.filter(p => p.stock <= p.minStock),
-    [products]
-  );
+  const completedOrders = useMemo(() => orders.filter(o => o.status === "completed"), [orders]);
+  const revenue = useMemo(() => completedOrders.reduce((s, o) => s + o.total, 0), [completedOrders]);
+  const lowStock = useMemo(() => products.filter(p => p.stock <= p.minStock), [products]);
+  const paymentBreakdown = useMemo(() => {
+    const map: Record<string, { count: number; total: number }> = {};
+    for (const o of completedOrders) {
+      if (!map[o.payment]) map[o.payment] = { count: 0, total: 0 };
+      map[o.payment].count++;
+      map[o.payment].total += o.total;
+    }
+    return map;
+  }, [completedOrders]);
 
   const [detailProductId, setDetailProductId] = useState<string | null>(null);
   const [detailOrderId, setDetailOrderId] = useState<string | null>(null);
@@ -67,6 +71,36 @@ export function DashboardPage() {
               <div className="w-7 h-[3px] rounded-full mt-1.5 opacity-50" style={{ background: s.color }} />
             </div>
           ))}
+        </div>
+      )}
+
+      {/* ─── Payment Breakdown ─── */}
+      {(isOwner || isCashier) && completedOrders.length > 0 && (
+        <div className={`rounded-[22px] border p-4 ${th.card} ${th.bdr}`}>
+          <p className={`text-[11px] font-bold uppercase tracking-wider mb-3 ${th.txm}`}>
+            {lang === "id" ? "Pembayaran" : "Payment Breakdown"}
+          </p>
+          <div className="grid grid-cols-3 gap-2">
+            {[
+              { key: "cash", label: lang === "id" ? "Tunai" : "Cash", icon: "💵", color: "#4A8B3F" },
+              { key: "transfer", label: "Transfer", icon: "🏦", color: "#5B8DEF" },
+              { key: "qris", label: "QRIS", icon: "📱", color: "#8B6FC0" },
+            ].map(m => {
+              const data = paymentBreakdown[m.key];
+              return (
+                <div key={m.key} className={`rounded-xl p-3 ${th.elev}`}>
+                  <p className={`text-[11px] ${th.txm}`}>{m.icon} {m.label}</p>
+                  <p className="text-sm font-black mt-1" style={{ color: m.color }}>
+                    {data ? $(data.total) : "Rp 0"}
+                  </p>
+                  <p className={`text-[10px] mt-0.5 ${th.txf}`}>
+                    {data ? `${data.count}x` : "0x"}
+                    {data && revenue > 0 ? ` · ${Math.round(data.total / revenue * 100)}%` : ""}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 

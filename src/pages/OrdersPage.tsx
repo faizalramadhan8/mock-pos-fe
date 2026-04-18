@@ -16,13 +16,14 @@ type OrdersTab = "orders" | "members";
 
 export function OrdersPage() {
   const th = useThemeClasses();
-  const { t } = useLangStore();
+  const { t, lang } = useLangStore();
   const orders = useOrderStore(s => s.orders);
   const products = useProductStore(s => s.products);
   const user = useAuthStore(s => s.user)!;
   const canViewMembers = user.role === "superadmin" || user.role === "admin";
   const [activeTab, setActiveTab] = useState<OrdersTab>("orders");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [paymentFilter, setPaymentFilter] = useState("all");
   const [dateRange, setDateRange] = useState<DateRange>("all");
   const [detailProductId, setDetailProductId] = useState<string | null>(null);
   const [detailOrderId, setDetailOrderId] = useState<string | null>(null);
@@ -63,13 +64,19 @@ export function OrdersPage() {
   }, [dateFiltered, debouncedSearch]);
 
   // Filter by status
-  const filtered = useMemo(() =>
+  const statusFiltered = useMemo(() =>
     statusFilter === "all" ? searchFiltered : searchFiltered.filter(o => o.status === statusFilter),
     [searchFiltered, statusFilter]
   );
 
+  // Filter by payment method
+  const filtered = useMemo(() =>
+    paymentFilter === "all" ? statusFiltered : statusFiltered.filter(o => o.payment === paymentFilter),
+    [statusFiltered, paymentFilter]
+  );
+
   // Reset pagination when filters change
-  const filterKey = `${dateRange}-${statusFilter}-${debouncedSearch}`;
+  const filterKey = `${dateRange}-${statusFilter}-${paymentFilter}-${debouncedSearch}`;
   if (filterKey !== prevFilterKey) {
     setPrevFilterKey(filterKey);
     setVisibleCount(ORDERS_PAGE_SIZE);
@@ -191,6 +198,21 @@ export function OrdersPage() {
             className={`shrink-0 px-3.5 py-2 rounded-[14px] text-xs font-bold ${
               statusFilter === f ? "text-white bg-gradient-to-r from-[#E8B088] to-[#A0673C]" : `border ${th.card} ${th.bdr} ${th.txm}`
             }`}>{statusLabel(f)}</button>
+        ))}
+      </div>
+
+      {/* Payment method filter pills */}
+      <div className="flex gap-2 overflow-x-auto scrollbar-hide">
+        {[
+          { k: "all", l: lang === "id" ? "Semua Bayar" : "All Payment" },
+          { k: "cash", l: lang === "id" ? "💵 Tunai" : "💵 Cash" },
+          { k: "transfer", l: "🏦 Transfer" },
+          { k: "qris", l: "📱 QRIS" },
+        ].map(f => (
+          <button key={f.k} onClick={() => setPaymentFilter(f.k)}
+            className={`shrink-0 px-3.5 py-2 rounded-[14px] text-xs font-bold ${
+              paymentFilter === f.k ? "text-white bg-gradient-to-r from-[#5B8DEF] to-[#3B6FCF]" : `border ${th.card} ${th.bdr} ${th.txm}`
+            }`}>{f.l}</button>
         ))}
       </div>
 
