@@ -230,7 +230,7 @@ function buildLabelHtml(product: Product, lang: "en" | "id", size: LabelSize, ex
   const name = lang === "id" ? product.nameId : product.name;
   // Barcode sizing — bigger bars so it scans reliably and looks prominent
   const barcodeW = size.width <= 40 ? 2.0 : size.width <= 50 ? 2.4 : 2.8;
-  const barcodeH = Math.round(Math.min(size.width, size.height) * 0.55);
+  const barcodeH = Math.round(Math.min(size.width, size.height) * 0.95);
   const barcodeSvg = generateBarcodeSvg(product.sku, { width: barcodeW, height: barcodeH, fontSize: 0, displayValue: false });
   if (!barcodeSvg) return "";
   const expDate = extras?.expiryDate ? formatExpiry(extras.expiryDate) : "";
