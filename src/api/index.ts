@@ -1,4 +1,4 @@
-export { api, setToken, getToken, getRefreshToken } from './client';
+export { api, setToken, getToken } from './client';
 export type { ApiRes } from './client';
 export { authApi, userApi } from './auth';
 export type { LoginRes, UserRes } from './auth';

@@ -84,10 +84,12 @@ const mapAudit = (a: any): AuditEntry => ({
 });
 
 // ─── Auth ───
+export type LoginResult = true | false | "inactive" | "pending" | "rejected";
+
 interface AuthState {
   user: User | null;
   users: User[];
-  login: (email: string, pw: string) => Promise<boolean | "inactive">;
+  login: (email: string, pw: string) => Promise<LoginResult>;
   loginDirect: (user: User) => void;
   logout: () => void;
   checkSession: () => Promise<boolean>;
@@ -106,21 +108,24 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   login: async (email, pw) => {
     try {
       const res = await authApi.login(email, pw);
-      const data = res.body!;
-      setToken(data.access_token, data.refresh_token);
-      const user = mapUser(data.user);
-      set({ user });
+      // HTTP 202 → device approval pending. Server sends `code: 202` in envelope.
+      if (res.code === 202) return "pending";
+      const data = res.body as any;
+      if (!data?.access_token) return false;
+      setToken(data.access_token);
+      set({ user: mapUser(data.user) });
       return true;
     } catch (e: any) {
-      const msg = e.message || '';
-      if (msg.toLowerCase().includes('deactivat') || msg.toLowerCase().includes('inactive')) return "inactive";
+      const msg = (e.message || '').toLowerCase();
+      if (msg.includes('deactivat') || msg.includes('inactive')) return "inactive";
+      if (msg.includes('ditolak') || msg.includes('rejected')) return "rejected";
       return false;
     }
   },
   loginDirect: (user) => set({ user }),
   logout: () => {
     authApi.logout().catch(() => {});
-    setToken(null, null);
+    setToken(null);
     set({ user: null, users: [] });
   },
   checkSession: async () => {
@@ -131,7 +136,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       set({ user: { id: s.id, name: s.fullname, email: s.email || '', password: '', role: s.role as any, initials: '', isActive: s.is_active } });
       return true;
     } catch {
-      setToken(null, null);
+      setToken(null);
       return false;
     }
   },

@@ -1,8 +1,7 @@
-import { api, setToken, getRefreshToken } from './client';
+import { api, setToken, getDeviceFingerprint } from './client';
 
 export interface LoginRes {
   access_token: string;
-  refresh_token: string;
   expires_in: number;
   user: {
     id: string;
@@ -16,6 +15,17 @@ export interface LoginRes {
     initials: string;
     created_at: string;
   };
+}
+
+export interface DevicePendingRes {
+  device_id: string;
+  fingerprint: string;
+  status: 'pending' | 'approved' | 'rejected';
+}
+
+export interface DeviceStatusRes {
+  status: 'pending' | 'approved' | 'rejected' | 'unknown';
+  fingerprint: string;
 }
 
 export interface UserRes {
@@ -33,7 +43,16 @@ export interface UserRes {
 
 export const authApi = {
   login: (email: string, password: string) =>
-    api.post<LoginRes>('/auth/login', { email, password }),
+    api.post<LoginRes | DevicePendingRes>('/auth/login', {
+      email,
+      password,
+      device_fingerprint: getDeviceFingerprint(),
+    }),
+
+  deviceStatus: (email: string) =>
+    api.get<DeviceStatusRes>(
+      `/auth/devices/status?email=${encodeURIComponent(email)}&fingerprint=${encodeURIComponent(getDeviceFingerprint())}`,
+    ),
 
   register: (data: {
     email: string;
@@ -47,15 +66,7 @@ export const authApi = {
 
   getSession: () => api.get<{ id: string; fullname: string; role: string; email: string; is_active: boolean }>('/auth/session'),
 
-  refreshToken: () => {
-    const rt = getRefreshToken();
-    return api.post<{ access_token: string; refresh_token: string; expires_in: number }>('/auth/refresh', { refresh_token: rt });
-  },
-
-  logout: () => {
-    const rt = getRefreshToken();
-    return api.post('/auth/logout', { refresh_token: rt }).finally(() => setToken(null, null));
-  },
+  logout: () => api.post('/auth/logout').finally(() => setToken(null)),
 
   changePassword: (currentPassword: string, newPassword: string) =>
     api.post('/auth/change-password', { current_password: currentPassword, new_password: newPassword }),

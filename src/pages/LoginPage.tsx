@@ -1,8 +1,12 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuthStore, useThemeStore, useLangStore, hydrateStores } from "@/stores";
+import { authApi } from "@/api";
 import { BakeryLogo } from "@/components/icons";
 import { useThemeClasses } from "@/hooks/useThemeClasses";
 import { Sun, Moon } from "lucide-react";
+
+const POLL_INTERVAL_MS = 3000;
+const POLL_TIMEOUT_MS = 5 * 60 * 1000;
 
 export function LoginPage() {
   const th = useThemeClasses();
@@ -13,6 +17,47 @@ export function LoginPage() {
   const [password, setPassword] = useState("");
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(false);
+  const [pending, setPending] = useState(false);
+  const pollRef = useRef<number | null>(null);
+  const timeoutRef = useRef<number | null>(null);
+
+  const clearTimers = () => {
+    if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+    if (timeoutRef.current) { clearTimeout(timeoutRef.current); timeoutRef.current = null; }
+  };
+
+  useEffect(() => clearTimers, []);
+
+  const startPolling = (emailToCheck: string, pwToRetry: string) => {
+    setPending(true);
+    setErr("");
+    pollRef.current = window.setInterval(async () => {
+      try {
+        const r = await authApi.deviceStatus(emailToCheck);
+        const status = r.body?.status;
+        if (status === "approved") {
+          clearTimers();
+          const result = await login(emailToCheck, pwToRetry);
+          setPending(false);
+          if (result === true) {
+            await hydrateStores();
+          } else {
+            setErr("Gagal login ulang setelah approval. Coba lagi.");
+          }
+        } else if (status === "rejected") {
+          clearTimers();
+          setPending(false);
+          setErr("Device ditolak oleh owner.");
+        }
+      } catch { /* keep polling */ }
+    }, POLL_INTERVAL_MS);
+
+    timeoutRef.current = window.setTimeout(() => {
+      clearTimers();
+      setPending(false);
+      setErr("Timeout menunggu approval. Coba login lagi atau minta owner cek WhatsApp.");
+    }, POLL_TIMEOUT_MS);
+  };
 
   const handleLogin = async () => {
     setLoading(true);
@@ -20,6 +65,8 @@ export function LoginPage() {
     try {
       const result = await login(email, password);
       if (result === "inactive") setErr(t.accountInactive as string);
+      else if (result === "pending") startPolling(email, password);
+      else if (result === "rejected") setErr("Device ini ditolak. Hubungi owner.");
       else if (!result) setErr(t.invalidCred as string);
       else await hydrateStores();
     } catch {
@@ -29,8 +76,14 @@ export function LoginPage() {
     }
   };
 
+  const handleCancelPending = () => {
+    clearTimers();
+    setPending(false);
+    setErr("");
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") handleLogin();
+    if (e.key === "Enter" && !pending) handleLogin();
   };
 
   return (
@@ -54,16 +107,29 @@ export function LoginPage() {
 
         <div className={`rounded-3xl border p-6 ${th.card} ${th.bdr} ${th.dark ? "" : "shadow-xl shadow-[#8B5E3C]/[0.04]"}`}>
           {err && <p className="text-xs text-red-400 mb-3 flex items-center gap-1.5">⚠ {err}</p>}
-          <div className="flex flex-col gap-2.5 mb-4" onKeyDown={handleKeyDown}>
-            <input value={email} onChange={e => setEmail(e.target.value)} placeholder={t.email as string}
-              className={`w-full px-4 py-3 text-sm rounded-2xl border focus:outline-none focus:ring-2 focus:ring-[#A0673C]/20 ${th.inp}`} />
-            <input value={password} onChange={e => setPassword(e.target.value)} type="password" placeholder={t.password as string}
-              className={`w-full px-4 py-3 text-sm rounded-2xl border focus:outline-none focus:ring-2 focus:ring-[#A0673C]/20 ${th.inp}`} />
-            <button onClick={handleLogin} disabled={loading}
-              className="w-full py-3.5 rounded-2xl font-bold text-white text-sm bg-gradient-to-r from-[#E8B088] to-[#A0673C] disabled:opacity-60">
-              {loading ? <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : t.signIn}
-            </button>
-          </div>
+          {pending ? (
+            <div className="flex flex-col items-center gap-3 py-4">
+              <span className="inline-block w-10 h-10 border-4 border-[#A0673C] border-t-transparent rounded-full animate-spin" />
+              <p className={`text-sm font-bold ${th.tx}`}>Menunggu persetujuan owner</p>
+              <p className={`text-xs text-center ${th.txm}`}>
+                Device ini belum terdaftar. Owner akan menerima pesan WhatsApp untuk meng-approve. Mohon tunggu...
+              </p>
+              <button onClick={handleCancelPending} className={`text-xs underline ${th.txm}`}>
+                Batal
+              </button>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-2.5 mb-4" onKeyDown={handleKeyDown}>
+              <input value={email} onChange={e => setEmail(e.target.value)} placeholder={t.email as string}
+                className={`w-full px-4 py-3 text-sm rounded-2xl border focus:outline-none focus:ring-2 focus:ring-[#A0673C]/20 ${th.inp}`} />
+              <input value={password} onChange={e => setPassword(e.target.value)} type="password" placeholder={t.password as string}
+                className={`w-full px-4 py-3 text-sm rounded-2xl border focus:outline-none focus:ring-2 focus:ring-[#A0673C]/20 ${th.inp}`} />
+              <button onClick={handleLogin} disabled={loading}
+                className="w-full py-3.5 rounded-2xl font-bold text-white text-sm bg-gradient-to-r from-[#E8B088] to-[#A0673C] disabled:opacity-60">
+                {loading ? <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : t.signIn}
+              </button>
+            </div>
+          )}
 
         </div>
       </div>

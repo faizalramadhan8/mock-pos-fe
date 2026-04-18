@@ -2,29 +2,36 @@ const API_URL = import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? 'http://l
 const BASE = `${API_URL}/api/v1`;
 
 const TOKEN_KEY = 'bakeshop-token';
-const REFRESH_KEY = 'bakeshop-refresh-token';
+const DEVICE_ID_KEY = 'bakeshop-device-id';
+const LEGACY_REFRESH_KEY = 'bakeshop-refresh-token';
+
+localStorage.removeItem(LEGACY_REFRESH_KEY);
 
 export function getToken(): string | null {
   return localStorage.getItem(TOKEN_KEY);
 }
 
-export function setToken(token: string | null, refreshToken?: string | null) {
+export function setToken(token: string | null) {
   if (token) {
     localStorage.setItem(TOKEN_KEY, token);
   } else {
     localStorage.removeItem(TOKEN_KEY);
   }
-  if (refreshToken !== undefined) {
-    if (refreshToken) {
-      localStorage.setItem(REFRESH_KEY, refreshToken);
-    } else {
-      localStorage.removeItem(REFRESH_KEY);
-    }
-  }
 }
 
-export function getRefreshToken(): string | null {
-  return localStorage.getItem(REFRESH_KEY);
+// Device fingerprint: random UUID generated once per browser profile,
+// persisted in localStorage. Falls back to Math.random when crypto API
+// is unavailable (very old browsers). Clearing localStorage → new id →
+// owner must re-approve once.
+export function getDeviceFingerprint(): string {
+  let id = localStorage.getItem(DEVICE_ID_KEY);
+  if (!id) {
+    id = typeof crypto !== 'undefined' && 'randomUUID' in crypto
+      ? crypto.randomUUID()
+      : Math.random().toString(36).slice(2) + Date.now().toString(36);
+    localStorage.setItem(DEVICE_ID_KEY, id);
+  }
+  return id;
 }
 
 export interface ApiRes<T = any> {
