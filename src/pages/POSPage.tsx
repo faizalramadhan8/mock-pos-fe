@@ -754,7 +754,9 @@ export function POSPage() {
           )}
           {(payment === "qris" || payment === "transfer") && (
             <div>
-              <p className={`text-sm font-bold mb-1.5 ${th.tx}`}>{t.uploadProof}</p>
+              <p className={`text-sm font-bold mb-1.5 ${th.tx}`}>
+                {t.uploadProof} <span className={`font-normal text-xs ${th.txm}`}>(opsional)</span>
+              </p>
               {proofImage ? (
                 <div className="relative">
                   <img src={proofImage} alt="proof" className="w-full rounded-2xl border object-cover max-h-48" />
@@ -764,18 +766,35 @@ export function POSPage() {
                   </button>
                 </div>
               ) : (
-                <label className={`flex items-center justify-center gap-2 w-full py-4 rounded-2xl border-2 border-dashed cursor-pointer ${th.bdr} ${th.txm}`}>
-                  <ImagePlus size={18} />
-                  <span className="text-sm font-semibold">{t.chooseImage}</span>
-                  <input type="file" accept="image/*" capture="environment" className="hidden" onChange={async e => {
-                    const file = e.target.files?.[0];
-                    if (!file) return;
-                    const base64 = await compressImage(file);
-                    setProofImage(base64);
-                    toast.success(t.proofUploaded as string);
-                    e.target.value = "";
-                  }} />
-                </label>
+                <div
+                  className={`flex flex-col items-center justify-center gap-1.5 w-full py-4 rounded-2xl border-2 border-dashed ${th.bdr} ${th.txm}`}
+                  onPaste={async (e) => {
+                    const item = e.clipboardData.items[0];
+                    if (item?.type.startsWith("image/")) {
+                      const file = item.getAsFile();
+                      if (file) {
+                        const base64 = await compressImage(file);
+                        setProofImage(base64);
+                        toast.success(t.proofUploaded as string);
+                      }
+                    }
+                  }}
+                  tabIndex={0}
+                >
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <ImagePlus size={18} />
+                    <span className="text-sm font-semibold">{t.chooseImage}</span>
+                    <input type="file" accept="image/*" className="hidden" onChange={async e => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      const base64 = await compressImage(file);
+                      setProofImage(base64);
+                      toast.success(t.proofUploaded as string);
+                      e.target.value = "";
+                    }} />
+                  </label>
+                  <span className={`text-[10px] ${th.txf}`}>atau Ctrl+V untuk paste screenshot</span>
+                </div>
               )}
             </div>
           )}
@@ -783,8 +802,7 @@ export function POSPage() {
             <button onClick={() => setCheckoutOpen(false)} className={`flex-1 py-3 rounded-2xl text-sm font-bold border ${th.bdr} ${th.txm}`}>{t.cancel}</button>
             <button onClick={doCheckout} disabled={
               (payment === "cash" && (!cashRcv || parseFloat(cashRcv) < cartTotal)) ||
-              (payment === "qris" && !proofImage) ||
-              (payment === "transfer" && (!proofImage || (bankAccounts.length > 0 && !selectedBankId)))
+              (payment === "transfer" && bankAccounts.length > 0 && !selectedBankId)
             }
               className="flex-1 py-3 rounded-2xl text-sm font-bold text-white bg-[#4A8B3F] disabled:opacity-40">{t.confirm}</button>
           </div>
