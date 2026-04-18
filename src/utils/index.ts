@@ -229,8 +229,8 @@ function getStoreNameForLabel(): string {
 function buildLabelHtml(product: Product, lang: "en" | "id", size: LabelSize, extras?: LabelExtras) {
   const name = lang === "id" ? product.nameId : product.name;
   // Barcode sizing — bigger bars so it scans reliably and looks prominent
-  const barcodeW = size.width <= 40 ? 1.8 : size.width <= 50 ? 2.0 : 2.4;
-  const barcodeH = Math.round(Math.min(size.width, size.height) * 0.35);
+  const barcodeW = size.width <= 40 ? 2.0 : size.width <= 50 ? 2.4 : 2.8;
+  const barcodeH = Math.round(Math.min(size.width, size.height) * 0.55);
   const barcodeSvg = generateBarcodeSvg(product.sku, { width: barcodeW, height: barcodeH, fontSize: 0, displayValue: false });
   if (!barcodeSvg) return "";
   const expDate = extras?.expiryDate ? formatExpiry(extras.expiryDate) : "";
@@ -253,7 +253,7 @@ function labelCss(size: LabelSize) {
   // Scale font based on label size. Sized to match target design (big & readable)
   const nameFont = size.width <= 40 ? 10 : size.width <= 50 ? 12 : 14;
   const priceFont = size.width <= 40 ? 11 : size.width <= 50 ? 13 : 15;
-  const footFont = size.width <= 40 ? 7 : 8;
+  const footFont = size.width <= 40 ? 9 : 10;
   // Use the SHORTER side as page width so the output stays portrait-oriented
   // (label exits the printer with content reading top-to-bottom).
   const pageW = Math.min(size.width, size.height);
@@ -270,7 +270,7 @@ function labelCss(size: LabelSize) {
   .bc{width:100%;display:flex;justify-content:center}
   .bc svg{max-width:95%;height:auto;display:block}
   .price{font-size:${priceFont}px;font-weight:900;letter-spacing:-0.2px}
-  .foot{background:#000;color:#fff;font-size:${footFont}px;font-weight:700;display:flex;justify-content:space-between;padding:0.6mm 1.5mm;letter-spacing:0.3px}`;
+  .foot{background:#000;color:#fff;font-size:${footFont}px;font-weight:700;display:flex;justify-content:space-between;padding:0.8mm 1.8mm;letter-spacing:0.3px}`;
 }
 
 export function printBarcodeLabel(product: Product, lang: "en" | "id", size?: LabelSize, extras?: LabelExtras) {
