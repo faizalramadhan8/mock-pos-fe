@@ -84,9 +84,6 @@ export function printReceipt(order: Order, opts?: { cashierName?: string }) {
   const orderDiscTotal = order.orderDiscount || 0;
   const hasDiscounts = itemDiscTotal > 0 || orderDiscTotal > 0 || memberSavings > 0;
 
-  const win = window.open("", "_blank", "width=360,height=600");
-  if (!win) return;
-
   const html = `<!DOCTYPE html>
 <html><head><title>Receipt ${order.id}</title>
 <style>
@@ -127,9 +124,29 @@ export function printReceipt(order: Order, opts?: { cashierName?: string }) {
   <p class="c">Thank you for your purchase!</p>
 </body></html>`;
 
-  win.document.write(html);
-  win.document.close();
-  win.onload = () => win.print();
+  // Use hidden iframe to bypass pop-up blockers
+  printViaIframe(html);
+}
+
+function printViaIframe(html: string) {
+  const id = "bakeshop-print-frame";
+  let iframe = document.getElementById(id) as HTMLIFrameElement | null;
+  if (!iframe) {
+    iframe = document.createElement("iframe");
+    iframe.id = id;
+    iframe.style.cssText = "position:fixed;width:0;height:0;border:none;left:-9999px;top:-9999px";
+    document.body.appendChild(iframe);
+  }
+  const doc = iframe.contentDocument || iframe.contentWindow?.document;
+  if (!doc) return;
+  doc.open();
+  doc.write(html);
+  doc.close();
+  // Wait for content to render then trigger print dialog
+  setTimeout(() => {
+    iframe!.contentWindow?.focus();
+    iframe!.contentWindow?.print();
+  }, 300);
 }
 
 export function printReport(orders: Order[], dateLabel: string) {
@@ -139,9 +156,6 @@ export function printReport(orders: Order[], dateLabel: string) {
   const cancelled = orders.filter(o => o.status === "cancelled");
   const revenue = completed.reduce((s, o) => s + o.total, 0);
   const avg = completed.length > 0 ? Math.round(revenue / completed.length) : 0;
-
-  const win = window.open("", "_blank", "width=420,height=700");
-  if (!win) return;
 
   const html = `<!DOCTYPE html>
 <html><head><title>Report - ${escapeHtml(storeName)}</title>
@@ -171,9 +185,7 @@ export function printReport(orders: Order[], dateLabel: string) {
   <p class="c" style="font-size:10px">Generated ${new Date().toLocaleString("id-ID")}</p>
 </body></html>`;
 
-  win.document.write(html);
-  win.document.close();
-  win.onload = () => win.print();
+  printViaIframe(html);
 }
 
 export interface LabelSize {
@@ -236,17 +248,10 @@ export function printBarcodeLabel(product: Product, lang: "en" | "id", size?: La
   const s = size || { width: 40, height: 30 };
   const content = buildLabelHtml(product, lang, s, extras);
   if (!content) return;
-
-  const win = window.open("", "_blank", `width=${Math.max(300, s.width * 4)},height=${Math.max(250, s.height * 4)}`);
-  if (!win) return;
-
   const html = `<!DOCTYPE html>
 <html><head><title>Label ${product.sku}</title>
 <style>${labelCss(s)}</style></head><body>${content}</body></html>`;
-
-  win.document.write(html);
-  win.document.close();
-  win.onload = () => win.print();
+  printViaIframe(html);
 }
 
 export function printBarcodeLabels(products: Product[], lang: "en" | "id", size?: LabelSize, extras?: LabelExtras) {
@@ -254,15 +259,8 @@ export function printBarcodeLabels(products: Product[], lang: "en" | "id", size?
   const s = size || { width: 40, height: 30 };
   const labels = products.map(p => buildLabelHtml(p, lang, s, extras)).filter(Boolean).join("\n");
   if (!labels) return;
-
-  const win = window.open("", "_blank", "width=800,height=600");
-  if (!win) return;
-
   const html = `<!DOCTYPE html>
 <html><head><title>Batch Labels (${products.length})</title>
 <style>${labelCss(s)}</style></head><body>${labels}</body></html>`;
-
-  win.document.write(html);
-  win.document.close();
-  win.onload = () => win.print();
+  printViaIframe(html);
 }
