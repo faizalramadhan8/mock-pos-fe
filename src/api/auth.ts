@@ -56,6 +56,9 @@ export const authApi = {
     const rt = getRefreshToken();
     return api.post('/auth/logout', { refresh_token: rt }).finally(() => setToken(null, null));
   },
+
+  changePassword: (currentPassword: string, newPassword: string) =>
+    api.post('/auth/change-password', { current_password: currentPassword, new_password: newPassword }),
 };
 
 export const userApi = {

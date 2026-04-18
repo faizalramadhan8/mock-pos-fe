@@ -8,6 +8,7 @@ import {
 import { genId, formatDate, formatTime, LABEL_PRESETS } from "@/utils";
 import { INDONESIAN_BANKS } from "@/constants";
 import toast from "react-hot-toast";
+import { authApi } from "@/api/auth";
 import type { Role, BankAccount } from "@/types";
 
 type SettingsTab = "preferences" | "store" | "team" | "activity";
@@ -30,6 +31,12 @@ export function SettingsPage() {
   const auditEntries = useAuditStore(s => s.entries);
 
   const [activeTab, setActiveTab] = useState<SettingsTab>("preferences");
+
+  // ─── Change Password ───
+  const [cpCurrent, setCpCurrent] = useState("");
+  const [cpNew, setCpNew] = useState("");
+  const [cpConfirm, setCpConfirm] = useState("");
+  const [cpLoading, setCpLoading] = useState(false);
 
   // ─── Store Info State ───
   const [storeName, setStoreName] = useState(settings.storeName);
@@ -223,6 +230,59 @@ export function SettingsPage() {
                       : `border ${th.bdr} ${th.txm}`
                   }`}>{o.f} {o.l}</button>
               ))}
+            </div>
+          </div>
+
+          {/* Change Password */}
+          <div className={`rounded-[22px] border p-5 ${th.card} ${th.bdr}`}>
+            <p className={`text-sm font-extrabold mb-3 ${th.tx}`}>
+              <Key size={14} className="inline mr-1.5 -mt-0.5" />
+              {lang === "id" ? "Ubah Password" : "Change Password"}
+            </p>
+            <div className="flex flex-col gap-2.5">
+              <input
+                type="password" value={cpCurrent}
+                onChange={e => setCpCurrent(e.target.value)}
+                placeholder={lang === "id" ? "Password lama" : "Current password"}
+                className={`w-full px-4 py-2.5 text-sm rounded-xl border ${th.inp}`}
+              />
+              <input
+                type="password" value={cpNew}
+                onChange={e => setCpNew(e.target.value)}
+                placeholder={lang === "id" ? "Password baru (min 6 karakter)" : "New password (min 6 chars)"}
+                className={`w-full px-4 py-2.5 text-sm rounded-xl border ${th.inp}`}
+              />
+              <input
+                type="password" value={cpConfirm}
+                onChange={e => setCpConfirm(e.target.value)}
+                placeholder={lang === "id" ? "Konfirmasi password baru" : "Confirm new password"}
+                className={`w-full px-4 py-2.5 text-sm rounded-xl border ${th.inp}`}
+              />
+              {cpNew && cpConfirm && cpNew !== cpConfirm && (
+                <p className="text-[11px] text-red-400 font-medium">
+                  {lang === "id" ? "Password baru tidak cocok" : "Passwords don't match"}
+                </p>
+              )}
+              <button
+                disabled={cpLoading || !cpCurrent || cpNew.length < 6 || cpNew !== cpConfirm}
+                onClick={async () => {
+                  setCpLoading(true);
+                  try {
+                    await authApi.changePassword(cpCurrent, cpNew);
+                    toast.success(lang === "id" ? "Password berhasil diubah" : "Password updated");
+                    setCpCurrent(""); setCpNew(""); setCpConfirm("");
+                  } catch (e: any) {
+                    toast.error(e.message || "Gagal ubah password");
+                  } finally {
+                    setCpLoading(false);
+                  }
+                }}
+                className="w-full py-2.5 rounded-xl text-sm font-bold text-white bg-[#A0673C] disabled:opacity-40"
+              >
+                {cpLoading
+                  ? (lang === "id" ? "Menyimpan…" : "Saving…")
+                  : (lang === "id" ? "Simpan Password Baru" : "Save New Password")}
+              </button>
             </div>
           </div>
 
