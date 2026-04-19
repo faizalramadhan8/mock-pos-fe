@@ -11,7 +11,7 @@ import { useBarcodeScanner } from "@/hooks/useBarcodeScanner";
 import { formatCurrency as $, printReceipt, compressImage, genId, formatTime } from "@/utils";
 import { calcItemDiscount } from "@/utils/calc";
 import Barcode from "react-barcode";
-import type { PaymentMethod, UnitType, DiscountType, Product, Order } from "@/types";
+import type { PaymentMethod, UnitType, DiscountType, Product, Order, Member } from "@/types";
 import toast from "react-hot-toast";
 import {
   Search, ScanLine, ShoppingBag, Minus, Plus, Trash2, ImagePlus, X, UserPlus, Tag, Percent, DollarSign, FileText,
@@ -61,6 +61,8 @@ export function POSPage() {
   const [showAddMember, setShowAddMember] = useState(false);
   const [newMemberName, setNewMemberName] = useState("");
   const [newMemberPhone, setNewMemberPhone] = useState("");
+  const [newMemberAddress, setNewMemberAddress] = useState("");
+  const [newMemberNumber, setNewMemberNumber] = useState("");
   const memberDropdownRef = useRef<HTMLDivElement>(null);
   const debouncedQuery = useDebounce(query, 150);
   const [catFilter, setCatFilter] = useState("all");
@@ -108,18 +110,31 @@ export function POSPage() {
 
   const filteredMembers = useMemo(() => {
     if (!memberQuery.trim()) return members.slice(0, 5);
-    const q = memberQuery.trim();
-    return members.filter(m => m.phone.includes(q)).slice(0, 5);
+    const q = memberQuery.trim().toLowerCase();
+    return members.filter(m =>
+      m.name.toLowerCase().includes(q) ||
+      m.phone.includes(memberQuery.trim()) ||
+      (m.memberNumber || "").toLowerCase().includes(q),
+    ).slice(0, 5);
   }, [members, memberQuery]);
 
   const handleAddNewMember = () => {
     if (!newMemberName.trim()) return;
-    const member = { id: genId(), name: newMemberName.trim(), phone: newMemberPhone.trim(), createdAt: new Date().toISOString() };
+    const member: Member = {
+      id: genId(),
+      name: newMemberName.trim(),
+      phone: newMemberPhone.trim(),
+      address: newMemberAddress.trim() || undefined,
+      memberNumber: newMemberNumber.trim() || undefined,
+      createdAt: new Date().toISOString(),
+    };
     addMember(member);
     setCustomer(member.name + (member.phone ? ` (${member.phone})` : ""));
     setMemberQuery("");
     setNewMemberName("");
     setNewMemberPhone("");
+    setNewMemberAddress("");
+    setNewMemberNumber("");
     setShowAddMember(false);
     setShowMemberDropdown(false);
     toast.success(t.memberAdded as string);
@@ -338,7 +353,6 @@ export function POSPage() {
           onChange={e => { setCustomer(e.target.value); setMemberQuery(e.target.value); setShowMemberDropdown(true); }}
           onFocus={() => setShowMemberDropdown(true)}
           placeholder={activeMember ? "Tambah catatan pelanggan…" : (t.searchMemberPhone as string || t.searchMember as string)}
-          type="tel" inputMode="tel"
           className={`w-full px-4 py-3 text-sm rounded-2xl border ${th.inp}`}
         />
         {showMemberDropdown && (
@@ -346,9 +360,11 @@ export function POSPage() {
             {filteredMembers.length > 0 && filteredMembers.map(m => (
               <button key={m.id} onClick={() => { setMember({ id: m.id, name: m.name, phone: m.phone }); setMemberQuery(""); setShowMemberDropdown(false); }}
                 className={`w-full text-left px-4 py-2.5 flex items-center justify-between hover:opacity-70 border-b last:border-0 ${th.bdrSoft}`}>
-                <div>
-                  <p className={`text-sm font-bold ${th.tx}`}>{m.name}</p>
-                  {m.phone && <p className={`text-[11px] ${th.txm}`}>{m.phone}</p>}
+                <div className="min-w-0">
+                  <p className={`text-sm font-bold truncate ${th.tx}`}>{m.name}</p>
+                  <p className={`text-[11px] ${th.txm} truncate`}>
+                    {[m.phone, m.memberNumber && `#${m.memberNumber}`].filter(Boolean).join(" · ")}
+                  </p>
                 </div>
               </button>
             ))}
@@ -373,6 +389,11 @@ export function POSPage() {
               placeholder={t.memberName as string} className={`w-full px-3 py-2.5 text-sm rounded-xl border ${th.inp}`} />
             <input value={newMemberPhone} onChange={e => setNewMemberPhone(e.target.value)}
               placeholder={t.memberPhone as string} type="tel" inputMode="tel" className={`w-full px-3 py-2.5 text-sm rounded-xl border ${th.inp}`} />
+            <input value={newMemberNumber} onChange={e => setNewMemberNumber(e.target.value)}
+              placeholder={t.memberNumber as string} className={`w-full px-3 py-2.5 text-sm rounded-xl border ${th.inp}`} />
+            <textarea value={newMemberAddress} onChange={e => setNewMemberAddress(e.target.value)}
+              placeholder={t.memberAddress as string} rows={2}
+              className={`w-full px-3 py-2.5 text-sm rounded-xl border resize-none ${th.inp}`} />
             <button onClick={handleAddNewMember} disabled={!newMemberName.trim()}
               className="w-full py-2.5 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-[#E8B088] to-[#A0673C] disabled:opacity-40">{t.save}</button>
           </div>

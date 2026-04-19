@@ -19,6 +19,7 @@ const POSPage = lazy(() => import("@/pages/POSPage").then(m => ({ default: m.POS
 const InventoryPage = lazy(() => import("@/pages/InventoryPage").then(m => ({ default: m.InventoryPage })));
 const OrdersPage = lazy(() => import("@/pages/OrdersPage").then(m => ({ default: m.OrdersPage })));
 const SettingsPage = lazy(() => import("@/pages/SettingsPage").then(m => ({ default: m.SettingsPage })));
+const DeviceApprovalPage = lazy(() => import("@/pages/DeviceApprovalPage").then(m => ({ default: m.DeviceApprovalPage })));
 
 const NAV_ICONS: Record<PageId, React.ReactNode> = {
   dashboard: <Home size={20} />,
@@ -43,6 +44,20 @@ export default function App() {
   const { user, defaultPage } = useAuthStore();
   const [page, setPage] = useState<PageId>("pos");
   const [initializing, setInitializing] = useState(true);
+
+  // Standalone routes for device approval links (sent via WhatsApp to owners).
+  // Short-circuit before the normal auth/session flow — no login required,
+  // the token in the URL is the authn.
+  const path = typeof window !== "undefined" ? window.location.pathname : "/";
+  if (path === "/approve" || path === "/reject") {
+    return (
+      <ErrorBoundary>
+        <Suspense fallback={<PageLoader />}>
+          <DeviceApprovalPage kind={path === "/approve" ? "approve" : "reject"} />
+        </Suspense>
+      </ErrorBoundary>
+    );
+  }
 
   useEffect(() => {
     (async () => {

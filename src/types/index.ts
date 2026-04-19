@@ -163,6 +163,8 @@ export interface Member {
   id: string;
   name: string;
   phone: string;
+  address?: string;
+  memberNumber?: string;
   createdAt: string;
 }
 

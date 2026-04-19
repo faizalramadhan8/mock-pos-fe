@@ -54,6 +54,16 @@ export const authApi = {
       `/auth/devices/status?email=${encodeURIComponent(email)}&fingerprint=${encodeURIComponent(getDeviceFingerprint())}`,
     ),
 
+  deviceApprove: (token: string) =>
+    api.get<{ status: 'approved' | 'rejected'; user_name: string }>(
+      `/auth/devices/approve?t=${encodeURIComponent(token)}`,
+    ),
+
+  deviceReject: (token: string) =>
+    api.get<{ status: 'approved' | 'rejected'; user_name: string }>(
+      `/auth/devices/reject?t=${encodeURIComponent(token)}`,
+    ),
+
   register: (data: {
     email: string;
     password: string;

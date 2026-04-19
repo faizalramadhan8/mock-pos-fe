@@ -4,6 +4,8 @@ export interface MemberRes {
   id: string;
   name: string;
   phone: string;
+  address?: string;
+  member_number?: string;
   created_at: string;
 }
 
@@ -86,7 +88,8 @@ export const memberApi = {
     return api.get<MemberStatsRes>(`/members/${id}/stats${qs ? '?' + qs : ''}`);
   },
 
-  create: (data: { name: string; phone: string }) => api.post<MemberRes>('/members/', data),
+  create: (data: { name: string; phone: string; address?: string; member_number?: string }) =>
+    api.post<MemberRes>('/members/', data),
 
   delete: (id: string) => api.del(`/members/${id}`),
 };

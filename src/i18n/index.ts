@@ -136,8 +136,10 @@ export const translations = {
     teamDesc: "Manage staff and roles",
     // Members
     members: "Members", addMember: "Add Member", memberName: "Member name",
-    memberPhone: "Phone number", memberAdded: "Member added",
-    searchMember: "Search or type customer name...", searchMemberPhone: "Search by phone number...", noMembers: "No members saved",
+    memberPhone: "Phone number", memberAddress: "Address",
+    memberNumber: "Member number (e.g. 1207022025)", memberAdded: "Member added",
+    searchMember: "Search or type customer name...",
+    searchMemberPhone: "Search by name, phone, or member number...", noMembers: "No members saved",
     // Void orders
     cancelled: "Cancelled", voidOrder: "Void Order",
     voidConfirm: "Void this order? Stock will be restored.",
@@ -308,8 +310,10 @@ export const translations = {
     teamDesc: "Kelola staf dan peran",
     // Members
     members: "Anggota", addMember: "Tambah Anggota", memberName: "Nama anggota",
-    memberPhone: "Nomor telepon", memberAdded: "Anggota ditambahkan",
-    searchMember: "Cari atau ketik nama pelanggan...", searchMemberPhone: "Cari nomor telepon...", noMembers: "Belum ada anggota",
+    memberPhone: "Nomor telepon", memberAddress: "Alamat",
+    memberNumber: "No. member (mis. 1207022025)", memberAdded: "Anggota ditambahkan",
+    searchMember: "Cari atau ketik nama pelanggan...",
+    searchMemberPhone: "Cari nama, no. telp, atau no. member...", noMembers: "Belum ada anggota",
     // Void orders
     cancelled: "Dibatalkan", voidOrder: "Batalkan Pesanan",
     voidConfirm: "Batalkan pesanan ini? Stok akan dikembalikan.",

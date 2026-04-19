@@ -68,7 +68,9 @@ const mapBatch = (b: any): StockBatch => ({
 });
 
 const mapMember = (m: any): Member => ({
-  id: m.id, name: m.name, phone: m.phone, createdAt: m.created_at,
+  id: m.id, name: m.name, phone: m.phone,
+  address: m.address || '', memberNumber: m.member_number || '',
+  createdAt: m.created_at,
 });
 
 const mapCashSession = (s: any): CashSession => ({
@@ -659,7 +661,12 @@ export const useMemberStore = create<MemberState>((set, get) => ({
   },
   addMember: async (member) => {
     try {
-      await memberApi.create({ name: member.name, phone: member.phone });
+      await memberApi.create({
+        name: member.name,
+        phone: member.phone,
+        address: member.address || undefined,
+        member_number: member.memberNumber || undefined,
+      });
       await get().fetchMembers();
     } catch (e: any) {
       set(s => ({ members: [member, ...s.members] }));
