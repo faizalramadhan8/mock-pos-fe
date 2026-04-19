@@ -91,6 +91,9 @@ export const memberApi = {
   create: (data: { name: string; phone: string; address?: string; member_number?: string }) =>
     api.post<MemberRes>('/members/', data),
 
+  update: (id: string, data: { name?: string; phone?: string; address?: string; member_number?: string }) =>
+    api.put<MemberRes>(`/members/${id}`, data),
+
   delete: (id: string) => api.del(`/members/${id}`),
 };
 

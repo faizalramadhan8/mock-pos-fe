@@ -9,7 +9,8 @@ import { useDebounce } from "@/hooks/useDebounce";
 import { formatCurrency as $, formatTime, formatDate, printReport, genId } from "@/utils";
 import { exportOrders } from "@/utils/export";
 import { getDateRange, type DateRange } from "@/utils/dateRange";
-import { Printer, FileText, Download, Search, Users, Trash2, Plus, Receipt } from "lucide-react";
+import { Printer, FileText, Download, Search, Users, Trash2, Plus, Receipt, Pencil } from "lucide-react";
+import type { Member } from "@/types";
 import toast from "react-hot-toast";
 
 type OrdersTab = "orders" | "members";
@@ -36,12 +37,15 @@ export function OrdersPage() {
   // Members tab state
   const members = useMemberStore(s => s.members);
   const addMemberAction = useMemberStore(s => s.addMember);
+  const updateMemberAction = useMemberStore(s => s.updateMember);
   const deleteMemberAction = useMemberStore(s => s.deleteMember);
   const [memberSearch, setMemberSearch] = useState("");
   const debouncedMemberSearch = useDebounce(memberSearch, 150);
   const [statsMember, setStatsMember] = useState<{ id: string; name: string; phone: string } | null>(null);
   const [addMemberOpen, setAddMemberOpen] = useState(false);
-  const [newMember, setNewMember] = useState({ name: "", phone: "" });
+  const emptyMemberForm = { name: "", phone: "", address: "", memberNumber: "" };
+  const [newMember, setNewMember] = useState(emptyMemberForm);
+  const [editMember, setEditMember] = useState<Member | null>(null);
   const [confirmDeleteMemberId, setConfirmDeleteMemberId] = useState<string | null>(null);
 
   // Filter by date range
@@ -285,7 +289,7 @@ export function OrdersPage() {
               />
             </div>
             <button
-              onClick={() => { setNewMember({ name: "", phone: "" }); setAddMemberOpen(true); }}
+              onClick={() => { setNewMember(emptyMemberForm); setAddMemberOpen(true); }}
               className={`flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl text-xs font-bold text-white bg-[#1E40AF]`}
             >
               <Plus size={13} /> Member
@@ -295,7 +299,11 @@ export function OrdersPage() {
           {(() => {
             const q = debouncedMemberSearch.toLowerCase().trim();
             const filteredMembers = q
-              ? members.filter(m => m.name.toLowerCase().includes(q) || m.phone.toLowerCase().includes(q))
+              ? members.filter(m =>
+                  m.name.toLowerCase().includes(q) ||
+                  m.phone.toLowerCase().includes(q) ||
+                  (m.memberNumber || "").toLowerCase().includes(q),
+                )
               : members;
 
             if (filteredMembers.length === 0) {
@@ -324,13 +332,25 @@ export function OrdersPage() {
                       <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm ${th.accBg} ${th.acc}`}>💎</div>
                       <div className="min-w-0">
                         <p className={`text-sm font-bold truncate ${th.tx}`}>{m.name}</p>
-                        <p className={`text-[11px] font-mono ${th.txf}`}>{m.phone}</p>
+                        <p className={`text-[11px] font-mono ${th.txf} truncate`}>
+                          {[m.phone, m.memberNumber && `#${m.memberNumber}`].filter(Boolean).join(" · ")}
+                        </p>
+                        {m.address && (
+                          <p className={`text-[10px] ${th.txf} truncate`}>📍 {m.address}</p>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       <p className={`text-[10px] ${th.txf} hidden sm:block`}>
                         Sejak {formatDate(m.createdAt)}
                       </p>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setEditMember(m); }}
+                        aria-label="Edit member"
+                        className={`w-7 h-7 rounded-lg flex items-center justify-center ${th.accBg} ${th.acc}`}
+                      >
+                        <Pencil size={12} />
+                      </button>
                       <button
                         onClick={(e) => { e.stopPropagation(); setConfirmDeleteMemberId(m.id); }}
                         aria-label="Delete member"
@@ -367,6 +387,21 @@ export function OrdersPage() {
               className={`w-full px-3.5 py-2.5 text-sm rounded-xl border ${th.inp}`}
               placeholder="08xxxxxxxxxx" />
           </div>
+          <div>
+            <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>No. Member</p>
+            <input value={newMember.memberNumber}
+              onChange={e => setNewMember({ ...newMember, memberNumber: e.target.value })}
+              className={`w-full px-3.5 py-2.5 text-sm rounded-xl border ${th.inp}`}
+              placeholder="Contoh: 1207022025" />
+          </div>
+          <div>
+            <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>Alamat</p>
+            <textarea value={newMember.address}
+              onChange={e => setNewMember({ ...newMember, address: e.target.value })}
+              rows={2}
+              className={`w-full px-3.5 py-2.5 text-sm rounded-xl border resize-none ${th.inp}`}
+              placeholder="Alamat lengkap" />
+          </div>
           <div className="flex gap-2 mt-2">
             <button onClick={() => setAddMemberOpen(false)}
               className={`flex-1 py-2.5 rounded-xl text-sm font-bold border ${th.bdr} ${th.txm}`}>
@@ -379,10 +414,12 @@ export function OrdersPage() {
                   id: genId(),
                   name: newMember.name.trim(),
                   phone: newMember.phone.trim(),
+                  address: newMember.address.trim() || undefined,
+                  memberNumber: newMember.memberNumber.trim() || undefined,
                   createdAt: new Date().toISOString(),
                 });
                 setAddMemberOpen(false);
-                setNewMember({ name: "", phone: "" });
+                setNewMember(emptyMemberForm);
                 toast.success("Member berhasil ditambah");
               }}
               disabled={!newMember.name.trim() || !newMember.phone.trim()}
@@ -392,6 +429,65 @@ export function OrdersPage() {
             </button>
           </div>
         </div>
+      </Modal>
+
+      {/* Edit Member modal */}
+      <Modal open={!!editMember} onClose={() => setEditMember(null)} title="Edit Member">
+        {editMember && (
+          <div className="flex flex-col gap-3">
+            <div>
+              <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>Nama</p>
+              <input value={editMember.name}
+                onChange={e => setEditMember({ ...editMember, name: e.target.value })}
+                className={`w-full px-3.5 py-2.5 text-sm rounded-xl border ${th.inp}`}
+                autoFocus />
+            </div>
+            <div>
+              <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>Nomor HP</p>
+              <input type="tel" inputMode="tel" value={editMember.phone}
+                onChange={e => setEditMember({ ...editMember, phone: e.target.value })}
+                className={`w-full px-3.5 py-2.5 text-sm rounded-xl border ${th.inp}`} />
+            </div>
+            <div>
+              <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>No. Member</p>
+              <input value={editMember.memberNumber || ""}
+                onChange={e => setEditMember({ ...editMember, memberNumber: e.target.value })}
+                className={`w-full px-3.5 py-2.5 text-sm rounded-xl border ${th.inp}`}
+                placeholder="Contoh: 1207022025" />
+            </div>
+            <div>
+              <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>Alamat</p>
+              <textarea value={editMember.address || ""}
+                onChange={e => setEditMember({ ...editMember, address: e.target.value })}
+                rows={2}
+                className={`w-full px-3.5 py-2.5 text-sm rounded-xl border resize-none ${th.inp}`}
+                placeholder="Alamat lengkap" />
+            </div>
+            <div className="flex gap-2 mt-2">
+              <button onClick={() => setEditMember(null)}
+                className={`flex-1 py-2.5 rounded-xl text-sm font-bold border ${th.bdr} ${th.txm}`}>
+                Batal
+              </button>
+              <button
+                onClick={async () => {
+                  if (!editMember.name.trim() || !editMember.phone.trim()) return;
+                  await updateMemberAction(editMember.id, {
+                    name: editMember.name.trim(),
+                    phone: editMember.phone.trim(),
+                    address: (editMember.address || "").trim(),
+                    memberNumber: (editMember.memberNumber || "").trim(),
+                  });
+                  setEditMember(null);
+                  toast.success("Member berhasil diperbarui");
+                }}
+                disabled={!editMember.name.trim() || !editMember.phone.trim()}
+                className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white bg-[#1E40AF] disabled:opacity-40"
+              >
+                Simpan
+              </button>
+            </div>
+          </div>
+        )}
       </Modal>
 
       {/* Delete Member confirm */}

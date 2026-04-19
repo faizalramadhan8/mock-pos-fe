@@ -650,6 +650,7 @@ interface MemberState {
   fetchMembers: () => Promise<void>;
   addMember: (member: Member) => Promise<void>;
   deleteMember: (id: string) => Promise<void>;
+  updateMember: (id: string, data: Partial<Omit<Member, "id" | "createdAt">>) => Promise<void>;
 }
 export const useMemberStore = create<MemberState>((set, get) => ({
   members: [],
@@ -670,6 +671,19 @@ export const useMemberStore = create<MemberState>((set, get) => ({
       await get().fetchMembers();
     } catch (e: any) {
       set(s => ({ members: [member, ...s.members] }));
+      toast.error(e.message);
+    }
+  },
+  updateMember: async (id, data) => {
+    try {
+      await memberApi.update(id, {
+        name: data.name,
+        phone: data.phone,
+        address: data.address ?? '',
+        member_number: data.memberNumber ?? '',
+      });
+      await get().fetchMembers();
+    } catch (e: any) {
       toast.error(e.message);
     }
   },
