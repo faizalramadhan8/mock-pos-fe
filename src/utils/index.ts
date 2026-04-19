@@ -84,44 +84,76 @@ export function printReceipt(order: Order, opts?: { cashierName?: string }) {
   const orderDiscTotal = order.orderDiscount || 0;
   const hasDiscounts = itemDiscTotal > 0 || orderDiscTotal > 0 || memberSavings > 0;
 
+  // Ubah PAPER_W / PAPER_H di bawah kalau ukuran kertas berubah.
+  // Sekarang: 40mm lebar × 90mm panjang per struk (thermal narrow).
+  // Semua tulisan font-weight:900 supaya hasil cetak thermal lebih tebal.
+  const PAPER_W = "40mm";
+  const PAPER_H = "90mm";
+  const BODY_W = "38mm"; // 2mm margin total
+
+  // Truncate order ID to last 8 chars (uppercase) supaya muat di 1 baris.
+  const shortId = order.id.slice(-8).toUpperCase();
+  const dt = new Date(order.createdAt).toLocaleString("id-ID", {
+    day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit",
+  });
+
   const html = `<!DOCTYPE html>
-<html><head><title>Receipt ${order.id}</title>
+<html><head><title>Receipt ${shortId}</title>
 <style>
-  @page{size:80mm auto;margin:0}
-  body{font-family:'Courier New',monospace;font-size:11px;width:72mm;margin:0 auto;padding:2mm 0;color:#222}
-  .c{text-align:center} .b{font-weight:bold}
-  .ln{border-top:1px dashed #999;margin:6px 0}
-  .r{display:flex;justify-content:space-between;gap:4px}
+  @page{size:${PAPER_W} ${PAPER_H};margin:0}
+  * { font-weight:900 !important; }
+  body{font-family:'Arial Narrow','Helvetica Condensed',Arial,sans-serif;
+       font-size:9px;line-height:1.25;width:${BODY_W};margin:0 auto;padding:1mm 0;color:#000;
+       -webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .c{text-align:center}
+  .ln{border-top:1px dashed #000;margin:2px 0}
+  .r{display:flex;justify-content:space-between;gap:2px}
   .r span:last-child{text-align:right;white-space:nowrap}
-  h2{margin:0;font-size:14px} p{margin:2px 0}
-  .bc{text-align:center;margin:6px 0} .bc svg{max-width:100%}
-  @media print{body{width:72mm}}
+  h2{margin:0;font-size:11px}
+  p{margin:1px 0}
+  .item{margin:2px 0}
+  .item .nm{word-break:break-word}
+  .total{font-size:11px}
+  .bc{text-align:center;margin:3px 0} .bc svg{max-width:100%}
+  @media print { body { width:${BODY_W}; } }
 </style></head><body>
-  <div class="c"><h2>${escapeHtml(name)}</h2><p>${escapeHtml(addr)}</p><p>${escapeHtml(phone)}</p></div>
+  <div class="c">
+    <h2>${escapeHtml(name)}</h2>
+    <p>${escapeHtml(addr)}</p>
+    <p>${escapeHtml(phone)}</p>
+  </div>
   <div class="ln"></div>
-  <div class="r"><span>${escapeHtml(order.id)}</span><span>${new Date(order.createdAt).toLocaleString("id-ID")}</span></div>
-  <div class="r"><span>Customer</span><span>${escapeHtml(customerName)}</span></div>
-  ${cashier ? `<div class="r"><span>Kasir</span><span>${escapeHtml(cashier)}</span></div>` : ""}
+  <div class="r"><span>#${shortId}</span><span>${dt}</span></div>
+  <div>Plgn: ${escapeHtml(customerName)}</div>
+  ${cashier ? `<div>Ksr: ${escapeHtml(cashier)}</div>` : ""}
   <div class="ln"></div>
   ${order.items.map(i => {
     const g = i.quantity * i.unitPrice;
     const d = i.discountAmount || 0;
     const memberLine = i.regularPrice && i.regularPrice > i.unitPrice
-      ? `<div class="r" style="color:#1E40AF;font-size:10px"><span>&nbsp;&nbsp;Member (was Rp ${i.regularPrice.toLocaleString("id-ID")})</span><span></span></div>`
+      ? `<div>&nbsp;&nbsp;(Member, normal Rp ${i.regularPrice.toLocaleString("id-ID")})</div>`
       : "";
-    return `<div><p>${escapeHtml(i.name)}</p><div class="r"><span>${i.quantity} x Rp ${i.unitPrice.toLocaleString("id-ID")}</span><span class="b">Rp ${g.toLocaleString("id-ID")}</span></div>${memberLine}${d > 0 ? `<div class="r" style="color:#2563EB;font-size:11px"><span>&nbsp;&nbsp;Disc ${i.discountType === "percent" ? i.discountValue + "%" : ""}</span><span>-Rp ${d.toLocaleString("id-ID")}</span></div>` : ""}</div>`;
+    const discLine = d > 0
+      ? `<div class="r"><span>&nbsp;&nbsp;Disc${i.discountType === "percent" ? " " + i.discountValue + "%" : ""}</span><span>-Rp ${d.toLocaleString("id-ID")}</span></div>`
+      : "";
+    return `<div class="item">
+      <div class="nm">${escapeHtml(i.name)}</div>
+      <div class="r"><span>${i.quantity} x Rp ${i.unitPrice.toLocaleString("id-ID")}</span><span>Rp ${g.toLocaleString("id-ID")}</span></div>
+      ${memberLine}
+      ${discLine}
+    </div>`;
   }).join("")}
   <div class="ln"></div>
   ${hasDiscounts || order.ppnRate > 0 ? `<div class="r"><span>Subtotal</span><span>Rp ${(grossSubtotal + memberSavings).toLocaleString("id-ID")}</span></div>` : ""}
-  ${memberSavings > 0 ? `<div class="r" style="color:#1E40AF"><span>Hemat Member</span><span>-Rp ${memberSavings.toLocaleString("id-ID")}</span></div>` : ""}
-  ${itemDiscTotal > 0 ? `<div class="r" style="color:#2563EB"><span>Item Disc</span><span>-Rp ${itemDiscTotal.toLocaleString("id-ID")}</span></div>` : ""}
-  ${orderDiscTotal > 0 ? `<div class="r" style="color:#2563EB"><span>Order Disc${order.orderDiscountType === "percent" ? " " + order.orderDiscountValue + "%" : ""}</span><span>-Rp ${orderDiscTotal.toLocaleString("id-ID")}</span></div>` : ""}
+  ${memberSavings > 0 ? `<div class="r"><span>Hemat Member</span><span>-Rp ${memberSavings.toLocaleString("id-ID")}</span></div>` : ""}
+  ${itemDiscTotal > 0 ? `<div class="r"><span>Item Disc</span><span>-Rp ${itemDiscTotal.toLocaleString("id-ID")}</span></div>` : ""}
+  ${orderDiscTotal > 0 ? `<div class="r"><span>Order Disc${order.orderDiscountType === "percent" ? " " + order.orderDiscountValue + "%" : ""}</span><span>-Rp ${orderDiscTotal.toLocaleString("id-ID")}</span></div>` : ""}
   ${order.ppnRate > 0 ? `<div class="r"><span>PPN (${order.ppnRate}%)</span><span>Rp ${order.ppn.toLocaleString("id-ID")}</span></div>` : ""}
-  <div class="r b"><span>TOTAL</span><span>Rp ${order.total.toLocaleString("id-ID")}</span></div>
-  <div class="r"><span>Payment</span><span>${order.payment.toUpperCase()}</span></div>
+  <div class="r total"><span>TOTAL</span><span>Rp ${order.total.toLocaleString("id-ID")}</span></div>
+  <div class="r"><span>Bayar</span><span>${order.payment.toUpperCase()}</span></div>
   <div class="ln"></div>
   ${barcodeSvg ? `<div class="bc">${barcodeSvg}</div>` : ""}
-  <p class="c">Thank you for your purchase!</p>
+  <p class="c">Terima kasih!</p>
 </body></html>`;
 
   // Use hidden iframe to bypass pop-up blockers
