@@ -20,7 +20,7 @@ export const ProductCard = memo(function ProductCard({ product: p, inCart, lang,
 
   return (
     <div className={`rounded-[20px] border overflow-hidden transition-all ${
-      inCart ? "border-[#A0673C] ring-1 ring-[#A0673C]/20" : th.bdr
+      inCart ? "border-[#1E40AF] ring-1 ring-[#1E40AF]/20" : th.bdr
     } ${th.card} ${p.stock === 0 ? "opacity-40" : ""}`}>
       <div className="p-3.5 relative">
         {onDetail && (
@@ -44,7 +44,7 @@ export const ProductCard = memo(function ProductCard({ product: p, inCart, lang,
         </div>
         <div className="mt-1.5">
           {p.stock === 0 && <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${th.dark ? "bg-[#D4627A]/15 text-[#D4627A]" : "bg-red-50 text-[#D4627A]"}`}>{t.soldOut}</span>}
-          {p.stock > 0 && p.stock <= p.minStock && <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${th.dark ? "bg-[#D4956B]/15 text-[#E8B088]" : "bg-[#FFF5EC] text-[#A0673C]"}`}>{p.stock} {t.left}</span>}
+          {p.stock > 0 && p.stock <= p.minStock && <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${th.dark ? "bg-[#60A5FA]/15 text-[#60A5FA]" : "bg-[#EFF6FF] text-[#1E40AF]"}`}>{p.stock} {t.left}</span>}
           {p.stock > p.minStock && <span className={`text-[10px] ${th.txf}`}>{p.stock} {t.inStock}</span>}
         </div>
       </div>

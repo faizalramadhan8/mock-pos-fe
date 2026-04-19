@@ -56,7 +56,7 @@ export function DashboardPage() {
       {/* ─── Owner Stats ─── */}
       {isOwner && (
         <div className="grid grid-cols-[1.2fr_1fr] gap-3">
-          <div className="row-span-2 rounded-[22px] p-5 text-white bg-gradient-to-br from-[#E8B088] to-[#8B5E3C]">
+          <div className="row-span-2 rounded-[22px] p-5 text-white bg-gradient-to-br from-[#60A5FA] to-[#1E3A8A]">
             <p className="text-[11px] font-semibold uppercase tracking-wider opacity-70">{t.revenue}</p>
             <p className="text-[28px] font-black tracking-tight mt-1.5">{$(revenue)}</p>
             <p className={`text-[11px] mt-2 opacity-50`}>{orders.length} {t.ordersCount?.toString().toLowerCase()}</p>
@@ -107,7 +107,7 @@ export function DashboardPage() {
       {/* ─── Cashier Stats ─── */}
       {isCashier && (
         <div className="grid grid-cols-2 gap-3">
-          <div className="rounded-[22px] p-5 text-white bg-gradient-to-br from-[#E8B088] to-[#8B5E3C]">
+          <div className="rounded-[22px] p-5 text-white bg-gradient-to-br from-[#60A5FA] to-[#1E3A8A]">
             <p className="text-[11px] font-semibold uppercase tracking-wider opacity-70">{t.revenue}</p>
             <p className="text-[28px] font-black tracking-tight mt-1.5">{$(revenue)}</p>
           </div>
@@ -145,7 +145,7 @@ export function DashboardPage() {
             <div key={o.id} onClick={() => setDetailOrderId(o.id)}
               className={`flex items-center justify-between px-5 py-3 border-b last:border-0 cursor-pointer active:opacity-70 ${th.bdrSoft}`}>
               <div className="flex items-center gap-2.5">
-                <div className={`w-2 h-2 rounded-full ${o.status === "completed" ? "bg-[#4A8B3F]" : "bg-[#E8B088]"}`} />
+                <div className={`w-2 h-2 rounded-full ${o.status === "completed" ? "bg-[#4A8B3F]" : "bg-[#60A5FA]"}`} />
                 <div>
                   <p className={`text-sm font-bold ${th.tx}`}>{o.id}</p>
                   <p className={`text-[11px] ${th.txm}`}>{o.customer} · {formatTime(o.createdAt)}</p>
@@ -174,7 +174,7 @@ export function DashboardPage() {
               <span className={`text-[11px] font-bold px-2 py-0.5 rounded-md ${
                 p.stock === 0
                   ? (th.dark ? "bg-[#D4627A]/15 text-[#D4627A]" : "bg-red-50 text-[#D4627A]")
-                  : (th.dark ? "bg-[#D4956B]/15 text-[#E8B088]" : "bg-[#FFF5EC] text-[#A0673C]")
+                  : (th.dark ? "bg-[#60A5FA]/15 text-[#60A5FA]" : "bg-[#EFF6FF] text-[#1E40AF]")
               }`}>{p.stock} {t.left}</span>
             </div>
           ))}
@@ -207,7 +207,7 @@ export function DashboardPage() {
                   isExpired
                     ? (th.dark ? "bg-[#D4627A]/15 text-[#D4627A]" : "bg-red-50 text-[#D4627A]")
                     : isUrgent
-                    ? (th.dark ? "bg-[#D4956B]/15 text-[#E8B088]" : "bg-[#FFF5EC] text-[#A0673C]")
+                    ? (th.dark ? "bg-[#60A5FA]/15 text-[#60A5FA]" : "bg-[#EFF6FF] text-[#1E40AF]")
                     : (th.dark ? "bg-[#E89B48]/10 text-[#E89B48]" : "bg-amber-50 text-[#E89B48]")
                 }`}>
                   {isExpired ? t.alreadyExpired : `${days} ${t.days}`}

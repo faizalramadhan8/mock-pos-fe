@@ -42,7 +42,7 @@ export function OrderDetailModal({ orderId, onClose }: OrderDetailModalProps) {
   const statusColor = order.status === "completed"
     ? (th.dark ? "bg-[#4A8B3F]/15 text-[#4A8B3F]" : "bg-green-50 text-[#4A8B3F]")
     : order.status === "pending"
-    ? (th.dark ? "bg-[#E8B088]/15 text-[#E8B088]" : "bg-[#FFF5EC] text-[#A0673C]")
+    ? (th.dark ? "bg-[#60A5FA]/15 text-[#60A5FA]" : "bg-[#EFF6FF] text-[#1E40AF]")
     : order.status === "refunded"
     ? (th.dark ? "bg-[#E89B48]/15 text-[#E89B48]" : "bg-amber-50 text-[#E89B48]")
     : (th.dark ? "bg-[#C4504A]/15 text-[#C4504A]" : "bg-red-50 text-[#C4504A]");
@@ -188,7 +188,7 @@ export function OrderDetailModal({ orderId, onClose }: OrderDetailModalProps) {
                           <>
                             <span className="line-through opacity-60">{$(item.regularPrice)}</span>{" "}
                             <span className={th.acc}>{$(item.unitPrice)}</span>{" "}
-                            <span className="text-[9px] font-bold px-1 py-0.5 rounded bg-[#A0673C]/15 text-[#A0673C]">💎</span>
+                            <span className="text-[9px] font-bold px-1 py-0.5 rounded bg-[#1E40AF]/15 text-[#1E40AF]">💎</span>
                           </>
                         ) : (
                           <span>{$(item.unitPrice)}</span>

@@ -1,7 +1,18 @@
 @import "tailwindcss";
 
+/* Owner request: perbesar tulisan global. Ubah angka di bawah untuk
+   menyesuaikan (default browser = 16px). Semua ukuran lain ikut skalanya
+   karena Tailwind pakai rem. */
+html {
+  font-size: 18px;
+}
+
 body {
-  font-family: 'DM Sans', 'Segoe UI', system-ui, sans-serif;
+  /* Owner preference: Arial Narrow. Fallback chain covers mobile (Roboto
+     Condensed ships on most Android) and macOS (Helvetica Neue Condensed). */
+  font-family: "Arial Narrow", "Helvetica Neue Condensed", "Roboto Condensed",
+               "Arial Narrow Bold", Arial, Helvetica, "Segoe UI", system-ui, sans-serif;
+  font-stretch: condensed;
   -webkit-font-smoothing: antialiased;
   overscroll-behavior: none;
   margin: 0;

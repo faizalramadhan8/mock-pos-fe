@@ -106,7 +106,7 @@ export default function App() {
     <div className={`min-h-screen flex items-center justify-center ${th.bg}`}>
       <div className="flex flex-col items-center gap-4">
         <BakeryLogo size={56} />
-        <div className="w-6 h-6 border-2 border-[#A0673C] border-t-transparent rounded-full animate-spin" />
+        <div className="w-6 h-6 border-2 border-[#1E40AF] border-t-transparent rounded-full animate-spin" />
       </div>
     </div>
   );
@@ -123,7 +123,7 @@ export default function App() {
   return (
     <div className={`min-h-screen ${th.bg}`}>
       {/* Header */}
-      <header className={`fixed top-0 left-0 right-0 z-40 h-14 flex items-center justify-between px-4 border-b backdrop-blur-xl ${th.dark ? "bg-[#1C1916]/85" : "bg-white/85"} ${th.bdr}`}>
+      <header className={`fixed top-0 left-0 right-0 z-40 h-14 flex items-center justify-between px-4 border-b backdrop-blur-xl ${th.dark ? "bg-[#1E293B]/85" : "bg-white/85"} ${th.bdr}`}>
         <div className="flex items-center gap-3">
           <BakeryLogo size={32} />
           <div>
@@ -146,7 +146,7 @@ export default function App() {
       </main>
 
       {/* Bottom Nav */}
-      <nav aria-label="Main navigation" className={`fixed bottom-0 left-0 right-0 z-40 border-t backdrop-blur-xl pb-safe ${th.dark ? "bg-[#1C1916]/92" : "bg-white/92"} ${th.bdr}`}>
+      <nav aria-label="Main navigation" className={`fixed bottom-0 left-0 right-0 z-40 border-t backdrop-blur-xl pb-safe ${th.dark ? "bg-[#1E293B]/92" : "bg-white/92"} ${th.bdr}`}>
         <div role="tablist" className="flex items-center justify-around max-w-md mx-auto h-16">
           {navItems.map((id, idx) => {
             const active = currentPage === id;

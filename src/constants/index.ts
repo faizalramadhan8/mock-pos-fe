@@ -64,7 +64,7 @@ export const INDONESIAN_BANKS = [
 ];
 
 export const CATEGORIES: Category[] = [
-  { id: "c1", name: "Flour & Starch", nameId: "Tepung & Pati", icon: "flour", color: "#C4884A" },
+  { id: "c1", name: "Flour & Starch", nameId: "Tepung & Pati", icon: "flour", color: "#3B82F6" },
   { id: "c2", name: "Sugar", nameId: "Gula", icon: "sugar", color: "#D4627A" },
   { id: "c3", name: "Dairy & Eggs", nameId: "Susu & Telur", icon: "dairy", color: "#5B8DEF" },
   { id: "c4", name: "Chocolate", nameId: "Cokelat", icon: "choco", color: "#7D5A44" },

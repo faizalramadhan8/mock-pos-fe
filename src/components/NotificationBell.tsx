@@ -149,9 +149,9 @@ function NotifItem({ notif, onDismiss, dark }: { notif: AppNotification; onDismi
       </div>
       <div className="flex-1 min-w-0">
         <p className={`text-xs font-bold ${COLOR_MAP[notif.priority]}`}>{notif.title}</p>
-        <p className={`text-[11px] mt-0.5 ${dark ? "text-[#8A7E73]" : "text-[#8B7560]"} truncate`}>{notif.message}</p>
+        <p className={`text-[11px] mt-0.5 ${dark ? "text-[#94A3B8]" : "text-[#64748B]"} truncate`}>{notif.message}</p>
       </div>
-      <button onClick={onDismiss} className={`w-6 h-6 flex items-center justify-center rounded-lg shrink-0 ${dark ? "hover:bg-white/10 text-[#5E5449]" : "hover:bg-black/5 text-[#B8A594]"}`}>
+      <button onClick={onDismiss} className={`w-6 h-6 flex items-center justify-center rounded-lg shrink-0 ${dark ? "hover:bg-white/10 text-[#64748B]" : "hover:bg-black/5 text-[#94A3B8]"}`}>
         <X size={12} />
       </button>
     </div>

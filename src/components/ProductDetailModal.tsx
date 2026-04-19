@@ -114,7 +114,7 @@ export function ProductDetailModal({ productId, onClose }: ProductDetailModalPro
               <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${th.dark ? "bg-[#D4627A]/15 text-[#D4627A]" : "bg-red-50 text-[#D4627A]"}`}>{t.outOfStock}</span>
             )}
             {product.stock > 0 && product.stock <= product.minStock && (
-              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${th.dark ? "bg-[#D4956B]/15 text-[#E8B088]" : "bg-[#FFF5EC] text-[#A0673C]"}`}>{t.lowStock}</span>
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${th.dark ? "bg-[#60A5FA]/15 text-[#60A5FA]" : "bg-[#EFF6FF] text-[#1E40AF]"}`}>{t.lowStock}</span>
             )}
             {product.stock > product.minStock && (
               <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${th.dark ? "bg-[#4A8B3F]/15 text-[#6F9A4D]" : "bg-[#F0F8EC] text-[#4A8B3F]"}`}>{t.normalStock}</span>
@@ -148,7 +148,7 @@ export function ProductDetailModal({ productId, onClose }: ProductDetailModalPro
                     isExpired
                       ? (th.dark ? "bg-[#D4627A]/15 text-[#D4627A]" : "bg-red-50 text-[#D4627A]")
                       : isUrgent
-                        ? (th.dark ? "bg-[#D4956B]/15 text-[#E8B088]" : "bg-[#FFF5EC] text-[#A0673C]")
+                        ? (th.dark ? "bg-[#60A5FA]/15 text-[#60A5FA]" : "bg-[#EFF6FF] text-[#1E40AF]")
                         : (th.dark ? "bg-[#4A8B3F]/15 text-[#6F9A4D]" : "bg-[#F0F8EC] text-[#4A8B3F]")
                   }`}>
                     {isExpired ? (t.expired as string) : `${days} ${t.days}`}

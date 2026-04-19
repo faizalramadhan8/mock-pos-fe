@@ -146,7 +146,7 @@ export function OrdersPage() {
             <button key={tab.id} onClick={() => setActiveTab(tab.id)}
               className={`shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-[14px] text-xs font-bold transition-all ${
                 activeTab === tab.id
-                  ? "text-white bg-gradient-to-r from-[#E8B088] to-[#A0673C]"
+                  ? "text-white bg-gradient-to-r from-[#60A5FA] to-[#1E40AF]"
                   : `${th.elev} ${th.txm}`
               }`}>
               {tab.icon} {tab.label}
@@ -162,7 +162,7 @@ export function OrdersPage() {
           <button key={r} onClick={() => setDateRange(r)}
             className={`shrink-0 px-3.5 py-2 rounded-[14px] text-xs font-bold transition-all ${
               dateRange === r
-                ? "text-white bg-gradient-to-r from-[#E8B088] to-[#A0673C]"
+                ? "text-white bg-gradient-to-r from-[#60A5FA] to-[#1E40AF]"
                 : `${th.elev} ${th.txm}`
             }`}>{dateRangeLabel(r)}</button>
         ))}
@@ -173,7 +173,7 @@ export function OrdersPage() {
         <Search size={16} className={`absolute left-3.5 top-1/2 -translate-y-1/2 ${th.txf}`} />
         <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
           placeholder={t.searchOrders as string}
-          className={`w-full pl-10 pr-4 py-3 text-sm rounded-2xl border focus:outline-none focus:ring-2 focus:ring-[#A0673C]/20 font-medium ${th.inp}`} />
+          className={`w-full pl-10 pr-4 py-3 text-sm rounded-2xl border focus:outline-none focus:ring-2 focus:ring-[#1E40AF]/20 font-medium ${th.inp}`} />
       </div>
 
       {/* Summary cards */}
@@ -196,7 +196,7 @@ export function OrdersPage() {
         {["all", "completed", "pending", "cancelled", "refunded"].map(f => (
           <button key={f} onClick={() => setStatusFilter(f)}
             className={`shrink-0 px-3.5 py-2 rounded-[14px] text-xs font-bold ${
-              statusFilter === f ? "text-white bg-gradient-to-r from-[#E8B088] to-[#A0673C]" : `border ${th.card} ${th.bdr} ${th.txm}`
+              statusFilter === f ? "text-white bg-gradient-to-r from-[#60A5FA] to-[#1E40AF]" : `border ${th.card} ${th.bdr} ${th.txm}`
             }`}>{statusLabel(f)}</button>
         ))}
       </div>
@@ -231,7 +231,7 @@ export function OrdersPage() {
             className={`px-5 py-4 border-b last:border-0 cursor-pointer active:opacity-70 ${th.bdrSoft}`}>
             <div className="flex items-center justify-between mb-1.5">
               <div className="flex items-center gap-2.5">
-                <div className={`w-2 h-2 rounded-full ${o.status === "completed" ? "bg-[#4A8B3F]" : o.status === "pending" ? "bg-[#E8B088]" : o.status === "refunded" ? "bg-[#E89B48]" : "bg-[#C4504A]"}`} />
+                <div className={`w-2 h-2 rounded-full ${o.status === "completed" ? "bg-[#4A8B3F]" : o.status === "pending" ? "bg-[#60A5FA]" : o.status === "refunded" ? "bg-[#E89B48]" : "bg-[#C4504A]"}`} />
                 <div>
                   <p className={`text-sm font-bold ${th.tx}`}>{o.id}</p>
                   <p className={`text-[11px] ${th.txm}`}>{o.customer} · {formatTime(o.createdAt)}</p>
@@ -286,7 +286,7 @@ export function OrdersPage() {
             </div>
             <button
               onClick={() => { setNewMember({ name: "", phone: "" }); setAddMemberOpen(true); }}
-              className={`flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl text-xs font-bold text-white bg-[#A0673C]`}
+              className={`flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl text-xs font-bold text-white bg-[#1E40AF]`}
             >
               <Plus size={13} /> Member
             </button>
@@ -386,7 +386,7 @@ export function OrdersPage() {
                 toast.success("Member berhasil ditambah");
               }}
               disabled={!newMember.name.trim() || !newMember.phone.trim()}
-              className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white bg-[#A0673C] disabled:opacity-40"
+              className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white bg-[#1E40AF] disabled:opacity-40"
             >
               Simpan
             </button>

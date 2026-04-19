@@ -331,7 +331,7 @@ export function POSPage() {
     <div className="flex flex-col gap-3">
       {/* Active member badge — shown when member is selected */}
       {activeMember && (
-        <div className={`flex items-center justify-between px-3 py-2 rounded-xl ${th.dark ? "bg-[#A0673C]/15" : "bg-[#FFF5EC]"}`}>
+        <div className={`flex items-center justify-between px-3 py-2 rounded-xl ${th.dark ? "bg-[#1E40AF]/15" : "bg-[#EFF6FF]"}`}>
           <div className="flex items-center gap-2 min-w-0">
             <span className="text-base">💎</span>
             <div className="min-w-0">
@@ -395,7 +395,7 @@ export function POSPage() {
               placeholder={t.memberAddress as string} rows={2}
               className={`w-full px-3 py-2.5 text-sm rounded-xl border resize-none ${th.inp}`} />
             <button onClick={handleAddNewMember} disabled={!newMemberName.trim()}
-              className="w-full py-2.5 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-[#E8B088] to-[#A0673C] disabled:opacity-40">{t.save}</button>
+              className="w-full py-2.5 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-[#60A5FA] to-[#1E40AF] disabled:opacity-40">{t.save}</button>
           </div>
         </div>
       )}
@@ -423,7 +423,7 @@ export function POSPage() {
                   <>
                     <span className={`text-[11px] line-through ${th.txf}`}>{$(ci.regularPrice)}</span>
                     <span className={`text-[11px] font-bold ${th.acc}`}>{$(ci.unitPrice)}</span>
-                    <span className="text-[9px] font-bold px-1 py-0.5 rounded bg-[#A0673C]/15 text-[#A0673C]">💎 Member</span>
+                    <span className="text-[9px] font-bold px-1 py-0.5 rounded bg-[#1E40AF]/15 text-[#1E40AF]">💎 Member</span>
                   </>
                 ) : (
                   <span className={`text-[11px] ${th.txm}`}>{$(ci.unitPrice)}</span>
@@ -519,7 +519,7 @@ export function POSPage() {
           {(["cash", "card", "transfer", "qris"] as PaymentMethod[]).map(pm => (
             <button key={pm} onClick={() => { setPayment(pm); if (pm !== "qris" && pm !== "transfer") setProofImage(""); if (pm !== "transfer") setSelectedBankId(""); }}
               className={`py-3 rounded-[14px] text-xs font-bold transition-all ${
-                payment === pm ? "text-white bg-gradient-to-r from-[#E8B088] to-[#A0673C]" : `border ${th.bdr} ${th.txm}`
+                payment === pm ? "text-white bg-gradient-to-r from-[#60A5FA] to-[#1E40AF]" : `border ${th.bdr} ${th.txm}`
               }`}>{t[pm]}</button>
           ))}
         </div>
@@ -527,7 +527,7 @@ export function POSPage() {
           <button onClick={() => { clearCart(); if (!isPanel) setCartOpen(false); toast(t.cartCleared as string, { icon: "🗑️" }); }}
             className={`flex-1 py-3 rounded-2xl text-sm font-bold border ${th.bdr} ${th.txm}`}>{t.clear}</button>
           <button onClick={() => setCheckoutOpen(true)}
-            className="flex-[2] py-3 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-[#E8B088] to-[#A0673C]">{t.payNow} {$(cartTotal)}</button>
+            className="flex-[2] py-3 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-[#60A5FA] to-[#1E40AF]">{t.payNow} {$(cartTotal)}</button>
         </div>
       </>}
     </div>
@@ -543,7 +543,7 @@ export function POSPage() {
         <p className={`text-lg font-black mb-2 ${th.tx}`}>{t.registerNotOpen}</p>
         <p className={`text-sm text-center max-w-sm mb-6 ${th.txm}`}>{t.registerNotOpenHint}</p>
         <button onClick={() => setOpenRegisterOpen(true)}
-          className="px-8 py-3.5 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-[#E8B088] to-[#A0673C]">
+          className="px-8 py-3.5 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-[#60A5FA] to-[#1E40AF]">
           {t.openRegister}
         </button>
 
@@ -564,7 +564,7 @@ export function POSPage() {
               <button onClick={() => { setOpenRegisterOpen(false); setOpeningCashInput(""); }}
                 className={`flex-1 py-3 rounded-2xl text-sm font-bold border ${th.bdr} ${th.txm}`}>{t.cancel}</button>
               <button onClick={doOpenRegister}
-                className="flex-1 py-3 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-[#E8B088] to-[#A0673C]">{t.confirm}</button>
+                className="flex-1 py-3 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-[#60A5FA] to-[#1E40AF]">{t.confirm}</button>
             </div>
           </div>
         </Modal>
@@ -613,7 +613,7 @@ export function POSPage() {
                 }
               }
             }}
-            className={`w-full pl-10 pr-12 py-3 text-sm rounded-2xl border focus:outline-none focus:ring-2 focus:ring-[#A0673C]/20 font-medium ${th.inp}`} />
+            className={`w-full pl-10 pr-12 py-3 text-sm rounded-2xl border focus:outline-none focus:ring-2 focus:ring-[#1E40AF]/20 font-medium ${th.inp}`} />
           <ScanLine size={16} className={`absolute right-3.5 top-1/2 -translate-y-1/2 ${th.txf}`} />
         </div>
         <button onClick={() => setOrderHistoryOpen(true)} aria-label={t.orderHistory as string}
@@ -633,7 +633,7 @@ export function POSPage() {
           <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
             <button onClick={() => setCatFilter("all")}
               className={`shrink-0 px-4 py-2.5 rounded-[14px] text-xs font-bold transition-all ${
-                catFilter === "all" ? "text-white bg-gradient-to-r from-[#E8B088] to-[#A0673C]" : `border ${th.card} ${th.bdr} ${th.txm}`
+                catFilter === "all" ? "text-white bg-gradient-to-r from-[#60A5FA] to-[#1E40AF]" : `border ${th.card} ${th.bdr} ${th.txm}`
               }`}>{t.all}</button>
             {categories.map(cat => {
               const Icon = CategoryIconMap[cat.icon];
@@ -641,7 +641,7 @@ export function POSPage() {
               return (
                 <button key={cat.id} onClick={() => setCatFilter(cat.id)}
                   className={`shrink-0 flex items-center gap-1.5 px-3.5 py-2.5 rounded-[14px] text-xs font-bold transition-all ${
-                    active ? "text-white bg-gradient-to-r from-[#E8B088] to-[#A0673C]" : `border ${th.card} ${th.bdr} ${th.txm}`
+                    active ? "text-white bg-gradient-to-r from-[#60A5FA] to-[#1E40AF]" : `border ${th.card} ${th.bdr} ${th.txm}`
                   }`}>
                   {Icon && <Icon color={active ? "#fff" : cat.color} size={18} />}
                   {lang === "id" ? cat.nameId : cat.name}
@@ -649,7 +649,7 @@ export function POSPage() {
               );
             })}
           </div>
-          <div className={`absolute right-0 top-0 bottom-1 w-8 pointer-events-none bg-gradient-to-l ${th.dark ? "from-[#12100E]" : "from-[#F8F3ED]"}`} />
+          <div className={`absolute right-0 top-0 bottom-1 w-8 pointer-events-none bg-gradient-to-l ${th.dark ? "from-[#020617]" : "from-[#F1F5F9]"}`} />
         </div>
 
         {/* Products grid */}
@@ -702,7 +702,7 @@ export function POSPage() {
       {cartCount > 0 && (
         <div className="lg:hidden fixed bottom-20 left-4 right-4 z-30">
           <button onClick={() => setCartOpen(true)}
-            className="w-full flex items-center justify-between text-white px-5 py-3.5 rounded-[20px] bg-gradient-to-r from-[#E8B088] to-[#A0673C] shadow-[0_8px_30px_rgba(160,103,60,0.3)] active:scale-[0.98] transition-transform">
+            className="w-full flex items-center justify-between text-white px-5 py-3.5 rounded-[20px] bg-gradient-to-r from-[#60A5FA] to-[#1E40AF] shadow-[0_8px_30px_rgba(160,103,60,0.3)] active:scale-[0.98] transition-transform">
             <span className="flex items-center gap-2.5">
               <ShoppingBag size={18} />
               <span className="font-bold text-sm">{t.cart} · {cartCount}</span>
@@ -752,12 +752,12 @@ export function POSPage() {
                     <button key={acc.id} onClick={() => setSelectedBankId(acc.id)}
                       className={`w-full text-left rounded-2xl border p-3.5 transition-all ${
                         selected
-                          ? "border-[#A0673C] bg-gradient-to-r from-[#E8B088]/10 to-[#A0673C]/10"
+                          ? "border-[#1E40AF] bg-gradient-to-r from-[#60A5FA]/10 to-[#1E40AF]/10"
                           : `${th.card2} ${th.bdr}`
                       }`}>
                       <div className="flex items-center gap-3">
                         <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-[10px] font-extrabold shrink-0 ${
-                          selected ? "bg-gradient-to-r from-[#E8B088] to-[#A0673C] text-white" : `${th.accBg} ${th.acc}`
+                          selected ? "bg-gradient-to-r from-[#60A5FA] to-[#1E40AF] text-white" : `${th.accBg} ${th.acc}`
                         }`}>
                           {acc.bankName.split("(")[1]?.replace(")", "").trim().slice(0, 3) || acc.bankName.slice(0, 3).toUpperCase()}
                         </div>
@@ -900,7 +900,7 @@ export function POSPage() {
               🖨 {t.printReceipt}
             </button>
             <button onClick={() => setLastOrder(null)}
-              className="w-full py-3 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-[#E8B088] to-[#A0673C]">{t.close}</button>
+              className="w-full py-3 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-[#60A5FA] to-[#1E40AF]">{t.close}</button>
           </div>
         )}
       </Modal>
@@ -979,7 +979,7 @@ export function POSPage() {
             <button onClick={() => { setCloseRegisterOpen(false); setActualCash(""); setRegisterNotes(""); }}
               className={`flex-1 py-3 rounded-2xl text-sm font-bold border ${th.bdr} ${th.txm}`}>{t.cancel}</button>
             <button onClick={doCloseRegister} disabled={!actualCash}
-              className="flex-1 py-3 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-[#E8B088] to-[#A0673C] disabled:opacity-40">{t.confirm}</button>
+              className="flex-1 py-3 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-[#60A5FA] to-[#1E40AF] disabled:opacity-40">{t.confirm}</button>
           </div>
 
           {/* Today's register history */}

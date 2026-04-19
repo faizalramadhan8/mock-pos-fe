@@ -175,7 +175,7 @@ export function SettingsPage() {
                 onClick={() => setActiveTab(tab.id)}
                 className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-sm font-bold whitespace-nowrap transition-all ${
                   active
-                    ? "text-white bg-gradient-to-r from-[#E8B088] to-[#A0673C] shadow-sm"
+                    ? "text-white bg-gradient-to-r from-[#60A5FA] to-[#1E40AF] shadow-sm"
                     : `${th.elev} ${th.txm}`
                 }`}
               >
@@ -208,7 +208,7 @@ export function SettingsPage() {
                 <button key={String(o.k)} onClick={() => dark !== o.k && toggle()}
                   className={`py-3.5 rounded-2xl text-sm font-bold flex items-center justify-center gap-2 transition-all ${
                     dark === o.k
-                      ? "text-white bg-gradient-to-r from-[#E8B088] to-[#A0673C]"
+                      ? "text-white bg-gradient-to-r from-[#60A5FA] to-[#1E40AF]"
                       : `border ${th.bdr} ${th.txm}`
                   }`}>{o.ic} {o.l}</button>
               ))}
@@ -226,7 +226,7 @@ export function SettingsPage() {
                 <button key={o.k} onClick={() => setLang(o.k)}
                   className={`py-3.5 rounded-2xl text-sm font-bold transition-all ${
                     lang === o.k
-                      ? "text-white bg-gradient-to-r from-[#E8B088] to-[#A0673C]"
+                      ? "text-white bg-gradient-to-r from-[#60A5FA] to-[#1E40AF]"
                       : `border ${th.bdr} ${th.txm}`
                   }`}>{o.f} {o.l}</button>
               ))}
@@ -277,7 +277,7 @@ export function SettingsPage() {
                     setCpLoading(false);
                   }
                 }}
-                className="w-full py-2.5 rounded-xl text-sm font-bold text-white bg-[#A0673C] disabled:opacity-40"
+                className="w-full py-2.5 rounded-xl text-sm font-bold text-white bg-[#1E40AF] disabled:opacity-40"
               >
                 {cpLoading
                   ? (lang === "id" ? "Menyimpan…" : "Saving…")
@@ -347,7 +347,7 @@ export function SettingsPage() {
                   onClick={() => { setLabelWidth(s.width); setLabelHeight(s.height); }}
                   className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${
                     labelWidth === s.width && labelHeight === s.height
-                      ? `${th.accBg} ${th.acc} border-[#A0673C]`
+                      ? `${th.accBg} ${th.acc} border-[#1E40AF]`
                       : `${th.card2} ${th.bdr}`
                   }`}>
                   {s.width}&times;{s.height}
@@ -372,7 +372,7 @@ export function SettingsPage() {
 
           {/* Save — clearly scoped to store info + tax */}
           <button onClick={handleSave}
-            className="w-full py-3 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-[#E8B088] to-[#A0673C]">
+            className="w-full py-3 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-[#60A5FA] to-[#1E40AF]">
             {t.save}
           </button>
 
@@ -387,7 +387,7 @@ export function SettingsPage() {
                 <p className={`text-[12px] mt-0.5 ${th.txm}`}>{t.bankDesc}</p>
               </div>
               <button onClick={() => setShowAddBank(true)}
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-[#E8B088] to-[#A0673C] shrink-0">
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-[#60A5FA] to-[#1E40AF] shrink-0">
                 <Plus size={13} /> {t.addBankAccount}
               </button>
             </div>
@@ -450,7 +450,7 @@ export function SettingsPage() {
               <p className={`text-[12px] mt-0.5 ${th.txm}`}>{t.teamDesc}</p>
             </div>
             <button onClick={() => setShowRegister(true)}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-[#E8B088] to-[#A0673C] shrink-0">
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-[#60A5FA] to-[#1E40AF] shrink-0">
               <UserPlus size={13} /> {t.registerStaff}
             </button>
           </div>
@@ -514,7 +514,7 @@ export function SettingsPage() {
                               setNewPasswordInput("");
                               toast.success(t.passwordUpdated as string);
                             }} disabled={!newPasswordInput.trim()}
-                              className="px-3 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-[#E8B088] to-[#A0673C] disabled:opacity-40">{t.save}</button>
+                              className="px-3 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-[#60A5FA] to-[#1E40AF] disabled:opacity-40">{t.save}</button>
                           </div>
                         </div>
 
@@ -676,7 +676,7 @@ export function SettingsPage() {
                   className={`flex-1 py-3 rounded-2xl text-sm font-bold border ${th.bdr} ${th.txm}`}>{t.cancel}</button>
                 <button onClick={handleAddBank}
                   disabled={!bankForm.bankName || !bankForm.accountNumber.trim() || !bankForm.accountHolder.trim()}
-                  className="flex-1 py-3 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-[#E8B088] to-[#A0673C] disabled:opacity-40">{t.save}</button>
+                  className="flex-1 py-3 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-[#60A5FA] to-[#1E40AF] disabled:opacity-40">{t.save}</button>
               </div>
             </div>
           </div>
@@ -722,7 +722,7 @@ export function SettingsPage() {
                     <button key={r} onClick={() => setRegForm(f => ({ ...f, role: r }))}
                       className={`py-3 rounded-2xl text-sm font-bold ${
                         regForm.role === r
-                          ? "text-white bg-gradient-to-r from-[#E8B088] to-[#A0673C]"
+                          ? "text-white bg-gradient-to-r from-[#60A5FA] to-[#1E40AF]"
                           : `border ${th.bdr} ${th.txm}`
                       }`}>{(t.roles as Record<string, string>)[r]}</button>
                   ))}
@@ -738,7 +738,7 @@ export function SettingsPage() {
 
               <button onClick={handleRegister}
                 disabled={!regForm.name.trim() || !regForm.email.trim()}
-                className={`w-full py-3.5 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-[#E8B088] to-[#A0673C] mt-1 ${
+                className={`w-full py-3.5 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-[#60A5FA] to-[#1E40AF] mt-1 ${
                   !regForm.name.trim() || !regForm.email.trim() ? "opacity-40" : ""
                 }`}>{t.registerStaff}</button>
             </div>

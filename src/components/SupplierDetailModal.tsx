@@ -44,7 +44,7 @@ export function SupplierDetailModal({ supplierId, onClose }: SupplierDetailModal
     <Modal open={!!supplierId} onClose={onClose} title={t.supplierDetail as string}>
       {/* Header */}
       <div className="flex flex-col items-center mb-5">
-        <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-3 ${th.dark ? "bg-[#D4956B]/15" : "bg-[#A0673C]/[0.07]"}`}>
+        <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-3 ${th.dark ? "bg-[#60A5FA]/15" : "bg-[#1E40AF]/[0.07]"}`}>
           <span className={`text-2xl font-black ${th.acc}`}>{supplier.name.charAt(0)}</span>
         </div>
         <p className={`text-base font-extrabold tracking-tight ${th.tx}`}>{supplier.name}</p>

@@ -149,7 +149,7 @@ export function MemberStatsModal({ member, onClose }: Props) {
           </div>
 
           {/* Lifetime summary */}
-          <div className={`flex justify-between items-center mb-3 px-1 py-2 rounded-xl ${th.dark ? "bg-[#A0673C]/10" : "bg-[#FFF5EC]"}`}>
+          <div className={`flex justify-between items-center mb-3 px-1 py-2 rounded-xl ${th.dark ? "bg-[#1E40AF]/10" : "bg-[#EFF6FF]"}`}>
             <p className={`text-[11px] ${th.txm}`}>📈 Lifetime</p>
             <p className={`text-xs font-bold ${th.tx}`}>
               {$(stats.lifetime_spend)} · {stats.lifetime_orders}x
@@ -169,8 +169,8 @@ export function MemberStatsModal({ member, onClose }: Props) {
                         <span className={th.txm}>{m.month}</span>
                         <span className={`font-bold ${th.tx}`}>{$(m.spend)} · {m.orders}x</span>
                       </div>
-                      <div className={`h-2 rounded-full ${th.dark ? "bg-[#352E28]" : "bg-[#F0E4D2]"}`}>
-                        <div className={`h-2 rounded-full bg-[#A0673C]`} style={{ width: `${pct}%` }} />
+                      <div className={`h-2 rounded-full ${th.dark ? "bg-[#334155]" : "bg-[#F0E4D2]"}`}>
+                        <div className={`h-2 rounded-full bg-[#1E40AF]`} style={{ width: `${pct}%` }} />
                       </div>
                     </div>
                   );

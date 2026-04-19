@@ -107,15 +107,15 @@ export function printReceipt(order: Order, opts?: { cashierName?: string }) {
     const g = i.quantity * i.unitPrice;
     const d = i.discountAmount || 0;
     const memberLine = i.regularPrice && i.regularPrice > i.unitPrice
-      ? `<div class="r" style="color:#A0673C;font-size:10px"><span>&nbsp;&nbsp;Member (was Rp ${i.regularPrice.toLocaleString("id-ID")})</span><span></span></div>`
+      ? `<div class="r" style="color:#1E40AF;font-size:10px"><span>&nbsp;&nbsp;Member (was Rp ${i.regularPrice.toLocaleString("id-ID")})</span><span></span></div>`
       : "";
-    return `<div><p>${escapeHtml(i.name)}</p><div class="r"><span>${i.quantity} x Rp ${i.unitPrice.toLocaleString("id-ID")}</span><span class="b">Rp ${g.toLocaleString("id-ID")}</span></div>${memberLine}${d > 0 ? `<div class="r" style="color:#B87333;font-size:11px"><span>&nbsp;&nbsp;Disc ${i.discountType === "percent" ? i.discountValue + "%" : ""}</span><span>-Rp ${d.toLocaleString("id-ID")}</span></div>` : ""}</div>`;
+    return `<div><p>${escapeHtml(i.name)}</p><div class="r"><span>${i.quantity} x Rp ${i.unitPrice.toLocaleString("id-ID")}</span><span class="b">Rp ${g.toLocaleString("id-ID")}</span></div>${memberLine}${d > 0 ? `<div class="r" style="color:#2563EB;font-size:11px"><span>&nbsp;&nbsp;Disc ${i.discountType === "percent" ? i.discountValue + "%" : ""}</span><span>-Rp ${d.toLocaleString("id-ID")}</span></div>` : ""}</div>`;
   }).join("")}
   <div class="ln"></div>
   ${hasDiscounts || order.ppnRate > 0 ? `<div class="r"><span>Subtotal</span><span>Rp ${(grossSubtotal + memberSavings).toLocaleString("id-ID")}</span></div>` : ""}
-  ${memberSavings > 0 ? `<div class="r" style="color:#A0673C"><span>Hemat Member</span><span>-Rp ${memberSavings.toLocaleString("id-ID")}</span></div>` : ""}
-  ${itemDiscTotal > 0 ? `<div class="r" style="color:#B87333"><span>Item Disc</span><span>-Rp ${itemDiscTotal.toLocaleString("id-ID")}</span></div>` : ""}
-  ${orderDiscTotal > 0 ? `<div class="r" style="color:#B87333"><span>Order Disc${order.orderDiscountType === "percent" ? " " + order.orderDiscountValue + "%" : ""}</span><span>-Rp ${orderDiscTotal.toLocaleString("id-ID")}</span></div>` : ""}
+  ${memberSavings > 0 ? `<div class="r" style="color:#1E40AF"><span>Hemat Member</span><span>-Rp ${memberSavings.toLocaleString("id-ID")}</span></div>` : ""}
+  ${itemDiscTotal > 0 ? `<div class="r" style="color:#2563EB"><span>Item Disc</span><span>-Rp ${itemDiscTotal.toLocaleString("id-ID")}</span></div>` : ""}
+  ${orderDiscTotal > 0 ? `<div class="r" style="color:#2563EB"><span>Order Disc${order.orderDiscountType === "percent" ? " " + order.orderDiscountValue + "%" : ""}</span><span>-Rp ${orderDiscTotal.toLocaleString("id-ID")}</span></div>` : ""}
   ${order.ppnRate > 0 ? `<div class="r"><span>PPN (${order.ppnRate}%)</span><span>Rp ${order.ppn.toLocaleString("id-ID")}</span></div>` : ""}
   <div class="r b"><span>TOTAL</span><span>Rp ${order.total.toLocaleString("id-ID")}</span></div>
   <div class="r"><span>Payment</span><span>${order.payment.toUpperCase()}</span></div>

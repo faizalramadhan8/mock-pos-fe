@@ -76,8 +76,8 @@ export function InventoryPage() {
     qtyPerBox: "12", stock: "0", unit: "kg" as UnitOfMeasure, image: "", minStock: "10",
   });
   const [addCatOpen, setAddCatOpen] = useState(false);
-  const [newCat, setNewCat] = useState({ name: "", nameId: "", color: "#C4884A" });
-  const catColors = ["#C4884A", "#D4627A", "#5B8DEF", "#7D5A44", "#8B6FC0", "#6F9A4D", "#E89B48", "#2BA5B5", "#9B59B6", "#E74C3C"];
+  const [newCat, setNewCat] = useState({ name: "", nameId: "", color: "#3B82F6" });
+  const catColors = ["#3B82F6", "#D4627A", "#5B8DEF", "#7D5A44", "#8B6FC0", "#6F9A4D", "#E89B48", "#2BA5B5", "#9B59B6", "#E74C3C"];
   const [overviewFilter, setOverviewFilter] = useState<"all" | "low" | "out" | "inactive" | "member">("all");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [productSearch, setProductSearch] = useState("");
@@ -185,7 +185,7 @@ export function InventoryPage() {
     if (!newCat.name || !newCat.nameId) return;
     addCategory({ id: genId(), name: newCat.name, nameId: newCat.nameId, icon: "", color: newCat.color });
     setAddCatOpen(false);
-    setNewCat({ name: "", nameId: "", color: "#C4884A" });
+    setNewCat({ name: "", nameId: "", color: "#3B82F6" });
     toast.success(t.categoryAdded as string);
   };
 
@@ -438,14 +438,14 @@ export function InventoryPage() {
             <button key={tab.id} onClick={() => setActiveTab(tab.id)}
               className={`shrink-0 flex items-center gap-1.5 px-3.5 py-2.5 rounded-[14px] text-xs font-bold transition-all ${
                 activeTab === tab.id
-                  ? "text-white bg-gradient-to-r from-[#E8B088] to-[#A0673C]"
+                  ? "text-white bg-gradient-to-r from-[#60A5FA] to-[#1E40AF]"
                   : `border ${th.card} ${th.bdr} ${th.txm}`
               }`}>
               {tab.icon} {tab.label}
             </button>
           ))}
         </div>
-        <div className={`absolute right-0 top-0 bottom-1 w-8 pointer-events-none bg-gradient-to-l ${th.dark ? "from-[#12100E]" : "from-[#F8F3ED]"}`} />
+        <div className={`absolute right-0 top-0 bottom-1 w-8 pointer-events-none bg-gradient-to-l ${th.dark ? "from-[#020617]" : "from-[#F1F5F9]"}`} />
       </div>
 
       {/* Admin-only action buttons */}
@@ -471,8 +471,8 @@ export function InventoryPage() {
               { l: t.all, v: products.length, clr: "#5B8DEF", f: "all" as const },
               { l: t.lowStock, v: lowStockCount, clr: "#E89B48", f: "low" as const },
               { l: t.outOfStock, v: outOfStockCount, clr: "#C4504A", f: "out" as const },
-              { l: t.inactive, v: inactiveCount, clr: "#8A7E73", f: "inactive" as const },
-              { l: "💎 Member", v: memberPriceCount, clr: "#A0673C", f: "member" as const },
+              { l: t.inactive, v: inactiveCount, clr: "#94A3B8", f: "inactive" as const },
+              { l: "💎 Member", v: memberPriceCount, clr: "#1E40AF", f: "member" as const },
             ].map(s => (
               <button key={s.f} onClick={() => setOverviewFilter(s.f)}
                 className={`rounded-[14px] border p-2.5 text-left transition-all ${
@@ -489,7 +489,7 @@ export function InventoryPage() {
             <Search size={16} className={`absolute left-3.5 top-1/2 -translate-y-1/2 ${th.txf}`} />
             <input value={productSearch} onChange={e => setProductSearch(e.target.value)}
               placeholder={t.searchProducts as string}
-              className={`w-full pl-10 pr-4 py-3 text-sm rounded-2xl border focus:outline-none focus:ring-2 focus:ring-[#A0673C]/20 font-medium ${th.inp}`} />
+              className={`w-full pl-10 pr-4 py-3 text-sm rounded-2xl border focus:outline-none focus:ring-2 focus:ring-[#1E40AF]/20 font-medium ${th.inp}`} />
           </div>
 
           {/* Product list */}
@@ -503,7 +503,7 @@ export function InventoryPage() {
                       if (e.target.checked) setSelectedIds(new Set(filteredProducts.map(p => p.id)));
                       else setSelectedIds(new Set());
                     }}
-                    className="w-4 h-4 rounded accent-[#A0673C]" />
+                    className="w-4 h-4 rounded accent-[#1E40AF]" />
                 )}
                 <p className={`text-sm font-extrabold tracking-tight ${th.tx}`}>
                   {t.product} ({filteredProducts.length})
@@ -534,7 +534,7 @@ export function InventoryPage() {
                         else next.delete(product.id);
                         setSelectedIds(next);
                       }}
-                      className="w-4 h-4 rounded accent-[#A0673C] shrink-0" />
+                      className="w-4 h-4 rounded accent-[#1E40AF] shrink-0" />
                   )}
                   <ProductImage product={product} size={36} />
                   <div className="min-w-0">
@@ -559,7 +559,7 @@ export function InventoryPage() {
                       product.stock === 0
                         ? (th.dark ? "bg-[#D4627A]/15 text-[#D4627A]" : "bg-red-50 text-[#D4627A]")
                         : product.stock <= product.minStock
-                        ? (th.dark ? "bg-[#D4956B]/15 text-[#E8B088]" : "bg-[#FFF5EC] text-[#A0673C]")
+                        ? (th.dark ? "bg-[#60A5FA]/15 text-[#60A5FA]" : "bg-[#EFF6FF] text-[#1E40AF]")
                         : (th.dark ? "bg-[#4A8B3F]/15 text-[#4A8B3F]" : "bg-green-50 text-[#4A8B3F]")
                     }`}>
                       {product.stock === 0 ? t.outOfStock : product.stock <= product.minStock ? t.lowStock : t.normalStock}
@@ -591,7 +591,7 @@ export function InventoryPage() {
                           toast.success(product.isActive ? t.productHidden as string : t.productShown as string);
                         }}
                         className={`w-10 h-6 rounded-full transition-colors relative ${
-                          product.isActive ? "bg-[#4A8B3F]" : (th.dark ? "bg-[#352E28]" : "bg-[#E8DDD2]")
+                          product.isActive ? "bg-[#4A8B3F]" : (th.dark ? "bg-[#334155]" : "bg-[#E2E8F0]")
                         }`}
                         aria-label={product.isActive ? t.hideFromPOS as string : t.showInPOS as string}
                         title={product.isActive ? t.hideFromPOS as string : t.showInPOS as string}
@@ -717,7 +717,7 @@ export function InventoryPage() {
                         isExpired
                           ? (th.dark ? "bg-[#D4627A]/15 text-[#D4627A]" : "bg-red-50 text-[#D4627A]")
                           : isUrgent
-                          ? (th.dark ? "bg-[#D4956B]/15 text-[#E8B088]" : "bg-[#FFF5EC] text-[#A0673C]")
+                          ? (th.dark ? "bg-[#60A5FA]/15 text-[#60A5FA]" : "bg-[#EFF6FF] text-[#1E40AF]")
                           : (th.dark ? "bg-[#E89B48]/10 text-[#E89B48]" : "bg-amber-50 text-[#E89B48]")
                       }`}>
                         {isExpired ? t.alreadyExpired : `${t.expiringIn} ${days} ${t.days}`}
@@ -806,7 +806,7 @@ export function InventoryPage() {
             <p className={`text-[15px] font-extrabold tracking-tight ${th.tx}`}>{t.suppliers}</p>
             {canWrite && (
               <button onClick={() => { setSupplierModal("add"); setSupForm({ name: "", phone: "", email: "", address: "" }); }}
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-[#E8B088] to-[#A0673C]">
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-[#60A5FA] to-[#1E40AF]">
                 <Plus size={13} /> {t.addSupplier}
               </button>
             )}
@@ -913,7 +913,7 @@ export function InventoryPage() {
                       {PAYMENT_TERMS_OPTIONS.map(pt => (
                         <button key={pt} onClick={() => setForm({ ...form, paymentTerms: pt })}
                           className={`py-2 rounded-xl text-[11px] font-bold ${
-                            form.paymentTerms === pt ? "text-white bg-gradient-to-r from-[#E8B088] to-[#A0673C]" : `border ${th.bdr} ${th.txm}`
+                            form.paymentTerms === pt ? "text-white bg-gradient-to-r from-[#60A5FA] to-[#1E40AF]" : `border ${th.bdr} ${th.txm}`
                           }`}>{pt}</button>
                       ))}
                     </div>
@@ -950,7 +950,7 @@ export function InventoryPage() {
                     }
                   }}
                     className={`py-2.5 rounded-xl text-xs font-bold ${
-                      form.unit === ut ? "text-white bg-gradient-to-r from-[#E8B088] to-[#A0673C]" : `border ${th.bdr} ${th.txm}`
+                      form.unit === ut ? "text-white bg-gradient-to-r from-[#60A5FA] to-[#1E40AF]" : `border ${th.bdr} ${th.txm}`
                     }`}>{ut === "individual" ? t.individual : (form.prod ? `${t.box} (${products.find(p => p.id === form.prod)?.qtyPerBox || "?"})` : t.box)}</button>
                 ))}
               </div>
@@ -1128,7 +1128,7 @@ export function InventoryPage() {
           <div className="flex gap-2 mt-1">
             <button onClick={() => setAddProdOpen(false)} className={`flex-1 py-3 rounded-2xl text-sm font-bold border ${th.bdr} ${th.txm}`}>{t.cancel}</button>
             <button onClick={doAddProduct} disabled={!newProd.name || !newProd.nameId || !newProd.sku}
-              className="flex-1 py-3 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-[#E8B088] to-[#A0673C] disabled:opacity-40">{t.save}</button>
+              className="flex-1 py-3 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-[#60A5FA] to-[#1E40AF] disabled:opacity-40">{t.save}</button>
           </div>
         </div>
       </Modal>
@@ -1159,7 +1159,7 @@ export function InventoryPage() {
           <div className="flex gap-2 mt-1">
             <button onClick={() => setAddCatOpen(false)} className={`flex-1 py-3 rounded-2xl text-sm font-bold border ${th.bdr} ${th.txm}`}>{t.cancel}</button>
             <button onClick={doAddCategory} disabled={!newCat.name || !newCat.nameId}
-              className="flex-1 py-3 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-[#E8B088] to-[#A0673C] disabled:opacity-40">{t.save}</button>
+              className="flex-1 py-3 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-[#60A5FA] to-[#1E40AF] disabled:opacity-40">{t.save}</button>
           </div>
         </div>
       </Modal>
@@ -1193,7 +1193,7 @@ export function InventoryPage() {
               className={`flex-1 py-3 rounded-2xl text-sm font-bold border ${th.bdr} ${th.txm}`}>{t.cancel}</button>
             <button onClick={supplierModal === "edit" ? doEditSupplier : doAddSupplier}
               disabled={!supForm.name.trim()}
-              className="flex-1 py-3 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-[#E8B088] to-[#A0673C] disabled:opacity-40">{t.save}</button>
+              className="flex-1 py-3 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-[#60A5FA] to-[#1E40AF] disabled:opacity-40">{t.save}</button>
           </div>
         </div>
       </Modal>
@@ -1312,7 +1312,7 @@ export function InventoryPage() {
           <div className="flex gap-2 mt-1">
             <button onClick={() => setEditProdOpen(false)} className={`flex-1 py-3 rounded-2xl text-sm font-bold border ${th.bdr} ${th.txm}`}>{t.cancel}</button>
             <button onClick={doEditProduct} disabled={!editProd.name || !editProd.nameId || !editProd.sku}
-              className="flex-1 py-3 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-[#E8B088] to-[#A0673C] disabled:opacity-40">{t.save}</button>
+              className="flex-1 py-3 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-[#60A5FA] to-[#1E40AF] disabled:opacity-40">{t.save}</button>
           </div>
         </div>
       </Modal>
@@ -1366,7 +1366,7 @@ export function InventoryPage() {
           <label className={`flex items-center gap-2 cursor-pointer px-3 py-2.5 rounded-xl border ${th.bdr}`}>
             <input type="checkbox" checked={labelIncludeExpiry}
               onChange={e => setLabelIncludeExpiry(e.target.checked)}
-              className="w-4 h-4 rounded accent-[#A0673C]" />
+              className="w-4 h-4 rounded accent-[#1E40AF]" />
             <span className={`text-sm font-bold ${th.tx}`}>Tampilkan tanggal kadaluarsa</span>
           </label>
 
@@ -1396,7 +1396,7 @@ export function InventoryPage() {
               );
               setLabelModalOpen(false);
             }}
-              className={`flex-1 py-2.5 rounded-xl text-sm font-bold text-white bg-[#A0673C]`}>
+              className={`flex-1 py-2.5 rounded-xl text-sm font-bold text-white bg-[#1E40AF]`}>
               Print
             </button>
           </div>

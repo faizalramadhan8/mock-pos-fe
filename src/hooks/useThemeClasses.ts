@@ -5,20 +5,20 @@ export function useThemeClasses() {
   const dark = useThemeStore(s => s.dark);
   return useMemo(() => ({
     dark,
-    bg: dark ? "bg-[#12100E]" : "bg-[#F8F3ED]",
-    card: dark ? "bg-[#1C1916]" : "bg-white",
-    card2: dark ? "bg-[#241F1B]" : "bg-[#FBF7F2]",
-    bdr: dark ? "border-[#352E28]" : "border-[#E8DDD2]",
-    bdrSoft: dark ? "border-[#241F1B]" : "border-[#F3ECE3]",
-    tx: dark ? "text-[#EDE4D9]" : "text-[#2E1F14]",
-    txm: dark ? "text-[#8A7E73]" : "text-[#8B7560]",
-    txf: dark ? "text-[#5E5449]" : "text-[#B8A594]",
-    elev: dark ? "bg-[#2A2420]" : "bg-[#F3ECE3]",
+    bg: dark ? "bg-[#020617]" : "bg-[#F1F5F9]",
+    card: dark ? "bg-[#1E293B]" : "bg-white",
+    card2: dark ? "bg-[#1E293B]" : "bg-[#F8FAFC]",
+    bdr: dark ? "border-[#334155]" : "border-[#E2E8F0]",
+    bdrSoft: dark ? "border-[#1E293B]" : "border-[#E2E8F0]",
+    tx: dark ? "text-[#F1F5F9]" : "text-[#0F172A]",
+    txm: dark ? "text-[#94A3B8]" : "text-[#64748B]",
+    txf: dark ? "text-[#64748B]" : "text-[#94A3B8]",
+    elev: dark ? "bg-[#334155]" : "bg-[#E2E8F0]",
     inp: dark
-      ? "bg-[#2A2420] border-[#352E28] text-[#EDE4D9] placeholder:text-[#5E5449]"
-      : "bg-[#F3ECE3] border-[#E8DDD2] text-[#2E1F14] placeholder:text-[#B8A594]",
-    ring: dark ? "bg-[#D4956B]/10" : "bg-[#A0673C]/[0.06]",
-    acc: dark ? "text-[#E8B088]" : "text-[#A0673C]",
-    accBg: dark ? "bg-[#D4956B]/15" : "bg-[#A0673C]/[0.07]",
+      ? "bg-[#334155] border-[#334155] text-[#F1F5F9] placeholder:text-[#64748B]"
+      : "bg-[#E2E8F0] border-[#E2E8F0] text-[#0F172A] placeholder:text-[#94A3B8]",
+    ring: dark ? "bg-[#60A5FA]/10" : "bg-[#1E40AF]/[0.06]",
+    acc: dark ? "text-[#60A5FA]" : "text-[#1E40AF]",
+    accBg: dark ? "bg-[#60A5FA]/15" : "bg-[#1E40AF]/[0.07]",
   }), [dark]);
 }

@@ -3,7 +3,7 @@ interface IconProps {
   size?: number;
 }
 
-export const FlourIcon = ({ color = "#C4884A", size = 20 }: IconProps) => (
+export const FlourIcon = ({ color = "#3B82F6", size = 20 }: IconProps) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
     <path d="M12 21V10" stroke={color} strokeWidth="1.8" strokeLinecap="round"/>
     <path d="M8.5 7.5C8.5 5.5 10 4 12 4" stroke={color} strokeWidth="1.6" strokeLinecap="round"/>
