@@ -71,7 +71,7 @@ export function InventoryPage() {
   const [addProdOpen, setAddProdOpen] = useState(false);
   const defaultCatId = categories.length > 0 ? categories[0].id : "";
   const [newProd, setNewProd] = useState({
-    name: "", nameId: "", sku: "", category: defaultCatId,
+    name: "", nameId: "", sku: "", category: defaultCatId, supplier: "",
     purchasePrice: "", sellingPrice: "", memberPrice: "",
     qtyPerBox: "12", stock: "0", unit: "kg" as UnitOfMeasure, image: "", minStock: "10",
   });
@@ -96,7 +96,7 @@ export function InventoryPage() {
   const [editProdOpen, setEditProdOpen] = useState(false);
   const [editProdId, setEditProdId] = useState<string | null>(null);
   const [editProd, setEditProd] = useState({
-    name: "", nameId: "", sku: "", category: defaultCatId,
+    name: "", nameId: "", sku: "", category: defaultCatId, supplier: "",
     purchasePrice: "", sellingPrice: "", memberPrice: "",
     qtyPerBox: "12", stock: "0", unit: "kg" as UnitOfMeasure, image: "", minStock: "10",
   });
@@ -199,7 +199,9 @@ export function InventoryPage() {
     const memberPriceVal = parseInt(newProd.memberPrice);
     addProduct({
       id: genId(), sku: newProd.sku, name: newProd.name, nameId: newProd.nameId,
-      category: newProd.category, purchasePrice: parseInt(newProd.purchasePrice) || 0,
+      category: newProd.category,
+      ...(newProd.supplier ? { supplierId: newProd.supplier } : {}),
+      purchasePrice: parseInt(newProd.purchasePrice) || 0,
       sellingPrice: parseInt(newProd.sellingPrice) || 0,
       ...(Number.isFinite(memberPriceVal) && memberPriceVal > 0 ? { memberPrice: memberPriceVal } : {}),
       qtyPerBox: parseInt(newProd.qtyPerBox) || 12,
@@ -208,7 +210,7 @@ export function InventoryPage() {
       createdAt: new Date().toISOString(),
     });
     setAddProdOpen(false);
-    setNewProd({ name: "", nameId: "", sku: "", category: defaultCatId, purchasePrice: "", sellingPrice: "", memberPrice: "", qtyPerBox: "12", stock: "0", unit: "kg", image: "", minStock: "10" });
+    setNewProd({ name: "", nameId: "", sku: "", category: defaultCatId, supplier: "", purchasePrice: "", sellingPrice: "", memberPrice: "", qtyPerBox: "12", stock: "0", unit: "kg", image: "", minStock: "10" });
     setProdFormErrors({});
     toast.success(t.productAdded as string);
   };
@@ -219,6 +221,7 @@ export function InventoryPage() {
     setEditProdId(productId);
     setEditProd({
       name: p.name, nameId: p.nameId, sku: p.sku, category: p.category,
+      supplier: p.supplierId || "",
       purchasePrice: String(p.purchasePrice), sellingPrice: String(p.sellingPrice),
       memberPrice: typeof p.memberPrice === "number" && p.memberPrice > 0 ? String(p.memberPrice) : "",
       qtyPerBox: String(p.qtyPerBox), stock: String(p.stock), unit: p.unit, image: p.image, minStock: String(p.minStock),
@@ -233,7 +236,9 @@ export function InventoryPage() {
     const memberPriceToSend = Number.isFinite(memberPriceVal) && memberPriceVal > 0 ? memberPriceVal : 0;
     updateProduct(editProdId, {
       name: editProd.name, nameId: editProd.nameId, sku: editProd.sku,
-      category: editProd.category, purchasePrice: parseInt(editProd.purchasePrice) || 0,
+      category: editProd.category,
+      supplierId: editProd.supplier,
+      purchasePrice: parseInt(editProd.purchasePrice) || 0,
       sellingPrice: parseInt(editProd.sellingPrice) || 0,
       memberPrice: memberPriceToSend,
       qtyPerBox: parseInt(editProd.qtyPerBox) || 12,
@@ -517,10 +522,35 @@ export function InventoryPage() {
               )}
             </div>
             {filteredProducts.length === 0 ? (
-              <div className={`py-10 text-center ${th.txm}`}>
-                <Package size={36} className="mx-auto opacity-20 mb-2" />
-                <p className="text-sm font-semibold">{t.noResults}</p>
-              </div>
+              products.length === 0 ? (
+                <div className={`py-10 px-6 text-center ${th.txm}`}>
+                  <Package size={40} className="mx-auto opacity-30 mb-3" />
+                  <p className={`text-sm font-bold mb-1 ${th.tx}`}>
+                    {lang === "id" ? "Belum ada produk" : "No products yet"}
+                  </p>
+                  <p className="text-xs mb-4">
+                    {categories.length === 0
+                      ? (lang === "id" ? "Mulai dengan tambah kategori dulu, lalu tambah produk." : "Start by adding a category, then add products.")
+                      : (lang === "id" ? "Klik tombol + di atas untuk tambah produk pertama." : "Click the + button above to add the first product.")}
+                  </p>
+                  {canWrite && (
+                    <button
+                      onClick={() => categories.length === 0 ? setAddCatOpen(true) : setAddProdOpen(true)}
+                      className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-[#60A5FA] to-[#1E40AF]"
+                    >
+                      <Plus size={14} />
+                      {categories.length === 0
+                        ? (lang === "id" ? "Tambah Kategori" : "Add Category")
+                        : (lang === "id" ? "Tambah Produk" : "Add Product")}
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div className={`py-10 text-center ${th.txm}`}>
+                  <Package size={36} className="mx-auto opacity-20 mb-2" />
+                  <p className="text-sm font-semibold">{t.noResults}</p>
+                </div>
+              )
             ) : paginatedProducts.map(product => (
               <div key={product.id} onClick={() => setDetailProductId(product.id)}
                 className={`flex items-center justify-between px-4 py-3 border-b last:border-0 cursor-pointer active:opacity-70 ${th.bdrSoft}`}>
@@ -542,6 +572,15 @@ export function InventoryPage() {
                       {lang === "id" ? product.nameId : product.name}
                     </p>
                     <p className={`text-[10px] font-mono ${th.txf}`}>{product.sku}</p>
+                    {product.supplierId && (() => {
+                      const sup = suppliers.find(s => s.id === product.supplierId);
+                      if (!sup) return null;
+                      return (
+                        <p className={`text-[10px] mt-0.5 font-semibold inline-flex items-center gap-1 ${th.txm}`}>
+                          <Truck size={10} /> {sup.name}
+                        </p>
+                      );
+                    })()}
                     {typeof product.memberPrice === "number" && product.memberPrice > 0 && product.memberPrice < product.sellingPrice && (
                       <p className={`text-[10px] mt-0.5 ${th.acc}`}>
                         💎 {$(product.sellingPrice)} → <b>{$(product.memberPrice)}</b>
@@ -1042,6 +1081,19 @@ export function InventoryPage() {
               />
             </div>
           </div>
+          {/* Supplier (optional) */}
+          <div>
+            <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>
+              {lang === "id" ? "Supplier Utama" : "Primary Supplier"}{" "}
+              <span className={`font-normal ${th.txm}`}>({lang === "id" ? "opsional" : "optional"})</span>
+            </p>
+            <SearchableSelect
+              value={newProd.supplier}
+              onChange={(sup) => setNewProd({ ...newProd, supplier: sup })}
+              placeholder={lang === "id" ? "Tidak ada supplier" : "No supplier"}
+              options={suppliers.map(s => ({ id: s.id, label: s.name, subtitle: s.phone || "" }))}
+            />
+          </div>
           {/* Pricing */}
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -1228,6 +1280,28 @@ export function InventoryPage() {
                 }))}
               />
             </div>
+          </div>
+          {/* Supplier (optional) */}
+          <div>
+            <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>
+              {lang === "id" ? "Supplier Utama" : "Primary Supplier"}{" "}
+              <span className={`font-normal ${th.txm}`}>({lang === "id" ? "opsional" : "optional"})</span>
+            </p>
+            <SearchableSelect
+              value={editProd.supplier}
+              onChange={(sup) => setEditProd({ ...editProd, supplier: sup })}
+              placeholder={lang === "id" ? "Tidak ada supplier" : "No supplier"}
+              options={suppliers.map(s => ({ id: s.id, label: s.name, subtitle: s.phone || "" }))}
+            />
+            {editProd.supplier && (
+              <button
+                type="button"
+                onClick={() => setEditProd({ ...editProd, supplier: "" })}
+                className={`text-[11px] mt-1 font-medium ${th.txm} underline`}
+              >
+                {lang === "id" ? "Hapus supplier" : "Clear supplier"}
+              </button>
+            )}
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>

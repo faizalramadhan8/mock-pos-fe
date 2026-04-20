@@ -17,7 +17,9 @@ const mapUser = (u: any): User => ({
 
 const mapProduct = (p: any): Product => ({
   id: p.id, sku: p.sku, barcode: p.barcode || '', name: p.name, nameId: p.name_id || '',
-  category: p.category_id, purchasePrice: p.purchase_price, sellingPrice: p.selling_price,
+  category: p.category_id,
+  supplierId: p.supplier_id || undefined,
+  purchasePrice: p.purchase_price, sellingPrice: p.selling_price,
   memberPrice: typeof p.member_price === 'number' ? p.member_price : undefined,
   qtyPerBox: p.qty_per_box || 1, stock: p.stock, unit: p.unit,
   image: p.image || '', minStock: p.min_stock || 0, isActive: p.is_active !== false,
@@ -284,7 +286,9 @@ export const useProductStore = create<ProductState>((set, get) => ({
     try {
       await productApi.create({
         sku: product.sku, name: product.name, name_id: product.nameId,
-        category_id: product.category, purchase_price: product.purchasePrice,
+        category_id: product.category,
+        supplier_id: product.supplierId || null,
+        purchase_price: product.purchasePrice,
         selling_price: product.sellingPrice,
         member_price: product.memberPrice ?? null,
         qty_per_box: product.qtyPerBox,
@@ -304,6 +308,7 @@ export const useProductStore = create<ProductState>((set, get) => ({
       if (data.nameId !== undefined) send.name_id = data.nameId;
       if (data.sku !== undefined) send.sku = data.sku;
       if (data.category !== undefined) send.category_id = data.category;
+      if (data.supplierId !== undefined) send.supplier_id = data.supplierId || "";
       if (data.purchasePrice !== undefined) send.purchase_price = data.purchasePrice;
       if (data.sellingPrice !== undefined) send.selling_price = data.sellingPrice;
       if (data.memberPrice !== undefined) send.member_price = data.memberPrice ?? null;
@@ -315,7 +320,6 @@ export const useProductStore = create<ProductState>((set, get) => ({
       await productApi.update(id, send);
       set(s => ({ products: s.products.map(p => p.id === id ? { ...p, ...data } : p) }));
     } catch (e: any) {
-      set(s => ({ products: s.products.map(p => p.id === id ? { ...p, ...data } : p) }));
       toast.error(e.message);
     }
   },

@@ -49,6 +49,7 @@ export interface Product {
   name: string;
   nameId: string;
   category: string;
+  supplierId?: string;
   purchasePrice: number;
   sellingPrice: number;
   memberPrice?: number;

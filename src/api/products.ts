@@ -8,6 +8,8 @@ export interface ProductRes {
   name_id: string;
   category_id: string;
   category?: { id: string; name: string; name_id: string; icon?: string; color?: string };
+  supplier_id?: string | null;
+  supplier?: { id: string; name: string; phone?: string; email?: string; address?: string };
   purchase_price: number;
   selling_price: number;
   member_price?: number;
@@ -60,6 +62,7 @@ export const productApi = {
     name: string;
     name_id?: string;
     category_id: string;
+    supplier_id?: string | null;
     purchase_price: number;
     selling_price: number;
     member_price?: number | null;
@@ -76,6 +79,7 @@ export const productApi = {
     sku: string;
     barcode: string;
     category_id: string;
+    supplier_id: string;
     purchase_price: number;
     selling_price: number;
     member_price: number | null;
@@ -83,6 +87,7 @@ export const productApi = {
     unit: string;
     image: string;
     min_stock: number;
+    stock: number;
   }>) => api.put<ProductRes>(`/products/${id}`, data),
 
   adjustStock: (id: string, delta: number) =>
