@@ -14,7 +14,7 @@ import Barcode from "react-barcode";
 import type { PaymentMethod, UnitType, DiscountType, Product, Order, Member } from "@/types";
 import toast from "react-hot-toast";
 import {
-  Search, ScanLine, ShoppingBag, Minus, Plus, Trash2, ImagePlus, X, UserPlus, Tag, Percent, DollarSign, FileText,
+  Search, ScanLine, ShoppingBag, Minus, Plus, Trash2, ImagePlus, X, UserPlus, Tag, Percent, Wallet, FileText,
 } from "lucide-react";
 
 export function POSPage() {
@@ -538,7 +538,7 @@ export function POSPage() {
     return (
       <div className="flex flex-col items-center justify-center py-20 px-4">
         <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-5 ${th.accBg}`}>
-          <DollarSign size={28} className={th.acc} />
+          <Wallet size={28} className={th.acc} />
         </div>
         <p className={`text-lg font-black mb-2 ${th.tx}`}>{t.registerNotOpen}</p>
         <p className={`text-sm text-center max-w-sm mb-6 ${th.txm}`}>{t.registerNotOpenHint}</p>
@@ -551,7 +551,7 @@ export function POSPage() {
         <Modal open={openRegisterOpen} onClose={() => { setOpenRegisterOpen(false); setOpeningCashInput(""); }} title={t.openRegister as string}>
           <div className="flex flex-col gap-4">
             <div className={`rounded-[20px] p-6 text-center ${th.accBg}`}>
-              <DollarSign size={28} className={`mx-auto mb-2 ${th.acc}`} />
+              <Wallet size={28} className={`mx-auto mb-2 ${th.acc}`} />
               <p className={`text-sm font-semibold ${th.acc}`}>{t.openingCashHint}</p>
             </div>
             <div>
@@ -623,7 +623,7 @@ export function POSPage() {
         {canManageRegister && (
           <button onClick={() => setCloseRegisterOpen(true)} aria-label={t.closeRegister as string}
             className={`shrink-0 flex items-center justify-center gap-1.5 w-11 sm:w-auto sm:px-3.5 py-3 rounded-2xl text-xs font-bold border ${th.bdr} ${th.txm}`}>
-            <DollarSign size={14} /> <span className="hidden sm:inline">{t.closeRegister}</span>
+            <Wallet size={14} /> <span className="hidden sm:inline">{t.closeRegister}</span>
           </button>
         )}
         </div>

@@ -14,7 +14,7 @@ import type { UnitType, StockType, StockMovement, PaymentTerms, PaymentStatus, U
 import toast from "react-hot-toast";
 import {
   Package, Plus, ChevronDown, ArrowDownCircle, ArrowUpCircle, Barcode,
-  LayoutGrid, Clock, AlertTriangle, Truck, X, Check, CircleDollarSign, Pencil, Download, Search, Printer, Trash2,
+  LayoutGrid, Clock, AlertTriangle, Truck, X, Check, Receipt, Pencil, Download, Search, Printer, Trash2,
 } from "lucide-react";
 
 type InventoryTab = "overview" | "stockIn" | "stockOut" | "expiry" | "history" | "suppliers";
@@ -810,7 +810,7 @@ export function InventoryPage() {
           {unpaidInvoices.length > 0 && (
             <div className={`rounded-[22px] border overflow-hidden ${th.card} ${th.bdr}`}>
               <div className={`px-5 py-3.5 border-b ${th.bdr} flex items-center gap-2`}>
-                <CircleDollarSign size={14} className="text-[#E89B48]" />
+                <Receipt size={14} className="text-[#E89B48]" />
                 <p className={`text-sm font-extrabold tracking-tight ${th.tx}`}>{t.unpaidInvoices} ({unpaidInvoices.length})</p>
               </div>
               {unpaidInvoices.map(inv => {

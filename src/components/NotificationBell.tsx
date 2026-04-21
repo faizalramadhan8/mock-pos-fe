@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Bell, X, Package, AlertTriangle, Clock, CircleDollarSign, ShieldAlert } from "lucide-react";
+import { Bell, X, Package, AlertTriangle, Clock, Receipt, ShieldAlert } from "lucide-react";
 import { useNotifications } from "@/hooks/useNotifications";
 import { useThemeClasses } from "@/hooks/useThemeClasses";
 import { useLangStore } from "@/stores";
@@ -25,7 +25,7 @@ const ICON_MAP: Record<NotifType, React.ReactNode> = {
   stock_low: <Package size={14} />,
   expired: <AlertTriangle size={14} />,
   expiry_soon: <Clock size={14} />,
-  invoice_due: <CircleDollarSign size={14} />,
+  invoice_due: <Receipt size={14} />,
   register_open: <Clock size={14} />,
 };
 

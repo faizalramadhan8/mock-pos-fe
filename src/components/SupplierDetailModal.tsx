@@ -4,7 +4,7 @@ import { useSupplierStore, useInventoryStore, useProductStore, useAuthStore, use
 import { INVENTORY_WRITE_ROLES } from "@/constants";
 import { useThemeClasses } from "@/hooks/useThemeClasses";
 import { formatCurrency as $, formatDate, formatTime } from "@/utils";
-import { Phone, Mail, MapPin, ArrowDownCircle, Check, CircleDollarSign, Package, Copy, AlertTriangle } from "lucide-react";
+import { Phone, Mail, MapPin, ArrowDownCircle, Check, Receipt, Package, Copy, AlertTriangle } from "lucide-react";
 import toast from "react-hot-toast";
 
 interface SupplierDetailModalProps {
@@ -194,7 +194,7 @@ export function SupplierDetailModal({ supplierId, onClose }: SupplierDetailModal
       {unpaidInvoices.length > 0 && (
         <div className={`rounded-2xl border overflow-hidden mb-3 ${th.bdr} ${th.card2}`}>
           <div className={`px-4 py-2.5 border-b ${th.bdr} flex items-center gap-2`}>
-            <CircleDollarSign size={13} className="text-[#D4627A]" />
+            <Receipt size={13} className="text-[#D4627A]" />
             <p className={`text-xs font-bold uppercase tracking-wider ${th.txf}`}>{t.unpaidInvoices} ({unpaidInvoices.length})</p>
           </div>
           {unpaidInvoices.map(inv => {
