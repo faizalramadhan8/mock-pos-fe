@@ -43,9 +43,21 @@ export const ProductCard = memo(function ProductCard({ product: p, inCart, lang,
           <span className={`text-xs ${th.txf}`}>/{p.unit}</span>
         </div>
         <div className="mt-1.5">
-          {p.stock === 0 && <span className={`text-xs font-bold px-2 py-0.5 rounded-md ${th.dark ? "bg-[#D4627A]/15 text-[#D4627A]" : "bg-red-50 text-[#D4627A]"}`}>{t.soldOut}</span>}
-          {p.stock > 0 && p.stock <= p.minStock && <span className={`text-xs font-bold px-2 py-0.5 rounded-md ${th.dark ? "bg-[#60A5FA]/15 text-[#60A5FA]" : "bg-[#EFF6FF] text-[#1E40AF]"}`}>{p.stock} {t.left}</span>}
-          {p.stock > p.minStock && <span className={`text-xs ${th.txf}`}>{p.stock} {t.inStock}</span>}
+          {p.stock === 0 && (
+            <span className={`text-base font-black px-2.5 py-1 rounded-lg ${th.dark ? "bg-[#D4627A]/20 text-[#D4627A]" : "bg-red-100 text-[#D4627A]"}`}>
+              {t.soldOut}
+            </span>
+          )}
+          {p.stock > 0 && p.stock <= p.minStock && (
+            <span className={`text-base font-black px-2.5 py-1 rounded-lg ${th.dark ? "bg-[#E89B48]/20 text-[#E89B48]" : "bg-orange-100 text-[#E89B48]"}`}>
+              {p.stock} {p.unit} · {t.left}
+            </span>
+          )}
+          {p.stock > p.minStock && (
+            <span className={`text-base font-black px-2.5 py-1 rounded-lg ${th.dark ? "bg-[#4A8B3F]/20 text-[#4A8B3F]" : "bg-green-100 text-[#4A8B3F]"}`}>
+              {p.stock} {p.unit}
+            </span>
+          )}
         </div>
       </div>
       <div className="grid grid-cols-2 gap-1.5 px-3.5 pb-3.5">
