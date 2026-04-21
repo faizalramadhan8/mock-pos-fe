@@ -50,12 +50,12 @@ export const ProductCard = memo(function ProductCard({ product: p, inCart, lang,
           )}
           {p.stock > 0 && p.stock <= p.minStock && (
             <span className={`text-base font-black px-2.5 py-1 rounded-lg ${th.dark ? "bg-[#E89B48]/20 text-[#E89B48]" : "bg-orange-100 text-[#E89B48]"}`}>
-              {p.stock} {p.unit} · {t.left}
+              {p.stock} {t.left}
             </span>
           )}
           {p.stock > p.minStock && (
             <span className={`text-base font-black px-2.5 py-1 rounded-lg ${th.dark ? "bg-[#4A8B3F]/20 text-[#4A8B3F]" : "bg-green-100 text-[#4A8B3F]"}`}>
-              {p.stock} {p.unit}
+              {p.stock} {t.inStock}
             </span>
           )}
         </div>
