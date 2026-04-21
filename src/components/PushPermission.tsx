@@ -22,7 +22,7 @@ export function PushPermission() {
           <p className={`text-xs font-bold ${th.tx}`}>
             {lang === "id" ? "Aktifkan Push Notification" : "Enable Push Notifications"}
           </p>
-          <p className={`text-[10px] mt-0.5 ${th.txm}`}>
+          <p className={`text-xs mt-0.5 ${th.txm}`}>
             {lang === "id"
               ? "Dapat notifikasi stok rendah & kadaluarsa walau app tertutup"
               : "Get low stock & expiry alerts even when app is closed"}
@@ -30,7 +30,7 @@ export function PushPermission() {
           <button
             onClick={subscribe}
             disabled={loading}
-            className={`mt-2 px-3 py-1.5 rounded-lg text-[11px] font-bold text-white bg-gradient-to-r from-[#60A5FA] to-[#1E40AF] disabled:opacity-60`}
+            className={`mt-2 px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-gradient-to-r from-[#60A5FA] to-[#1E40AF] disabled:opacity-60`}
           >
             {loading ? "..." : lang === "id" ? "Aktifkan" : "Enable"}
           </button>

@@ -4,7 +4,18 @@
    menyesuaikan (default browser = 16px). Semua ukuran lain ikut skalanya
    karena Tailwind pakai rem. */
 html {
-  font-size: 18px;
+  font-size: 20px;
+}
+
+/* Hide spinner arrows on number inputs — owner accidentally clicked them
+   and changed prices by ±1 (21500 → 21499). Users type numbers directly. */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
 }
 
 body {

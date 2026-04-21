@@ -336,11 +336,11 @@ export function POSPage() {
             <span className="text-base">💎</span>
             <div className="min-w-0">
               <p className={`text-xs font-extrabold truncate ${th.acc}`}>{activeMember.name}</p>
-              <p className={`text-[10px] ${th.txm}`}>{activeMember.phone} · Member price aktif</p>
-              <p className={`text-[10px] ${th.txm} mt-0.5`}>📱 Struk akan dikirim ke WhatsApp</p>
+              <p className={`text-xs ${th.txm}`}>{activeMember.phone} · Member price aktif</p>
+              <p className={`text-xs ${th.txm} mt-0.5`}>📱 Struk akan dikirim ke WhatsApp</p>
             </div>
           </div>
-          <button onClick={() => setMember(null)} className={`text-[10px] font-bold px-2 py-1 rounded-lg ${th.txm} hover:opacity-70`}>
+          <button onClick={() => setMember(null)} className={`text-xs font-bold px-2 py-1 rounded-lg ${th.txm} hover:opacity-70`}>
             Lepas
           </button>
         </div>
@@ -362,7 +362,7 @@ export function POSPage() {
                 className={`w-full text-left px-4 py-2.5 flex items-center justify-between hover:opacity-70 border-b last:border-0 ${th.bdrSoft}`}>
                 <div className="min-w-0">
                   <p className={`text-sm font-bold truncate ${th.tx}`}>{m.name}</p>
-                  <p className={`text-[11px] ${th.txm} truncate`}>
+                  <p className={`text-xs ${th.txm} truncate`}>
                     {[m.phone, m.memberNumber && `#${m.memberNumber}`].filter(Boolean).join(" · ")}
                   </p>
                 </div>
@@ -416,19 +416,19 @@ export function POSPage() {
             <div className="flex-1 min-w-0">
               <p className={`text-sm font-bold truncate ${th.tx}`}>{ci.name}</p>
               <div className="flex items-center gap-1.5 mt-0.5">
-                <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md ${th.accBg} ${th.acc}`}>
+                <span className={`text-xs font-semibold px-1.5 py-0.5 rounded-md ${th.accBg} ${th.acc}`}>
                   {ci.unitType === "box" ? `${t.box}(${ci.qtyPerBox})` : t.individual}
                 </span>
                 {ci.regularPrice && ci.regularPrice > ci.unitPrice ? (
                   <>
-                    <span className={`text-[11px] line-through ${th.txf}`}>{$(ci.regularPrice)}</span>
-                    <span className={`text-[11px] font-bold ${th.acc}`}>{$(ci.unitPrice)}</span>
-                    <span className="text-[9px] font-bold px-1 py-0.5 rounded bg-[#1E40AF]/15 text-[#1E40AF]">💎 Member</span>
+                    <span className={`text-xs line-through ${th.txf}`}>{$(ci.regularPrice)}</span>
+                    <span className={`text-xs font-bold ${th.acc}`}>{$(ci.unitPrice)}</span>
+                    <span className="text-xs font-bold px-1 py-0.5 rounded bg-[#1E40AF]/15 text-[#1E40AF]">💎 Member</span>
                   </>
                 ) : (
-                  <span className={`text-[11px] ${th.txm}`}>{$(ci.unitPrice)}</span>
+                  <span className={`text-xs ${th.txm}`}>{$(ci.unitPrice)}</span>
                 )}
-                {ci.discountType && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-[#E89B48]/15 text-[#E89B48]">-{ci.discountType === "percent" ? `${ci.discountValue}%` : $(ci.discountValue || 0)}</span>}
+                {ci.discountType && <span className="text-xs font-bold px-1.5 py-0.5 rounded-md bg-[#E89B48]/15 text-[#E89B48]">-{ci.discountType === "percent" ? `${ci.discountValue}%` : $(ci.discountValue || 0)}</span>}
               </div>
               <div className="flex items-center justify-between mt-2">
                 <div className="flex items-center gap-1.5">
@@ -439,7 +439,7 @@ export function POSPage() {
                 <div className="flex items-center gap-2">
                   {itemDisc > 0 ? (
                     <div className="text-right">
-                      <span className={`text-[10px] line-through ${th.txf}`}>{$(itemGross)}</span>
+                      <span className={`text-xs line-through ${th.txf}`}>{$(itemGross)}</span>
                       <span className={`text-sm font-extrabold ml-1 ${th.tx}`}>{$(itemGross - itemDisc)}</span>
                     </div>
                   ) : (
@@ -453,15 +453,15 @@ export function POSPage() {
               {discountItemId === ci.id && (
                 <div className="mt-2 flex items-center gap-1.5">
                   <div className="flex rounded-lg overflow-hidden border">
-                    <button onClick={() => setDiscountMode("percent")} aria-label="Percent discount" className={`px-2 py-1 text-[10px] font-bold ${discountMode === "percent" ? "bg-[#E89B48] text-white" : `${th.elev} ${th.txm}`}`}><Percent size={10} /></button>
-                    <button onClick={() => setDiscountMode("fixed")} aria-label="Fixed discount" className={`px-2 py-1 text-[10px] font-bold ${discountMode === "fixed" ? "bg-[#E89B48] text-white" : `${th.elev} ${th.txm}`}`}>Rp</button>
+                    <button onClick={() => setDiscountMode("percent")} aria-label="Percent discount" className={`px-2 py-1 text-xs font-bold ${discountMode === "percent" ? "bg-[#E89B48] text-white" : `${th.elev} ${th.txm}`}`}><Percent size={10} /></button>
+                    <button onClick={() => setDiscountMode("fixed")} aria-label="Fixed discount" className={`px-2 py-1 text-xs font-bold ${discountMode === "fixed" ? "bg-[#E89B48] text-white" : `${th.elev} ${th.txm}`}`}>Rp</button>
                   </div>
                   <input value={discountInput} onChange={e => setDiscountInput(e.target.value)} type="number" placeholder="0"
                     className={`flex-1 px-2 py-1 text-xs rounded-lg border w-16 ${th.inp}`} />
                   <button onClick={() => { setItemDiscount(ci.id, discountMode, parseFloat(discountInput) || 0); setDiscountItemId(null); }}
-                    className="px-2 py-1 rounded-lg text-[10px] font-bold text-white bg-[#E89B48]">{t.save}</button>
+                    className="px-2 py-1 rounded-lg text-xs font-bold text-white bg-[#E89B48]">{t.save}</button>
                   {ci.discountType && <button onClick={() => { setItemDiscount(ci.id, null, 0); setDiscountItemId(null); }}
-                    aria-label="Remove discount" className="text-[10px] font-bold text-[#C4504A]"><X size={10} /></button>}
+                    aria-label="Remove discount" className="text-xs font-bold text-[#C4504A]"><X size={10} /></button>}
                 </div>
               )}
             </div>
@@ -491,25 +491,25 @@ export function POSPage() {
           {/* Order discount toggle */}
           {!showOrderDiscount && !orderDiscountType ? (
             <button onClick={() => { setShowOrderDiscount(true); setOrderDiscMode("percent"); setOrderDiscInput(""); }}
-              className={`mt-2 flex items-center gap-1.5 text-[11px] font-bold ${th.acc}`}>
+              className={`mt-2 flex items-center gap-1.5 text-xs font-bold ${th.acc}`}>
               <Tag size={11} /> {t.addDiscount}
             </button>
           ) : !showOrderDiscount && orderDiscountType ? (
             <div className="mt-2 flex items-center justify-between">
-              <span className="text-[11px] font-bold text-[#E89B48]">{t.orderDiscount}: -{orderDiscountType === "percent" ? `${orderDiscountValue}%` : $(orderDiscountValue)}</span>
-              <button onClick={() => { setOrderDiscount(null, 0); }} className="text-[10px] font-bold text-[#C4504A]">{t.removeDiscount}</button>
+              <span className="text-xs font-bold text-[#E89B48]">{t.orderDiscount}: -{orderDiscountType === "percent" ? `${orderDiscountValue}%` : $(orderDiscountValue)}</span>
+              <button onClick={() => { setOrderDiscount(null, 0); }} className="text-xs font-bold text-[#C4504A]">{t.removeDiscount}</button>
             </div>
           ) : null}
           {showOrderDiscount && (
             <div className="mt-2 flex items-center gap-1.5">
               <div className="flex rounded-lg overflow-hidden border">
-                <button onClick={() => setOrderDiscMode("percent")} aria-label="Percent discount" className={`px-2 py-1 text-[10px] font-bold ${orderDiscMode === "percent" ? "bg-[#E89B48] text-white" : `${th.elev} ${th.txm}`}`}><Percent size={10} /></button>
-                <button onClick={() => setOrderDiscMode("fixed")} aria-label="Fixed discount" className={`px-2 py-1 text-[10px] font-bold ${orderDiscMode === "fixed" ? "bg-[#E89B48] text-white" : `${th.elev} ${th.txm}`}`}>Rp</button>
+                <button onClick={() => setOrderDiscMode("percent")} aria-label="Percent discount" className={`px-2 py-1 text-xs font-bold ${orderDiscMode === "percent" ? "bg-[#E89B48] text-white" : `${th.elev} ${th.txm}`}`}><Percent size={10} /></button>
+                <button onClick={() => setOrderDiscMode("fixed")} aria-label="Fixed discount" className={`px-2 py-1 text-xs font-bold ${orderDiscMode === "fixed" ? "bg-[#E89B48] text-white" : `${th.elev} ${th.txm}`}`}>Rp</button>
               </div>
               <input value={orderDiscInput} onChange={e => setOrderDiscInput(e.target.value)} type="number" placeholder="0"
                 className={`flex-1 px-2 py-1 text-xs rounded-lg border w-16 ${th.inp}`} />
               <button onClick={() => { setOrderDiscount(orderDiscMode, parseFloat(orderDiscInput) || 0); setShowOrderDiscount(false); }}
-                className="px-2 py-1 rounded-lg text-[10px] font-bold text-white bg-[#E89B48]">{t.save}</button>
+                className="px-2 py-1 rounded-lg text-xs font-bold text-white bg-[#E89B48]">{t.save}</button>
               <button onClick={() => setShowOrderDiscount(false)} aria-label="Close" className={th.txf}><X size={12} /></button>
             </div>
           )}
@@ -583,8 +583,8 @@ export function POSPage() {
                     <span className={`text-sm font-bold ${th.tx}`}>{formatTime(s.closedAt)}</span>
                     <span className={`text-sm font-black ${diffColor}`}>{s.difference >= 0 ? "+" : ""}{$(s.difference)}</span>
                   </div>
-                  <p className={`text-[11px] ${th.txm}`}>{t.openingCash}: {$(s.openingCash)} · {t.expectedCash}: {$(s.expectedCash)} · {t.actualCash}: {$(s.actualCash)}</p>
-                  {s.notes && <p className={`text-[10px] mt-0.5 ${th.txf}`}>{s.notes}</p>}
+                  <p className={`text-xs ${th.txm}`}>{t.openingCash}: {$(s.openingCash)} · {t.expectedCash}: {$(s.expectedCash)} · {t.actualCash}: {$(s.actualCash)}</p>
+                  {s.notes && <p className={`text-xs mt-0.5 ${th.txf}`}>{s.notes}</p>}
                 </div>
               );
             })}
@@ -724,7 +724,7 @@ export function POSPage() {
             <p className={`text-xs font-semibold ${th.acc}`}>{t.totalAmount}</p>
             <p className={`text-[32px] font-black tracking-tight mt-1 ${th.acc}`}>{$(cartTotal)}</p>
             {(ppnRate > 0 || totalDiscount > 0) && (
-              <p className={`text-[11px] mt-1 ${th.acc} opacity-70`}>
+              <p className={`text-xs mt-1 ${th.acc} opacity-70`}>
                 {t.subtotal}: {$(cartSubtotal)}
                 {totalDiscount > 0 && ` - ${t.discount}: ${$(totalDiscount)}`}
                 {ppnRate > 0 && ` + ${t.ppn} ${ppnRate}%: ${$(ppnAmount)}`}
@@ -756,15 +756,15 @@ export function POSPage() {
                           : `${th.card2} ${th.bdr}`
                       }`}>
                       <div className="flex items-center gap-3">
-                        <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-[10px] font-extrabold shrink-0 ${
+                        <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-xs font-extrabold shrink-0 ${
                           selected ? "bg-gradient-to-r from-[#60A5FA] to-[#1E40AF] text-white" : `${th.accBg} ${th.acc}`
                         }`}>
                           {acc.bankName.split("(")[1]?.replace(")", "").trim().slice(0, 3) || acc.bankName.slice(0, 3).toUpperCase()}
                         </div>
                         <div className="min-w-0">
                           <p className={`text-sm font-bold truncate ${th.tx}`}>{acc.bankName}</p>
-                          <p className={`text-[12px] font-mono mt-0.5 ${th.tx}`}>{acc.accountNumber}</p>
-                          <p className={`text-[11px] ${th.txm}`}>{acc.accountHolder}</p>
+                          <p className={`text-xs font-mono mt-0.5 ${th.tx}`}>{acc.accountNumber}</p>
+                          <p className={`text-xs ${th.txm}`}>{acc.accountHolder}</p>
                         </div>
                       </div>
                     </button>
@@ -814,7 +814,7 @@ export function POSPage() {
                       e.target.value = "";
                     }} />
                   </label>
-                  <span className={`text-[10px] ${th.txf}`}>atau Ctrl+V untuk paste screenshot</span>
+                  <span className={`text-xs ${th.txf}`}>atau Ctrl+V untuk paste screenshot</span>
                 </div>
               )}
             </div>
@@ -850,8 +850,8 @@ export function POSPage() {
                   </div>
                   {(item.discountAmount || 0) > 0 && (
                     <div className="flex justify-between">
-                      <span className="text-[11px] text-[#E89B48]">&nbsp;&nbsp;{t.discount} {item.discountType === "percent" ? `${item.discountValue}%` : ""}</span>
-                      <span className="text-[11px] font-bold text-[#E89B48]">-{$(item.discountAmount || 0)}</span>
+                      <span className="text-xs text-[#E89B48]">&nbsp;&nbsp;{t.discount} {item.discountType === "percent" ? `${item.discountValue}%` : ""}</span>
+                      <span className="text-xs font-bold text-[#E89B48]">-{$(item.discountAmount || 0)}</span>
                     </div>
                   )}
                 </div>
@@ -919,15 +919,15 @@ export function POSPage() {
               <div key={o.id} className={`rounded-[16px] border p-3.5 ${th.card2} ${th.bdr}`}>
                 <div className="flex items-center justify-between mb-1">
                   <span className={`text-xs font-mono font-bold ${th.tx}`}>{o.id}</span>
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${statusColor}`}>{statusLabel}</span>
+                  <span className={`text-xs font-bold px-2 py-0.5 rounded-md ${statusColor}`}>{statusLabel}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className={`text-[11px] ${th.txm}`}>{formatTime(o.createdAt)} · {o.customer}</span>
+                  <span className={`text-xs ${th.txm}`}>{formatTime(o.createdAt)} · {o.customer}</span>
                   <span className={`text-sm font-black ${th.acc}`}>{$(o.total)}</span>
                 </div>
                 <div className={`mt-1.5 pt-1.5 border-t ${th.bdrSoft}`}>
                   {o.items.map((item, i) => (
-                    <p key={i} className={`text-[11px] ${th.txm}`}>{item.name} ×{item.quantity} — {$(item.unitPrice * item.quantity)}</p>
+                    <p key={i} className={`text-xs ${th.txm}`}>{item.name} ×{item.quantity} — {$(item.unitPrice * item.quantity)}</p>
                   ))}
                 </div>
               </div>
@@ -952,7 +952,7 @@ export function POSPage() {
               <span className={`text-sm ${th.txm}`}>{t.expectedCash}</span>
               <span className={`text-sm font-black ${th.tx}`}>{$(expectedCash)}</span>
             </div>
-            <p className={`text-[10px] ${th.txf}`}>{activeSession ? `${t.openingCash} + ${t.cash} orders` : `${t.cash} orders ${t.today?.toString().toLowerCase()}`}</p>
+            <p className={`text-xs ${th.txf}`}>{activeSession ? `${t.openingCash} + ${t.cash} orders` : `${t.cash} orders ${t.today?.toString().toLowerCase()}`}</p>
           </div>
           <div>
             <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>{t.actualCash}</p>
@@ -996,8 +996,8 @@ export function POSPage() {
                       <span className={`text-sm font-bold ${th.tx}`}>{formatTime(s.closedAt)}</span>
                       <span className={`text-sm font-black ${diffColor}`}>{s.difference >= 0 ? "+" : ""}{$(s.difference)}</span>
                     </div>
-                    <p className={`text-[11px] ${th.txm}`}>{t.openingCash}: {$(s.openingCash)} · {t.expectedCash}: {$(s.expectedCash)} · {t.actualCash}: {$(s.actualCash)}</p>
-                    {s.notes && <p className={`text-[10px] mt-0.5 ${th.txf}`}>{s.notes}</p>}
+                    <p className={`text-xs ${th.txm}`}>{t.openingCash}: {$(s.openingCash)} · {t.expectedCash}: {$(s.expectedCash)} · {t.actualCash}: {$(s.actualCash)}</p>
+                    {s.notes && <p className={`text-xs mt-0.5 ${th.txf}`}>{s.notes}</p>}
                   </div>
                 );
               })}

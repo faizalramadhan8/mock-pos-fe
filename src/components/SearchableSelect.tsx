@@ -79,7 +79,7 @@ export function SearchableSelect({
         <span className={`truncate ${selected ? th.tx : th.txf}`}>
           {selected ? selected.label : placeholder}
           {selected?.subtitle && (
-            <span className={`ml-2 text-[11px] font-normal ${th.txf}`}>· {selected.subtitle}</span>
+            <span className={`ml-2 text-xs font-normal ${th.txf}`}>· {selected.subtitle}</span>
           )}
         </span>
         <ChevronDown size={14} className={`shrink-0 ml-2 ${th.txf} transition-transform ${open ? "rotate-180" : ""}`} />
@@ -115,11 +115,11 @@ export function SearchableSelect({
                   className={`w-full text-left px-3 py-2 text-sm border-b last:border-0 hover:opacity-70 ${th.bdrSoft} ${o.id === value ? th.accBg : ""}`}
                 >
                   <p className={`font-semibold ${th.tx} truncate`}>{o.label}</p>
-                  {o.subtitle && <p className={`text-[11px] ${th.txm}`}>{o.subtitle}</p>}
+                  {o.subtitle && <p className={`text-xs ${th.txm}`}>{o.subtitle}</p>}
                 </button>
               ))}
               {hasMore && (
-                <p className={`text-[11px] text-center py-2 ${th.txm}`}>
+                <p className={`text-xs text-center py-2 ${th.txm}`}>
                   {filtered.length - maxVisible} hasil lagi — ketik untuk mempersempit
                 </p>
               )}

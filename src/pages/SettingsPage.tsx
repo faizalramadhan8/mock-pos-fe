@@ -193,8 +193,8 @@ export function SettingsPage() {
       {currentTab === "preferences" && (
         <div className="flex flex-col gap-4">
           <div className="mb-1">
-            <h3 className={`text-[15px] font-extrabold tracking-tight ${th.tx}`}>{t.preferences}</h3>
-            <p className={`text-[12px] mt-0.5 ${th.txm}`}>{t.preferencesDesc}</p>
+            <h3 className={`text-sm font-extrabold tracking-tight ${th.tx}`}>{t.preferences}</h3>
+            <p className={`text-xs mt-0.5 ${th.txm}`}>{t.preferencesDesc}</p>
           </div>
 
           {/* Theme */}
@@ -259,7 +259,7 @@ export function SettingsPage() {
                 className={`w-full px-4 py-2.5 text-sm rounded-xl border ${th.inp}`}
               />
               {cpNew && cpConfirm && cpNew !== cpConfirm && (
-                <p className="text-[11px] text-red-400 font-medium">
+                <p className="text-xs text-red-400 font-medium">
                   {lang === "id" ? "Password baru tidak cocok" : "Passwords don't match"}
                 </p>
               )}
@@ -301,24 +301,24 @@ export function SettingsPage() {
         <div className="flex flex-col gap-4">
           {/* ── Store Info ── */}
           <div className="mb-1">
-            <h3 className={`text-[15px] font-extrabold tracking-tight ${th.tx}`}>{t.storeInfo}</h3>
-            <p className={`text-[12px] mt-0.5 ${th.txm}`}>{t.storeInfoDesc}</p>
+            <h3 className={`text-sm font-extrabold tracking-tight ${th.tx}`}>{t.storeInfo}</h3>
+            <p className={`text-xs mt-0.5 ${th.txm}`}>{t.storeInfoDesc}</p>
           </div>
 
           <div className={`rounded-[22px] border p-5 ${th.card} ${th.bdr}`}>
             <div className="flex flex-col gap-3">
               <div>
-                <label className={`text-[11px] font-semibold mb-1.5 block ${th.txm}`}>{t.storeName}</label>
+                <label className={`text-xs font-semibold mb-1.5 block ${th.txm}`}>{t.storeName}</label>
                 <input value={storeName} onChange={e => setStoreName(e.target.value)}
                   className={inp} placeholder={t.storeName as string} />
               </div>
               <div>
-                <label className={`text-[11px] font-semibold mb-1.5 block ${th.txm}`}>{t.storeAddress}</label>
+                <label className={`text-xs font-semibold mb-1.5 block ${th.txm}`}>{t.storeAddress}</label>
                 <input value={storeAddress} onChange={e => setStoreAddress(e.target.value)}
                   className={inp} placeholder={t.storeAddress as string} />
               </div>
               <div>
-                <label className={`text-[11px] font-semibold mb-1.5 block ${th.txm}`}>{t.storePhone}</label>
+                <label className={`text-xs font-semibold mb-1.5 block ${th.txm}`}>{t.storePhone}</label>
                 <input value={storePhone} onChange={e => setStorePhone(e.target.value)}
                   className={inp} placeholder={t.storePhone as string} />
               </div>
@@ -328,7 +328,7 @@ export function SettingsPage() {
           {/* ── Tax ── */}
           <div className={`rounded-[22px] border p-5 ${th.card} ${th.bdr}`}>
             <p className={`text-sm font-extrabold mb-1 ${th.tx}`}>{t.taxSettings}</p>
-            <p className={`text-[11px] mb-3 ${th.txf}`}>{t.taxDesc}</p>
+            <p className={`text-xs mb-3 ${th.txf}`}>{t.taxDesc}</p>
             <div className="relative">
               <input type="number" value={ppnRate} onChange={e => setPpnRate(e.target.value)}
                 min="0" max="100" step="0.5"
@@ -340,7 +340,7 @@ export function SettingsPage() {
           {/* ── Label Size ── */}
           <div className={`rounded-[22px] border p-5 ${th.card} ${th.bdr}`}>
             <p className={`text-sm font-extrabold mb-1 ${th.tx}`}>Label Size (mm)</p>
-            <p className={`text-[11px] mb-3 ${th.txf}`}>{lang === "id" ? "Pilih ukuran label cetak" : "Select print label size"}</p>
+            <p className={`text-xs mb-3 ${th.txf}`}>{lang === "id" ? "Pilih ukuran label cetak" : "Select print label size"}</p>
             <div className="flex flex-wrap gap-2 mb-3">
               {Object.entries(LABEL_PRESETS).map(([key, s]) => (
                 <button key={key} type="button"
@@ -356,13 +356,13 @@ export function SettingsPage() {
             </div>
             <div className="flex gap-2">
               <div className="flex-1">
-                <label className={`text-[10px] ${th.txf}`}>{lang === "id" ? "Lebar" : "Width"}</label>
+                <label className={`text-xs ${th.txf}`}>{lang === "id" ? "Lebar" : "Width"}</label>
                 <input type="number" value={labelWidth} min={30} max={100}
                   onChange={e => setLabelWidth(Number(e.target.value))}
                   className={`w-full px-3 py-2 text-sm rounded-xl border ${th.inp}`} />
               </div>
               <div className="flex-1">
-                <label className={`text-[10px] ${th.txf}`}>{lang === "id" ? "Tinggi" : "Height"}</label>
+                <label className={`text-xs ${th.txf}`}>{lang === "id" ? "Tinggi" : "Height"}</label>
                 <input type="number" value={labelHeight} min={20} max={80}
                   onChange={e => setLabelHeight(Number(e.target.value))}
                   className={`w-full px-3 py-2 text-sm rounded-xl border ${th.inp}`} />
@@ -383,8 +383,8 @@ export function SettingsPage() {
           <div>
             <div className="flex items-center justify-between mb-3">
               <div>
-                <h3 className={`text-[15px] font-extrabold tracking-tight ${th.tx}`}>{t.bankAccounts}</h3>
-                <p className={`text-[12px] mt-0.5 ${th.txm}`}>{t.bankDesc}</p>
+                <h3 className={`text-sm font-extrabold tracking-tight ${th.tx}`}>{t.bankAccounts}</h3>
+                <p className={`text-xs mt-0.5 ${th.txm}`}>{t.bankDesc}</p>
               </div>
               <button onClick={() => setShowAddBank(true)}
                 className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-[#60A5FA] to-[#1E40AF] shrink-0">
@@ -403,24 +403,24 @@ export function SettingsPage() {
                   <div key={acc.id} className={`rounded-[18px] border p-4 ${th.card} ${th.bdr}`}>
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-3 min-w-0">
-                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-[11px] font-extrabold shrink-0 ${th.accBg} ${th.acc}`}>
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xs font-extrabold shrink-0 ${th.accBg} ${th.acc}`}>
                           {acc.bankName.split("(")[1]?.replace(")", "").trim().slice(0, 3) || acc.bankName.slice(0, 3).toUpperCase()}
                         </div>
                         <div className="min-w-0">
                           <p className={`text-sm font-bold truncate ${th.tx}`}>{acc.bankName}</p>
-                          <p className={`text-[13px] font-mono mt-0.5 ${th.tx}`}>{acc.accountNumber}</p>
-                          <p className={`text-[11px] mt-0.5 ${th.txm}`}>{acc.accountHolder}</p>
+                          <p className={`text-sm font-mono mt-0.5 ${th.tx}`}>{acc.accountNumber}</p>
+                          <p className={`text-xs mt-0.5 ${th.txm}`}>{acc.accountHolder}</p>
                         </div>
                       </div>
                       <div className="shrink-0">
                         {confirmRemoveBankId === acc.id ? (
                           <div className="flex gap-1.5">
                             <button onClick={() => setConfirmRemoveBankId(null)}
-                              className={`px-2 py-1 rounded-lg text-[10px] font-bold border ${th.bdr} ${th.txm}`}>
+                              className={`px-2 py-1 rounded-lg text-xs font-bold border ${th.bdr} ${th.txm}`}>
                               {t.cancel}
                             </button>
                             <button onClick={() => { handleRemoveBank(acc.id); setConfirmRemoveBankId(null); }}
-                              className="px-2 py-1 rounded-lg text-[10px] font-bold text-white bg-[#C4504A]">
+                              className="px-2 py-1 rounded-lg text-xs font-bold text-white bg-[#C4504A]">
                               {t.confirm}
                             </button>
                           </div>
@@ -446,8 +446,8 @@ export function SettingsPage() {
         <div className="flex flex-col gap-4">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className={`text-[15px] font-extrabold tracking-tight ${th.tx}`}>{t.staffList}</h3>
-              <p className={`text-[12px] mt-0.5 ${th.txm}`}>{t.teamDesc}</p>
+              <h3 className={`text-sm font-extrabold tracking-tight ${th.tx}`}>{t.staffList}</h3>
+              <p className={`text-xs mt-0.5 ${th.txm}`}>{t.teamDesc}</p>
             </div>
             <button onClick={() => setShowRegister(true)}
               className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-[#60A5FA] to-[#1E40AF] shrink-0">
@@ -469,17 +469,17 @@ export function SettingsPage() {
                   <div key={u.id} className={`rounded-[18px] border overflow-hidden ${th.card} ${th.bdr} ${inactive ? "opacity-60" : ""}`}>
                     <button onClick={() => { setExpandedUserId(expanded ? null : u.id); setNewPasswordInput(""); setConfirmDeleteId(null); }}
                       className={`w-full flex items-center gap-3 px-5 py-3.5 text-left`}>
-                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-[11px] font-extrabold shrink-0 ${th.accBg} ${th.acc}`}>
+                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-xs font-extrabold shrink-0 ${th.accBg} ${th.acc}`}>
                         {u.initials}
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <p className={`text-sm font-bold truncate ${th.tx}`}>{u.name}</p>
-                          {inactive && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-[#C4504A]/15 text-[#C4504A]">{t.accountInactive}</span>}
+                          {inactive && <span className="text-xs font-bold px-1.5 py-0.5 rounded bg-[#C4504A]/15 text-[#C4504A]">{t.accountInactive}</span>}
                         </div>
-                        <p className={`text-[11px] truncate ${th.txm}`}>{u.email}{u.phone ? ` · ${u.phone}` : ""}</p>
+                        <p className={`text-xs truncate ${th.txm}`}>{u.email}{u.phone ? ` · ${u.phone}` : ""}</p>
                       </div>
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md shrink-0 ${
+                      <span className={`text-xs font-bold px-2 py-0.5 rounded-md shrink-0 ${
                         u.role === "cashier"
                           ? (th.dark ? "bg-[#5B8DEF]/15 text-[#5B8DEF]" : "bg-blue-50 text-[#5B8DEF]")
                           : (th.dark ? "bg-[#6F9A4D]/15 text-[#6F9A4D]" : "bg-green-50 text-[#6F9A4D]")
@@ -491,17 +491,17 @@ export function SettingsPage() {
                       <div className={`px-5 pb-4 pt-1 border-t ${th.bdr} flex flex-col gap-3`}>
                         {/* Detail info */}
                         <div className="grid grid-cols-2 gap-2">
-                          {u.nik && <div><p className={`text-[10px] font-semibold ${th.txf}`}>{t.nik}</p><p className={`text-sm font-medium ${th.tx}`}>{u.nik}</p></div>}
-                          {u.phone && <div><p className={`text-[10px] font-semibold ${th.txf}`}>{t.msisdn}</p><p className={`text-sm font-medium ${th.tx}`}>{u.phone}</p></div>}
-                          {u.dateOfBirth && <div><p className={`text-[10px] font-semibold ${th.txf}`}>{t.dateOfBirth}</p><p className={`text-sm font-medium ${th.tx}`}>{u.dateOfBirth}</p></div>}
-                          <div><p className={`text-[10px] font-semibold ${th.txf}`}>{t.email}</p><p className={`text-sm font-medium ${th.tx}`}>{u.email}</p></div>
+                          {u.nik && <div><p className={`text-xs font-semibold ${th.txf}`}>{t.nik}</p><p className={`text-sm font-medium ${th.tx}`}>{u.nik}</p></div>}
+                          {u.phone && <div><p className={`text-xs font-semibold ${th.txf}`}>{t.msisdn}</p><p className={`text-sm font-medium ${th.tx}`}>{u.phone}</p></div>}
+                          {u.dateOfBirth && <div><p className={`text-xs font-semibold ${th.txf}`}>{t.dateOfBirth}</p><p className={`text-sm font-medium ${th.tx}`}>{u.dateOfBirth}</p></div>}
+                          <div><p className={`text-xs font-semibold ${th.txf}`}>{t.email}</p><p className={`text-sm font-medium ${th.tx}`}>{u.email}</p></div>
                         </div>
 
                         {/* Reset Password */}
                         <div className={`rounded-xl border p-3 ${th.card2} ${th.bdr}`}>
                           <div className="flex items-center gap-2 mb-2">
                             <Key size={12} className={th.txm} />
-                            <p className={`text-[11px] font-bold ${th.tx}`}>{t.resetPassword}</p>
+                            <p className={`text-xs font-bold ${th.tx}`}>{t.resetPassword}</p>
                           </div>
                           <div className="flex gap-2">
                             <input value={newPasswordInput} onChange={e => setNewPasswordInput(e.target.value)}
@@ -568,8 +568,8 @@ export function SettingsPage() {
       {currentTab === "activity" && isAdmin && (
         <div className="flex flex-col gap-4">
           <div className="mb-1">
-            <h3 className={`text-[15px] font-extrabold tracking-tight ${th.tx}`}>{t.activity}</h3>
-            <p className={`text-[12px] mt-0.5 ${th.txm}`}>{t.activityDesc}</p>
+            <h3 className={`text-sm font-extrabold tracking-tight ${th.tx}`}>{t.activity}</h3>
+            <p className={`text-xs mt-0.5 ${th.txm}`}>{t.activityDesc}</p>
           </div>
           {auditEntries.length === 0 ? (
             <div className={`rounded-[22px] border p-8 text-center ${th.card} ${th.bdr}`}>
@@ -590,11 +590,11 @@ export function SettingsPage() {
                 return (
                   <div key={entry.id} className={`px-5 py-3 ${i > 0 ? `border-t ${th.bdrSoft}` : ""}`}>
                     <div className="flex items-center justify-between">
-                      <span className={`text-[11px] font-bold uppercase tracking-wider ${actionColor}`}>{actionLabel}</span>
-                      <span className={`text-[10px] ${th.txf}`}>{formatDate(entry.createdAt)} · {formatTime(entry.createdAt)}</span>
+                      <span className={`text-xs font-bold uppercase tracking-wider ${actionColor}`}>{actionLabel}</span>
+                      <span className={`text-xs ${th.txf}`}>{formatDate(entry.createdAt)} · {formatTime(entry.createdAt)}</span>
                     </div>
                     <p className={`text-sm mt-0.5 ${th.tx}`}>{entry.details}</p>
-                    <p className={`text-[10px] mt-0.5 ${th.txm}`}>{entry.userName}</p>
+                    <p className={`text-xs mt-0.5 ${th.txm}`}>{entry.userName}</p>
                   </div>
                 );
               })}
@@ -624,7 +624,7 @@ export function SettingsPage() {
             <div className="px-6 py-5 flex flex-col gap-3">
               {/* Searchable bank dropdown */}
               <div>
-                <p className={`text-[11px] font-semibold mb-1.5 ${th.txm}`}>{t.bankName}</p>
+                <p className={`text-xs font-semibold mb-1.5 ${th.txm}`}>{t.bankName}</p>
                 <div className="relative" ref={bankDropdownRef}>
                   <div className="relative">
                     <Search size={14} className={`absolute left-3.5 top-1/2 -translate-y-1/2 ${th.txf}`} />
@@ -653,23 +653,23 @@ export function SettingsPage() {
                     </div>
                   )}
                 </div>
-                {bankFormErrors.bankName && <p className="text-red-400 text-[10px] mt-1 font-medium">{t.required}</p>}
+                {bankFormErrors.bankName && <p className="text-red-400 text-xs mt-1 font-medium">{t.required}</p>}
               </div>
               <div>
-                <p className={`text-[11px] font-semibold mb-1.5 ${th.txm}`}>{t.accountNumber}</p>
+                <p className={`text-xs font-semibold mb-1.5 ${th.txm}`}>{t.accountNumber}</p>
                 <input value={bankForm.accountNumber}
                   onChange={e => { setBankForm(f => ({ ...f, accountNumber: e.target.value })); setBankFormErrors(p => ({ ...p, accountNumber: false })); }}
                   placeholder="1234567890" inputMode="numeric"
                   className={`w-full px-4 py-3 text-sm rounded-2xl border ${th.inp} ${bankFormErrors.accountNumber ? "!border-red-400" : ""}`} />
-                {bankFormErrors.accountNumber && <p className="text-red-400 text-[10px] mt-1 font-medium">{t.required}</p>}
+                {bankFormErrors.accountNumber && <p className="text-red-400 text-xs mt-1 font-medium">{t.required}</p>}
               </div>
               <div>
-                <p className={`text-[11px] font-semibold mb-1.5 ${th.txm}`}>{t.accountHolder}</p>
+                <p className={`text-xs font-semibold mb-1.5 ${th.txm}`}>{t.accountHolder}</p>
                 <input value={bankForm.accountHolder}
                   onChange={e => { setBankForm(f => ({ ...f, accountHolder: e.target.value })); setBankFormErrors(p => ({ ...p, accountHolder: false })); }}
                   placeholder={t.accountHolder as string}
                   className={`w-full px-4 py-3 text-sm rounded-2xl border ${th.inp} ${bankFormErrors.accountHolder ? "!border-red-400" : ""}`} />
-                {bankFormErrors.accountHolder && <p className="text-red-400 text-[10px] mt-1 font-medium">{t.required}</p>}
+                {bankFormErrors.accountHolder && <p className="text-red-400 text-xs mt-1 font-medium">{t.required}</p>}
               </div>
               <div className="flex gap-2 mt-1">
                 <button onClick={() => { setShowAddBank(false); setBankForm({ bankName: "", accountNumber: "", accountHolder: "" }); setBankQuery(""); setShowBankDropdown(false); }}
@@ -691,7 +691,7 @@ export function SettingsPage() {
           <div className="absolute inset-0 bg-black/40" onClick={() => setShowRegister(false)} />
           <div className={`relative w-full max-w-md rounded-t-3xl sm:rounded-3xl border p-5 max-h-[85vh] overflow-y-auto ${th.card} ${th.bdr}`}>
             <div className="flex items-center justify-between mb-4">
-              <p className={`text-[15px] font-extrabold ${th.tx}`}>{t.registerStaff}</p>
+              <p className={`text-sm font-extrabold ${th.tx}`}>{t.registerStaff}</p>
               <button onClick={() => setShowRegister(false)} aria-label="Close" className={`p-1.5 rounded-xl ${th.txm}`}><X size={18} /></button>
             </div>
 
@@ -699,15 +699,15 @@ export function SettingsPage() {
               <div>
                 <input value={regForm.name} onChange={e => { setRegForm(f => ({ ...f, name: e.target.value })); setRegFormErrors(p => ({ ...p, name: false })); }}
                   className={`${inp} ${regFormErrors.name ? "!border-red-400" : ""}`} placeholder={t.fullName as string} />
-                {regFormErrors.name && <p className="text-red-400 text-[10px] mt-1 font-medium">{t.required}</p>}
+                {regFormErrors.name && <p className="text-red-400 text-xs mt-1 font-medium">{t.required}</p>}
               </div>
               <input value={regForm.nik} onChange={e => setRegForm(f => ({ ...f, nik: e.target.value }))}
                 className={inp} placeholder={t.nik as string} inputMode="numeric" />
               <div>
                 <input value={regForm.email} onChange={e => { setRegForm(f => ({ ...f, email: e.target.value })); setRegFormErrors(p => ({ ...p, email: false, invalidEmail: false })); }}
                   className={`${inp} ${regFormErrors.email || regFormErrors.invalidEmail ? "!border-red-400" : ""}`} placeholder={t.email as string} type="email" />
-                {regFormErrors.email && <p className="text-red-400 text-[10px] mt-1 font-medium">{t.required}</p>}
-                {regFormErrors.invalidEmail && <p className="text-red-400 text-[10px] mt-1 font-medium">{t.invalidEmail}</p>}
+                {regFormErrors.email && <p className="text-red-400 text-xs mt-1 font-medium">{t.required}</p>}
+                {regFormErrors.invalidEmail && <p className="text-red-400 text-xs mt-1 font-medium">{t.invalidEmail}</p>}
               </div>
               <input value={regForm.phone} onChange={e => setRegForm(f => ({ ...f, phone: e.target.value }))}
                 className={inp} placeholder={t.msisdn as string} type="tel" inputMode="tel" />
@@ -716,7 +716,7 @@ export function SettingsPage() {
 
               {/* Role selector */}
               <div>
-                <p className={`text-[11px] font-semibold mb-1.5 ${th.txm}`}>{t.selectRole}</p>
+                <p className={`text-xs font-semibold mb-1.5 ${th.txm}`}>{t.selectRole}</p>
                 <div className="grid grid-cols-2 gap-2">
                   {(["cashier", "staff"] as Role[]).map(r => (
                     <button key={r} onClick={() => setRegForm(f => ({ ...f, role: r }))}
@@ -731,7 +731,7 @@ export function SettingsPage() {
 
               {/* Default password hint */}
               <div className={`rounded-xl p-3 ${th.dark ? "bg-[#E89B48]/10" : "bg-amber-50"}`}>
-                <p className={`text-[11px] font-semibold ${th.dark ? "text-[#E89B48]" : "text-amber-700"}`}>
+                <p className={`text-xs font-semibold ${th.dark ? "text-[#E89B48]" : "text-amber-700"}`}>
                   {t.defaultPassword}: <span className="font-mono">{DEFAULT_PASSWORD}</span>
                 </p>
               </div>

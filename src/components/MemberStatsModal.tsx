@@ -86,7 +86,7 @@ export function MemberStatsModal({ member, onClose }: Props) {
         <div className={`w-10 h-10 rounded-full flex items-center justify-center text-base ${th.accBg} ${th.acc}`}>💎</div>
         <div className="min-w-0 flex-1">
           <p className={`text-sm font-extrabold ${th.tx} truncate`}>{member.name}</p>
-          <p className={`text-[11px] ${th.txm}`}>{member.phone}</p>
+          <p className={`text-xs ${th.txm}`}>{member.phone}</p>
         </div>
       </div>
 
@@ -96,7 +96,7 @@ export function MemberStatsModal({ member, onClose }: Props) {
           <button
             key={p}
             onClick={() => setPeriod(p)}
-            className={`px-3 py-1.5 rounded-full text-[11px] font-bold ${period === p ? `${th.accBg} ${th.acc}` : `${th.elev} ${th.txm}`}`}
+            className={`px-3 py-1.5 rounded-full text-xs font-bold ${period === p ? `${th.accBg} ${th.acc}` : `${th.elev} ${th.txm}`}`}
           >
             {({ "7d": "7 hari", "30d": "30 hari", "3m": "3 bulan", "year": "Tahun ini", "lifetime": "All time", "custom": "Custom" } as Record<string, string>)[p]}
           </button>
@@ -107,12 +107,12 @@ export function MemberStatsModal({ member, onClose }: Props) {
       {period === "custom" && (
         <div className="grid grid-cols-2 gap-2 mb-3">
           <div>
-            <p className={`text-[10px] font-bold mb-1 ${th.txm}`}>Dari</p>
+            <p className={`text-xs font-bold mb-1 ${th.txm}`}>Dari</p>
             <input type="date" value={from} onChange={e => setFrom(e.target.value)}
               className={`w-full px-3 py-2 text-xs rounded-lg border ${th.inp}`} />
           </div>
           <div>
-            <p className={`text-[10px] font-bold mb-1 ${th.txm}`}>Sampai</p>
+            <p className={`text-xs font-bold mb-1 ${th.txm}`}>Sampai</p>
             <input type="date" value={to} onChange={e => setTo(e.target.value)}
               className={`w-full px-3 py-2 text-xs rounded-lg border ${th.inp}`} />
           </div>
@@ -127,21 +127,21 @@ export function MemberStatsModal({ member, onClose }: Props) {
           {/* Big summary cards */}
           <div className="grid grid-cols-2 gap-2 mb-3">
             <div className={`rounded-2xl p-3 ${th.elev}`}>
-              <p className={`text-[10px] uppercase tracking-wider ${th.txf}`}>Total Belanja</p>
+              <p className={`text-xs uppercase tracking-wider ${th.txf}`}>Total Belanja</p>
               <p className={`text-base font-black ${th.acc}`}>{$(stats.total_spend)}</p>
-              <p className={`text-[10px] ${th.txm}`}>{periodLabel}</p>
+              <p className={`text-xs ${th.txm}`}>{periodLabel}</p>
             </div>
             <div className={`rounded-2xl p-3 ${th.elev}`}>
-              <p className={`text-[10px] uppercase tracking-wider ${th.txf}`}>Transaksi</p>
+              <p className={`text-xs uppercase tracking-wider ${th.txf}`}>Transaksi</p>
               <p className={`text-base font-black ${th.tx}`}>{stats.order_count}x</p>
-              <p className={`text-[10px] ${th.txm}`}>Avg {$(stats.avg_basket)}</p>
+              <p className={`text-xs ${th.txm}`}>Avg {$(stats.avg_basket)}</p>
             </div>
             <div className={`rounded-2xl p-3 ${th.elev}`}>
-              <p className={`text-[10px] uppercase tracking-wider ${th.txf}`}>💎 Total Hemat</p>
+              <p className={`text-xs uppercase tracking-wider ${th.txf}`}>💎 Total Hemat</p>
               <p className={`text-base font-black ${th.acc}`}>{$(stats.total_savings)}</p>
             </div>
             <div className={`rounded-2xl p-3 ${th.elev}`}>
-              <p className={`text-[10px] uppercase tracking-wider ${th.txf}`}>Last Visit</p>
+              <p className={`text-xs uppercase tracking-wider ${th.txf}`}>Last Visit</p>
               <p className={`text-sm font-bold ${th.tx}`}>
                 {stats.last_visit ? new Date(stats.last_visit).toLocaleDateString("id-ID") : "—"}
               </p>
@@ -150,7 +150,7 @@ export function MemberStatsModal({ member, onClose }: Props) {
 
           {/* Lifetime summary */}
           <div className={`flex justify-between items-center mb-3 px-1 py-2 rounded-xl ${th.dark ? "bg-[#1E40AF]/10" : "bg-[#EFF6FF]"}`}>
-            <p className={`text-[11px] ${th.txm}`}>📈 Lifetime</p>
+            <p className={`text-xs ${th.txm}`}>📈 Lifetime</p>
             <p className={`text-xs font-bold ${th.tx}`}>
               {$(stats.lifetime_spend)} · {stats.lifetime_orders}x
             </p>
@@ -159,13 +159,13 @@ export function MemberStatsModal({ member, onClose }: Props) {
           {/* Monthly bar chart */}
           {monthly.length > 0 && (
             <div className={`rounded-2xl p-3 mb-3 border ${th.bdr} ${th.card2}`}>
-              <p className={`text-[11px] font-bold mb-2 ${th.txm}`}>Per Bulan</p>
+              <p className={`text-xs font-bold mb-2 ${th.txm}`}>Per Bulan</p>
               <div className="space-y-2">
                 {monthly.map(m => {
                   const pct = maxBarSpend > 0 ? (m.spend / maxBarSpend) * 100 : 0;
                   return (
                     <div key={m.month}>
-                      <div className="flex justify-between mb-1 text-[10px]">
+                      <div className="flex justify-between mb-1 text-xs">
                         <span className={th.txm}>{m.month}</span>
                         <span className={`font-bold ${th.tx}`}>{$(m.spend)} · {m.orders}x</span>
                       </div>
@@ -182,12 +182,12 @@ export function MemberStatsModal({ member, onClose }: Props) {
           {/* Top products */}
           {topProducts.length > 0 && (
             <div className={`rounded-2xl p-3 border ${th.bdr} ${th.card2}`}>
-              <p className={`text-[11px] font-bold mb-2 ${th.txm}`}>Top Produk</p>
+              <p className={`text-xs font-bold mb-2 ${th.txm}`}>Top Produk</p>
               <div className="space-y-1.5">
                 {topProducts.map(p => (
                   <div key={p.product_id} className="flex justify-between items-center">
-                    <span className={`text-[12px] font-medium truncate flex-1 ${th.tx}`}>{p.name}</span>
-                    <span className={`text-[10px] font-bold ml-2 ${th.txm}`}>{p.quantity}x · {$(p.spend)}</span>
+                    <span className={`text-xs font-medium truncate flex-1 ${th.tx}`}>{p.name}</span>
+                    <span className={`text-xs font-bold ml-2 ${th.txm}`}>{p.quantity}x · {$(p.spend)}</span>
                   </div>
                 ))}
               </div>

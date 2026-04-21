@@ -97,7 +97,7 @@ export function NotificationBell() {
       >
         <Bell size={18} />
         {count > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-bold px-1 animate-pulse">
+          <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-red-500 text-white text-xs font-bold px-1 animate-pulse">
             {count > 99 ? "99+" : count}
           </span>
         )}
@@ -112,7 +112,7 @@ export function NotificationBell() {
               {lang === "id" ? "Notifikasi" : "Notifications"} {count > 0 && `(${count})`}
             </p>
             {count > 0 && (
-              <button onClick={dismissAll} className={`text-[10px] font-bold uppercase tracking-wide ${th.acc}`}>
+              <button onClick={dismissAll} className={`text-xs font-bold uppercase tracking-wide ${th.acc}`}>
                 {lang === "id" ? "Hapus Semua" : "Clear All"}
               </button>
             )}
@@ -149,7 +149,7 @@ function NotifItem({ notif, onDismiss, dark }: { notif: AppNotification; onDismi
       </div>
       <div className="flex-1 min-w-0">
         <p className={`text-xs font-bold ${COLOR_MAP[notif.priority]}`}>{notif.title}</p>
-        <p className={`text-[11px] mt-0.5 ${dark ? "text-[#94A3B8]" : "text-[#64748B]"} truncate`}>{notif.message}</p>
+        <p className={`text-xs mt-0.5 ${dark ? "text-[#94A3B8]" : "text-[#64748B]"} truncate`}>{notif.message}</p>
       </div>
       <button onClick={onDismiss} className={`w-6 h-6 flex items-center justify-center rounded-lg shrink-0 ${dark ? "hover:bg-white/10 text-[#64748B]" : "hover:bg-black/5 text-[#94A3B8]"}`}>
         <X size={12} />

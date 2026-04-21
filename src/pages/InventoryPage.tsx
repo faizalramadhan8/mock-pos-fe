@@ -347,7 +347,7 @@ export function InventoryPage() {
         {grouped.map(group => (
           <div key={group.label}>
             <div className={`px-5 py-2 ${th.elev}`}>
-              <p className={`text-[10px] font-bold uppercase tracking-wider ${th.txm}`}>{group.label}</p>
+              <p className={`text-xs font-bold uppercase tracking-wider ${th.txm}`}>{group.label}</p>
             </div>
             {group.items.map(m => {
               const prod = products.find(p => p.id === m.productId);
@@ -365,12 +365,12 @@ export function InventoryPage() {
                         {lang === "id" ? prod?.nameId : prod?.name}
                         <span className={`ml-1.5 ${th.txm}`}>{m.type === "in" ? "+" : "-"}{m.quantity}</span>
                       </p>
-                      <p className={`text-[11px] ${th.txf}`}>{m.note}</p>
+                      <p className={`text-xs ${th.txf}`}>{m.note}</p>
                     </div>
                   </div>
                   <div className="text-right">
                     <p className={`text-sm font-semibold ${m.type === "in" ? "text-[#4A8B3F]" : "text-[#C4504A]"}`}>{$(m.unitPrice * m.quantity)}</p>
-                    <p className={`text-[11px] ${th.txf}`}>{formatTime(m.createdAt)}</p>
+                    <p className={`text-xs ${th.txf}`}>{formatTime(m.createdAt)}</p>
                   </div>
                 </div>
               );
@@ -412,11 +412,11 @@ export function InventoryPage() {
           {activeTab === "overview" && (
             <>
               <button onClick={async () => { await exportProducts(products, "csv"); toast.success(t.exportSuccess as string); }}
-                className={`flex items-center gap-1 px-2 py-1.5 rounded-xl text-[10px] font-bold ${th.elev} ${th.txm}`}>
+                className={`flex items-center gap-1 px-2 py-1.5 rounded-xl text-xs font-bold ${th.elev} ${th.txm}`}>
                 <Download size={11} /> CSV
               </button>
               <button onClick={async () => { await exportProducts(products, "xlsx"); toast.success(t.exportSuccess as string); }}
-                className={`flex items-center gap-1 px-2 py-1.5 rounded-xl text-[10px] font-bold ${th.elev} ${th.txm}`}>
+                className={`flex items-center gap-1 px-2 py-1.5 rounded-xl text-xs font-bold ${th.elev} ${th.txm}`}>
                 <Download size={11} /> Excel
               </button>
             </>
@@ -424,11 +424,11 @@ export function InventoryPage() {
           {activeTab === "history" && (
             <>
               <button onClick={async () => { await exportInventory(movements, products, "csv"); toast.success(t.exportSuccess as string); }}
-                className={`flex items-center gap-1 px-2 py-1.5 rounded-xl text-[10px] font-bold ${th.elev} ${th.txm}`}>
+                className={`flex items-center gap-1 px-2 py-1.5 rounded-xl text-xs font-bold ${th.elev} ${th.txm}`}>
                 <Download size={11} /> CSV
               </button>
               <button onClick={async () => { await exportInventory(movements, products, "xlsx"); toast.success(t.exportSuccess as string); }}
-                className={`flex items-center gap-1 px-2 py-1.5 rounded-xl text-[10px] font-bold ${th.elev} ${th.txm}`}>
+                className={`flex items-center gap-1 px-2 py-1.5 rounded-xl text-xs font-bold ${th.elev} ${th.txm}`}>
                 <Download size={11} /> Excel
               </button>
             </>
@@ -483,7 +483,7 @@ export function InventoryPage() {
                 className={`rounded-[14px] border p-2.5 text-left transition-all ${
                   overviewFilter === s.f ? `ring-2 ring-[${s.clr}]/30` : ""
                 } ${th.card} ${th.bdr}`}>
-                <p className={`text-[10px] font-semibold uppercase tracking-wider ${th.txm}`}>{s.l}</p>
+                <p className={`text-xs font-semibold uppercase tracking-wider ${th.txm}`}>{s.l}</p>
                 <p className="text-lg font-black mt-0.5" style={{ color: s.clr }}>{s.v}</p>
               </button>
             ))}
@@ -571,18 +571,18 @@ export function InventoryPage() {
                     <p className={`text-sm font-bold truncate ${th.tx} ${!product.isActive ? "line-through opacity-50" : ""}`}>
                       {lang === "id" ? product.nameId : product.name}
                     </p>
-                    <p className={`text-[10px] font-mono ${th.txf}`}>{product.sku}</p>
+                    <p className={`text-xs font-mono ${th.txf}`}>{product.sku}</p>
                     {product.supplierId && (() => {
                       const sup = suppliers.find(s => s.id === product.supplierId);
                       if (!sup) return null;
                       return (
-                        <p className={`text-[10px] mt-0.5 font-semibold inline-flex items-center gap-1 ${th.txm}`}>
+                        <p className={`text-xs mt-0.5 font-semibold inline-flex items-center gap-1 ${th.txm}`}>
                           <Truck size={10} /> {sup.name}
                         </p>
                       );
                     })()}
                     {typeof product.memberPrice === "number" && product.memberPrice > 0 && product.memberPrice < product.sellingPrice && (
-                      <p className={`text-[10px] mt-0.5 ${th.acc}`}>
+                      <p className={`text-xs mt-0.5 ${th.acc}`}>
                         💎 {$(product.sellingPrice)} → <b>{$(product.memberPrice)}</b>
                         <span className={`ml-1 ${th.txm}`}>
                           (-{Math.round((1 - product.memberPrice / product.sellingPrice) * 100)}%)
@@ -593,13 +593,22 @@ export function InventoryPage() {
                 </div>
                 <div className="flex items-center gap-2.5 shrink-0">
                   <div className="text-right">
-                    <p className={`text-sm font-black ${th.tx}`}>{product.stock} <span className={`text-[10px] font-medium ${th.txf}`}>{product.unit}</span></p>
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
+                    <p className={`text-2xl font-black leading-none ${
                       product.stock === 0
-                        ? (th.dark ? "bg-[#D4627A]/15 text-[#D4627A]" : "bg-red-50 text-[#D4627A]")
+                        ? "text-[#D4627A]"
                         : product.stock <= product.minStock
-                        ? (th.dark ? "bg-[#60A5FA]/15 text-[#60A5FA]" : "bg-[#EFF6FF] text-[#1E40AF]")
-                        : (th.dark ? "bg-[#4A8B3F]/15 text-[#4A8B3F]" : "bg-green-50 text-[#4A8B3F]")
+                        ? "text-[#E89B48]"
+                        : "text-[#4A8B3F]"
+                    }`}>
+                      {product.stock}
+                      <span className={`text-xs font-bold ml-1 ${th.txm}`}>{product.unit}</span>
+                    </p>
+                    <span className={`inline-block mt-1 text-xs font-bold px-2.5 py-1 rounded-lg ${
+                      product.stock === 0
+                        ? (th.dark ? "bg-[#D4627A]/20 text-[#D4627A]" : "bg-red-100 text-[#D4627A]")
+                        : product.stock <= product.minStock
+                        ? (th.dark ? "bg-[#E89B48]/20 text-[#E89B48]" : "bg-orange-100 text-[#E89B48]")
+                        : (th.dark ? "bg-[#4A8B3F]/20 text-[#4A8B3F]" : "bg-green-100 text-[#4A8B3F]")
                     }`}>
                       {product.stock === 0 ? t.outOfStock : product.stock <= product.minStock ? t.lowStock : t.normalStock}
                     </span>
@@ -685,7 +694,7 @@ export function InventoryPage() {
             </button>
           )}
           <div className={`rounded-[18px] border p-3.5 ${th.card} ${th.bdr}`}>
-            <p className={`text-[10px] font-semibold uppercase tracking-wider ${th.txm}`}>{t.totalIn}</p>
+            <p className={`text-xs font-semibold uppercase tracking-wider ${th.txm}`}>{t.totalIn}</p>
             <p className="text-xl font-black mt-1 text-[#4A8B3F]">+{totalInCount}</p>
           </div>
           <div className={`rounded-[22px] border overflow-hidden ${th.card} ${th.bdr}`}>
@@ -704,7 +713,7 @@ export function InventoryPage() {
             </button>
           )}
           <div className={`rounded-[18px] border p-3.5 ${th.card} ${th.bdr}`}>
-            <p className={`text-[10px] font-semibold uppercase tracking-wider ${th.txm}`}>{t.totalOut}</p>
+            <p className={`text-xs font-semibold uppercase tracking-wider ${th.txm}`}>{t.totalOut}</p>
             <p className="text-xl font-black mt-1 text-[#C4504A]">-{totalOutCount}</p>
           </div>
           <div className={`rounded-[22px] border overflow-hidden ${th.card} ${th.bdr}`}>
@@ -743,16 +752,16 @@ export function InventoryPage() {
                         <p className={`text-sm font-bold truncate ${th.tx}`}>
                           {product ? (lang === "id" ? product.nameId : product.name) : batch.productId}
                         </p>
-                        <p className={`text-[11px] ${th.txf}`}>
+                        <p className={`text-xs ${th.txf}`}>
                           {batch.batchNumber} · {batch.quantity} {product?.unit || "pcs"}
                         </p>
                       </div>
                     </div>
                     <div className="text-right shrink-0">
-                      <p className={`text-[11px] font-mono ${th.txm}`}>
+                      <p className={`text-xs font-mono ${th.txm}`}>
                         {new Date(batch.expiryDate).toLocaleDateString("en", { day: "numeric", month: "short", year: "numeric" })}
                       </p>
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
+                      <span className={`text-xs font-bold px-2 py-0.5 rounded-md ${
                         isExpired
                           ? (th.dark ? "bg-[#D4627A]/15 text-[#D4627A]" : "bg-red-50 text-[#D4627A]")
                           : isUrgent
@@ -780,7 +789,7 @@ export function InventoryPage() {
               { l: t.netChange, v: `${totalInCount - totalOutCount >= 0 ? "+" : ""}${totalInCount - totalOutCount}`, clr: "#5B8DEF" },
             ].map((s, i) => (
               <div key={i} className={`rounded-[18px] border p-3.5 ${th.card} ${th.bdr}`}>
-                <p className={`text-[10px] font-semibold uppercase tracking-wider ${th.txm}`}>{s.l}</p>
+                <p className={`text-xs font-semibold uppercase tracking-wider ${th.txm}`}>{s.l}</p>
                 <p className="text-xl font-black mt-1" style={{ color: s.clr }}>{s.v}</p>
               </div>
             ))}
@@ -812,17 +821,17 @@ export function InventoryPage() {
                   <div key={inv.id} className={`flex items-center justify-between px-4 py-3 border-b last:border-0 ${th.bdrSoft}`}>
                     <div className="min-w-0 flex-1">
                       <p className={`text-sm font-bold truncate ${th.tx}`}>{sup?.name || "\u2014"}</p>
-                      <p className={`text-[11px] ${th.txf}`}>
+                      <p className={`text-xs ${th.txf}`}>
                         {lang === "id" ? prod?.nameId : prod?.name} · {inv.quantity} · {$(inv.unitPrice * inv.quantity)}
                       </p>
-                      <p className={`text-[10px] ${isOverdue ? "text-[#D4627A] font-bold" : th.txm}`}>
+                      <p className={`text-xs ${isOverdue ? "text-[#D4627A] font-bold" : th.txm}`}>
                         {t.dueDate}: {inv.dueDate ? formatDate(inv.dueDate) : "\u2014"}
                         {isOverdue && ` · ${t.overdue}`}
                       </p>
                     </div>
                     {canWrite && (
                       <button onClick={() => { updatePaymentStatus(inv.id, "paid"); toast.success(t.paid as string); }}
-                        className={`shrink-0 ml-3 px-3 py-1.5 rounded-xl text-[11px] font-bold flex items-center gap-1 ${
+                        className={`shrink-0 ml-3 px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1 ${
                           th.dark ? "bg-[#4A8B3F]/15 text-[#4A8B3F]" : "bg-green-50 text-[#4A8B3F]"
                         }`}>
                         <Check size={12} /> {t.markAsPaid}
@@ -842,7 +851,7 @@ export function InventoryPage() {
 
           {/* Supplier list */}
           <div className="flex items-center justify-between">
-            <p className={`text-[15px] font-extrabold tracking-tight ${th.tx}`}>{t.suppliers}</p>
+            <p className={`text-sm font-extrabold tracking-tight ${th.tx}`}>{t.suppliers}</p>
             {canWrite && (
               <button onClick={() => { setSupplierModal("add"); setSupForm({ name: "", phone: "", email: "", address: "" }); }}
                 className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-[#60A5FA] to-[#1E40AF]">
@@ -864,10 +873,10 @@ export function InventoryPage() {
                   <div className="flex items-center justify-between">
                     <div className="min-w-0 flex-1">
                       <p className={`text-sm font-bold ${th.tx}`}>{sup.name}</p>
-                      <p className={`text-[11px] ${th.txm}`}>
+                      <p className={`text-xs ${th.txm}`}>
                         {sup.phone}{sup.email ? ` · ${sup.email}` : ""}
                       </p>
-                      {sup.address && <p className={`text-[10px] mt-0.5 ${th.txf}`}>{sup.address}</p>}
+                      {sup.address && <p className={`text-xs mt-0.5 ${th.txf}`}>{sup.address}</p>}
                     </div>
                     {canWrite && (
                       <div className="flex gap-1.5 shrink-0 ml-3">
@@ -877,23 +886,23 @@ export function InventoryPage() {
                           setSupForm({ name: sup.name, phone: sup.phone, email: sup.email, address: sup.address });
                           setSupplierModal("edit");
                         }}
-                          className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold ${th.dark ? "bg-[#5B8DEF]/15 text-[#5B8DEF]" : "bg-blue-50 text-[#5B8DEF]"}`}>
+                          className={`px-2.5 py-1.5 rounded-lg text-xs font-bold ${th.dark ? "bg-[#5B8DEF]/15 text-[#5B8DEF]" : "bg-blue-50 text-[#5B8DEF]"}`}>
                           {t.editSupplier}
                         </button>
                         {confirmDeleteSupplierId === sup.id ? (
                           <div className="flex gap-1.5" onClick={e => e.stopPropagation()}>
                             <button onClick={() => setConfirmDeleteSupplierId(null)}
-                              className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold border ${th.bdr} ${th.txm}`}>
+                              className={`px-2.5 py-1.5 rounded-lg text-xs font-bold border ${th.bdr} ${th.txm}`}>
                               {t.cancel}
                             </button>
                             <button onClick={() => { deleteSupplier(sup.id); setConfirmDeleteSupplierId(null); toast.success(t.supplierDeleted as string); }}
-                              className="px-2.5 py-1.5 rounded-lg text-[10px] font-bold text-white bg-[#C4504A]">
+                              className="px-2.5 py-1.5 rounded-lg text-xs font-bold text-white bg-[#C4504A]">
                               {t.confirm}
                             </button>
                           </div>
                         ) : (
                           <button onClick={(e) => { e.stopPropagation(); setConfirmDeleteSupplierId(sup.id); }}
-                            className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold ${th.dark ? "bg-[#C4504A]/15 text-[#C4504A]" : "bg-red-50 text-[#C4504A]"}`}>
+                            className={`px-2.5 py-1.5 rounded-lg text-xs font-bold ${th.dark ? "bg-[#C4504A]/15 text-[#C4504A]" : "bg-red-50 text-[#C4504A]"}`}>
                             {t.deleteSupplier}
                           </button>
                         )}
@@ -951,7 +960,7 @@ export function InventoryPage() {
                     <div className="grid grid-cols-2 gap-1.5">
                       {PAYMENT_TERMS_OPTIONS.map(pt => (
                         <button key={pt} onClick={() => setForm({ ...form, paymentTerms: pt })}
-                          className={`py-2 rounded-xl text-[11px] font-bold ${
+                          className={`py-2 rounded-xl text-xs font-bold ${
                             form.paymentTerms === pt ? "text-white bg-gradient-to-r from-[#60A5FA] to-[#1E40AF]" : `border ${th.bdr} ${th.txm}`
                           }`}>{pt}</button>
                       ))}
@@ -962,7 +971,7 @@ export function InventoryPage() {
                     <div className="grid grid-cols-2 gap-1.5">
                       {(["unpaid", "paid"] as PaymentStatus[]).map(ps => (
                         <button key={ps} onClick={() => setForm({ ...form, paymentStatus: ps })}
-                          className={`py-2 rounded-xl text-[11px] font-bold ${
+                          className={`py-2 rounded-xl text-xs font-bold ${
                             form.paymentStatus === ps
                               ? (ps === "paid" ? "text-white bg-[#4A8B3F]" : "text-white bg-[#E89B48]")
                               : `border ${th.bdr} ${th.txm}`
@@ -995,7 +1004,7 @@ export function InventoryPage() {
               </div>
               {form.unit === "box" && form.prod && (() => {
                 const sp = products.find(p => p.id === form.prod);
-                return sp ? <p className={`text-[11px] mt-1.5 font-medium ${th.acc}`}>{t.boxEquals} = {sp.qtyPerBox} {sp.unit}</p> : null;
+                return sp ? <p className={`text-xs mt-1.5 font-medium ${th.acc}`}>{t.boxEquals} = {sp.qtyPerBox} {sp.unit}</p> : null;
               })()}
             </div>
             <div>
@@ -1050,20 +1059,20 @@ export function InventoryPage() {
             <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>{t.productName}</p>
             <input value={newProd.name} onChange={e => { setNewProd({ ...newProd, name: e.target.value }); setProdFormErrors(p => ({ ...p, name: false })); }}
               className={`${inp} ${prodFormErrors.name ? "!border-red-400" : ""}`} />
-            {prodFormErrors.name && <p className="text-red-400 text-[10px] mt-1 font-medium">{t.required}</p>}
+            {prodFormErrors.name && <p className="text-red-400 text-xs mt-1 font-medium">{t.required}</p>}
           </div>
           <div>
             <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>{t.productNameId}</p>
             <input value={newProd.nameId} onChange={e => { setNewProd({ ...newProd, nameId: e.target.value }); setProdFormErrors(p => ({ ...p, nameId: false })); }}
               className={`${inp} ${prodFormErrors.nameId ? "!border-red-400" : ""}`} />
-            {prodFormErrors.nameId && <p className="text-red-400 text-[10px] mt-1 font-medium">{t.required}</p>}
+            {prodFormErrors.nameId && <p className="text-red-400 text-xs mt-1 font-medium">{t.required}</p>}
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>{t.sku}</p>
               <input value={newProd.sku} onChange={e => { setNewProd({ ...newProd, sku: e.target.value }); setProdFormErrors(p => ({ ...p, sku: false })); }}
                 className={`${inp} ${prodFormErrors.sku ? "!border-red-400" : ""}`} />
-              {prodFormErrors.sku && <p className="text-red-400 text-[10px] mt-1 font-medium">{t.required}</p>}
+              {prodFormErrors.sku && <p className="text-red-400 text-xs mt-1 font-medium">{t.required}</p>}
             </div>
             <div>
               <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>{lang === "id" ? "Kategori" : "Category"}</p>
@@ -1119,7 +1128,7 @@ export function InventoryPage() {
               const memberMargin = purchase > 0 ? ((member - purchase) / purchase * 100) : 0;
               const memberDiscount = sell > 0 ? ((sell - member) / sell * 100) : 0;
               return (
-                <p className={`text-[11px] mt-1 font-medium ${memberMargin < 0 ? "text-red-500" : memberMargin < 10 ? "text-[#E89B48]" : th.acc}`}>
+                <p className={`text-xs mt-1 font-medium ${memberMargin < 0 ? "text-red-500" : memberMargin < 10 ? "text-[#E89B48]" : th.acc}`}>
                   Diskon member: {memberDiscount.toFixed(1)}% · Margin member: {memberMargin.toFixed(1)}%
                 </p>
               );
@@ -1127,7 +1136,7 @@ export function InventoryPage() {
           </div>
           {/* Box price hint */}
           {newProd.sellingPrice && newProd.qtyPerBox && (
-            <p className={`text-[11px] -mt-1 font-medium ${th.acc}`}>
+            <p className={`text-xs -mt-1 font-medium ${th.acc}`}>
               {t.boxPrice}: {$((parseInt(newProd.sellingPrice) || 0) * (parseInt(newProd.qtyPerBox) || 0))}
             </p>
           )}
@@ -1297,7 +1306,7 @@ export function InventoryPage() {
               <button
                 type="button"
                 onClick={() => setEditProd({ ...editProd, supplier: "" })}
-                className={`text-[11px] mt-1 font-medium ${th.txm} underline`}
+                className={`text-xs mt-1 font-medium ${th.txm} underline`}
               >
                 {lang === "id" ? "Hapus supplier" : "Clear supplier"}
               </button>
@@ -1327,14 +1336,14 @@ export function InventoryPage() {
               const memberMargin = purchase > 0 ? ((member - purchase) / purchase * 100) : 0;
               const memberDiscount = sell > 0 ? ((sell - member) / sell * 100) : 0;
               return (
-                <p className={`text-[11px] mt-1 font-medium ${memberMargin < 0 ? "text-red-500" : memberMargin < 10 ? "text-[#E89B48]" : th.acc}`}>
+                <p className={`text-xs mt-1 font-medium ${memberMargin < 0 ? "text-red-500" : memberMargin < 10 ? "text-[#E89B48]" : th.acc}`}>
                   Diskon member: {memberDiscount.toFixed(1)}% · Margin member: {memberMargin.toFixed(1)}%
                 </p>
               );
             })()}
           </div>
           {editProd.sellingPrice && editProd.qtyPerBox && (
-            <p className={`text-[11px] -mt-1 font-medium ${th.acc}`}>
+            <p className={`text-xs -mt-1 font-medium ${th.acc}`}>
               {t.boxPrice}: {$((parseInt(editProd.sellingPrice) || 0) * (parseInt(editProd.qtyPerBox) || 0))}
             </p>
           )}
@@ -1403,7 +1412,7 @@ export function InventoryPage() {
               <p className={`text-sm ${th.tx}`}>
                 {p ? <>Produk <b>{lang === "id" ? p.nameId : p.name}</b> (SKU {p.sku}) akan dihapus.</> : "Produk akan dihapus."}
               </p>
-              <div className={`rounded-xl border px-3 py-2.5 text-[11px] ${th.dark ? "border-[#E89B48]/30 bg-[#E89B48]/5 text-[#E89B48]" : "border-amber-200 bg-amber-50 text-amber-700"}`}>
+              <div className={`rounded-xl border px-3 py-2.5 text-xs ${th.dark ? "border-[#E89B48]/30 bg-[#E89B48]/5 text-[#E89B48]" : "border-amber-200 bg-amber-50 text-amber-700"}`}>
                 ⚠️ Produk akan hilang dari daftar dan POS. Riwayat transaksi lama tetap aman (nama & harga sudah tersimpan di order).
                 <br />
                 <span className="opacity-70">Kalau ragu, pakai toggle "Sembunyikan dari POS" saja.</span>
@@ -1450,7 +1459,7 @@ export function InventoryPage() {
               <input type="date" value={labelExpiryDate}
                 onChange={e => setLabelExpiryDate(e.target.value)}
                 className={`w-full px-3 py-2.5 text-sm rounded-xl border ${th.inp}`} />
-              <p className={`text-[10px] mt-1 ${th.txm}`}>
+              <p className={`text-xs mt-1 ${th.txm}`}>
                 Berlaku untuk semua {selectedIds.size} label yang dicetak.
               </p>
             </div>

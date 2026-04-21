@@ -125,15 +125,15 @@ export function OrdersPage() {
         {activeTab === "orders" && (
           <div className="flex gap-1.5 shrink-0">
             <button onClick={async () => { await exportOrders(dateFiltered, "csv"); toast.success(t.exportSuccess as string); }}
-              className={`flex items-center gap-1 px-2 py-1.5 rounded-xl text-[10px] font-bold ${th.elev} ${th.txm}`}>
+              className={`flex items-center gap-1 px-2 py-1.5 rounded-xl text-xs font-bold ${th.elev} ${th.txm}`}>
               <Download size={11} /> CSV
             </button>
             <button onClick={async () => { await exportOrders(dateFiltered, "xlsx"); toast.success(t.exportSuccess as string); }}
-              className={`flex items-center gap-1 px-2 py-1.5 rounded-xl text-[10px] font-bold ${th.elev} ${th.txm}`}>
+              className={`flex items-center gap-1 px-2 py-1.5 rounded-xl text-xs font-bold ${th.elev} ${th.txm}`}>
               <Download size={11} /> Excel
             </button>
             <button onClick={() => printReport(dateFiltered, dateRangeLabel(dateRange) as string)}
-              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-[10px] font-bold ${th.accBg} ${th.acc}`}>
+              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold ${th.accBg} ${th.acc}`}>
               <Printer size={12} /> {t.printReport}
             </button>
           </div>
@@ -189,7 +189,7 @@ export function OrdersPage() {
           { label: t.cancelledCount, value: String(stats.cancelledCount), color: "text-[#C4504A]" },
         ].map((card, i) => (
           <div key={i} className={`rounded-[18px] border p-3.5 ${th.card} ${th.bdr}`}>
-            <p className={`text-[10px] font-semibold ${th.txm}`}>{card.label}</p>
+            <p className={`text-xs font-semibold ${th.txm}`}>{card.label}</p>
             <p className={`text-lg font-black tracking-tight mt-0.5 ${card.color}`}>{card.value}</p>
           </div>
         ))}
@@ -238,12 +238,12 @@ export function OrdersPage() {
                 <div className={`w-2 h-2 rounded-full ${o.status === "completed" ? "bg-[#4A8B3F]" : o.status === "pending" ? "bg-[#60A5FA]" : o.status === "refunded" ? "bg-[#E89B48]" : "bg-[#C4504A]"}`} />
                 <div>
                   <p className={`text-sm font-bold ${th.tx}`}>{o.id}</p>
-                  <p className={`text-[11px] ${th.txm}`}>{o.customer} · {formatTime(o.createdAt)}</p>
+                  <p className={`text-xs ${th.txm}`}>{o.customer} · {formatTime(o.createdAt)}</p>
                 </div>
               </div>
               <div className="text-right">
                 <p className={`font-black ${o.status === "cancelled" || o.status === "refunded" ? "line-through opacity-50" : ""} ${th.tx}`}>{$(o.total)}</p>
-                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
+                <span className={`text-xs font-bold px-2 py-0.5 rounded-md ${
                   o.status === "cancelled"
                     ? (th.dark ? "bg-[#C4504A]/15 text-[#C4504A]" : "bg-red-50 text-[#C4504A]")
                     : o.status === "refunded"
@@ -258,7 +258,7 @@ export function OrdersPage() {
               {o.items.map((item, i) => (
                 <span key={i}
                   onClick={(e) => { e.stopPropagation(); if (products.find(p => p.id === item.productId)) setDetailProductId(item.productId); }}
-                  className={`text-[10px] px-2 py-0.5 rounded-md font-medium cursor-pointer active:opacity-70 ${th.elev} ${th.txm}`}>
+                  className={`text-xs px-2 py-0.5 rounded-md font-medium cursor-pointer active:opacity-70 ${th.elev} ${th.txm}`}>
                   {item.name} ×{item.quantity}
                 </span>
               ))}
@@ -311,7 +311,7 @@ export function OrdersPage() {
                 <div className={`rounded-[22px] border py-12 text-center ${th.card} ${th.bdr}`}>
                   <Users size={36} className={`mx-auto opacity-20 mb-2 ${th.txm}`} />
                   <p className={`text-sm font-semibold ${th.txm}`}>Tidak ada member</p>
-                  <p className={`text-[11px] ${th.txf} mt-1`}>Klik tombol "+ Member" untuk menambah</p>
+                  <p className={`text-xs ${th.txf} mt-1`}>Klik tombol "+ Member" untuk menambah</p>
                 </div>
               );
             }
@@ -322,7 +322,7 @@ export function OrdersPage() {
                   <p className={`text-sm font-extrabold tracking-tight ${th.tx}`}>
                     Members ({filteredMembers.length})
                   </p>
-                  <p className={`text-[10px] ${th.txm}`}>Klik row untuk lihat statistik</p>
+                  <p className={`text-xs ${th.txm}`}>Klik row untuk lihat statistik</p>
                 </div>
                 {filteredMembers.map(m => (
                   <div key={m.id}
@@ -332,16 +332,16 @@ export function OrdersPage() {
                       <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm ${th.accBg} ${th.acc}`}>💎</div>
                       <div className="min-w-0">
                         <p className={`text-sm font-bold truncate ${th.tx}`}>{m.name}</p>
-                        <p className={`text-[11px] font-mono ${th.txf} truncate`}>
+                        <p className={`text-xs font-mono ${th.txf} truncate`}>
                           {[m.phone, m.memberNumber && `#${m.memberNumber}`].filter(Boolean).join(" · ")}
                         </p>
                         {m.address && (
-                          <p className={`text-[10px] ${th.txf} truncate`}>📍 {m.address}</p>
+                          <p className={`text-xs ${th.txf} truncate`}>📍 {m.address}</p>
                         )}
                       </div>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                      <p className={`text-[10px] ${th.txf} hidden sm:block`}>
+                      <p className={`text-xs ${th.txf} hidden sm:block`}>
                         Sejak {formatDate(m.createdAt)}
                       </p>
                       <button

@@ -103,18 +103,18 @@ export function DeviceApprovalPage({ kind }: Props) {
             {icon}
           </div>
           <h1 className={`text-[22px] font-bold tracking-tight mb-2 ${th.tx}`}>{title}</h1>
-          <p className={`text-[15px] leading-relaxed ${th.txm}`}>{description}</p>
+          <p className={`text-sm leading-relaxed ${th.txm}`}>{description}</p>
 
           {state.status !== "loading" && (
             <>
               <div
-                className={`mt-5 pt-4 border-t flex justify-between text-[11px] ${th.txf}`}
+                className={`mt-5 pt-4 border-t flex justify-between text-xs ${th.txf}`}
                 style={{ borderColor: th.dark ? "#334155" : "#E2E8F0" }}
               >
                 <span>Security</span>
                 <time>{now}</time>
               </div>
-              <p className={`mt-4 text-[11px] ${th.txf}`}>Halaman ini aman ditutup.</p>
+              <p className={`mt-4 text-xs ${th.txf}`}>Halaman ini aman ditutup.</p>
               <button
                 type="button"
                 onClick={() => window.close()}

@@ -57,16 +57,16 @@ export function DashboardPage() {
       {isOwner && (
         <div className="grid grid-cols-[1.2fr_1fr] gap-3">
           <div className="row-span-2 rounded-[22px] p-5 text-white bg-gradient-to-br from-[#60A5FA] to-[#1E3A8A]">
-            <p className="text-[11px] font-semibold uppercase tracking-wider opacity-70">{t.revenue}</p>
+            <p className="text-xs font-semibold uppercase tracking-wider opacity-70">{t.revenue}</p>
             <p className="text-[28px] font-black tracking-tight mt-1.5">{$(revenue)}</p>
-            <p className={`text-[11px] mt-2 opacity-50`}>{orders.length} {t.ordersCount?.toString().toLowerCase()}</p>
+            <p className={`text-xs mt-2 opacity-50`}>{orders.length} {t.ordersCount?.toString().toLowerCase()}</p>
           </div>
           {[
             { label: t.ordersCount, value: orders.length, color: "#5B8DEF" },
             { label: t.lowAlerts, value: lowStock.length, color: lowStock.length > 3 ? "#D4627A" : "#4A8B3F" },
           ].map((s, i) => (
             <div key={i} className={`rounded-[18px] border p-4 ${th.card} ${th.bdr}`}>
-              <p className={`text-[10px] font-semibold uppercase tracking-wider ${th.txm}`}>{s.label}</p>
+              <p className={`text-xs font-semibold uppercase tracking-wider ${th.txm}`}>{s.label}</p>
               <p className={`text-[22px] font-black mt-1 ${th.tx}`}>{s.value}</p>
               <div className="w-7 h-[3px] rounded-full mt-1.5 opacity-50" style={{ background: s.color }} />
             </div>
@@ -77,7 +77,7 @@ export function DashboardPage() {
       {/* ─── Payment Breakdown ─── */}
       {(isOwner || isCashier) && completedOrders.length > 0 && (
         <div className={`rounded-[22px] border p-4 ${th.card} ${th.bdr}`}>
-          <p className={`text-[11px] font-bold uppercase tracking-wider mb-3 ${th.txm}`}>
+          <p className={`text-xs font-bold uppercase tracking-wider mb-3 ${th.txm}`}>
             {lang === "id" ? "Pembayaran" : "Payment Breakdown"}
           </p>
           <div className="grid grid-cols-3 gap-2">
@@ -89,11 +89,11 @@ export function DashboardPage() {
               const data = paymentBreakdown[m.key];
               return (
                 <div key={m.key} className={`rounded-xl p-3 ${th.elev}`}>
-                  <p className={`text-[11px] ${th.txm}`}>{m.icon} {m.label}</p>
+                  <p className={`text-xs ${th.txm}`}>{m.icon} {m.label}</p>
                   <p className="text-sm font-black mt-1" style={{ color: m.color }}>
                     {data ? $(data.total) : "Rp 0"}
                   </p>
-                  <p className={`text-[10px] mt-0.5 ${th.txf}`}>
+                  <p className={`text-xs mt-0.5 ${th.txf}`}>
                     {data ? `${data.count}x` : "0x"}
                     {data && revenue > 0 ? ` · ${Math.round(data.total / revenue * 100)}%` : ""}
                   </p>
@@ -108,11 +108,11 @@ export function DashboardPage() {
       {isCashier && (
         <div className="grid grid-cols-2 gap-3">
           <div className="rounded-[22px] p-5 text-white bg-gradient-to-br from-[#60A5FA] to-[#1E3A8A]">
-            <p className="text-[11px] font-semibold uppercase tracking-wider opacity-70">{t.revenue}</p>
+            <p className="text-xs font-semibold uppercase tracking-wider opacity-70">{t.revenue}</p>
             <p className="text-[28px] font-black tracking-tight mt-1.5">{$(revenue)}</p>
           </div>
           <div className={`rounded-[18px] border p-4 flex flex-col justify-center ${th.card} ${th.bdr}`}>
-            <p className={`text-[10px] font-semibold uppercase tracking-wider ${th.txm}`}>{t.ordersCount}</p>
+            <p className={`text-xs font-semibold uppercase tracking-wider ${th.txm}`}>{t.ordersCount}</p>
             <p className={`text-[22px] font-black mt-1 ${th.tx}`}>{orders.length}</p>
             <div className="w-7 h-[3px] rounded-full mt-1.5 opacity-50" style={{ background: "#5B8DEF" }} />
           </div>
@@ -128,7 +128,7 @@ export function DashboardPage() {
             { label: t.invExpiry, value: expiringBatches.length, color: expiringBatches.length > 0 ? "#E89B48" : "#4A8B3F" },
           ].map((s, i) => (
             <div key={i} className={`rounded-[18px] border p-3.5 ${th.card} ${th.bdr}`}>
-              <p className={`text-[10px] font-semibold uppercase tracking-wider ${th.txm}`}>{s.label}</p>
+              <p className={`text-xs font-semibold uppercase tracking-wider ${th.txm}`}>{s.label}</p>
               <p className="text-xl font-black mt-1" style={{ color: s.color }}>{s.value}</p>
             </div>
           ))}
@@ -148,7 +148,7 @@ export function DashboardPage() {
                 <div className={`w-2 h-2 rounded-full ${o.status === "completed" ? "bg-[#4A8B3F]" : "bg-[#60A5FA]"}`} />
                 <div>
                   <p className={`text-sm font-bold ${th.tx}`}>{o.id}</p>
-                  <p className={`text-[11px] ${th.txm}`}>{o.customer} · {formatTime(o.createdAt)}</p>
+                  <p className={`text-xs ${th.txm}`}>{o.customer} · {formatTime(o.createdAt)}</p>
                 </div>
               </div>
               <p className={`text-sm font-extrabold ${th.tx}`}>{$(o.total)}</p>
@@ -171,7 +171,7 @@ export function DashboardPage() {
                 <ProductImage product={p} size={28} />
                 <p className={`text-sm font-semibold ${th.tx}`}>{lang === "id" ? p.nameId : p.name}</p>
               </div>
-              <span className={`text-[11px] font-bold px-2 py-0.5 rounded-md ${
+              <span className={`text-xs font-bold px-2 py-0.5 rounded-md ${
                 p.stock === 0
                   ? (th.dark ? "bg-[#D4627A]/15 text-[#D4627A]" : "bg-red-50 text-[#D4627A]")
                   : (th.dark ? "bg-[#60A5FA]/15 text-[#60A5FA]" : "bg-[#EFF6FF] text-[#1E40AF]")
@@ -200,10 +200,10 @@ export function DashboardPage() {
                   {product && <ProductImage product={product} size={28} />}
                   <div>
                     <p className={`text-sm font-semibold ${th.tx}`}>{product ? (lang === "id" ? product.nameId : product.name) : batch.productId}</p>
-                    <p className={`text-[11px] ${th.txf}`}>{batch.quantity} {product?.unit || "pcs"}</p>
+                    <p className={`text-xs ${th.txf}`}>{batch.quantity} {product?.unit || "pcs"}</p>
                   </div>
                 </div>
-                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
+                <span className={`text-xs font-bold px-2 py-0.5 rounded-md ${
                   isExpired
                     ? (th.dark ? "bg-[#D4627A]/15 text-[#D4627A]" : "bg-red-50 text-[#D4627A]")
                     : isUrgent

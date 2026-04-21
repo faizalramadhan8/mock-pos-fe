@@ -22,11 +22,11 @@ const SettingsPage = lazy(() => import("@/pages/SettingsPage").then(m => ({ defa
 const DeviceApprovalPage = lazy(() => import("@/pages/DeviceApprovalPage").then(m => ({ default: m.DeviceApprovalPage })));
 
 const NAV_ICONS: Record<PageId, React.ReactNode> = {
-  dashboard: <Home size={20} />,
-  pos: <ShoppingBag size={20} />,
-  inventory: <Package size={20} />,
-  orders: <FileText size={20} />,
-  settings: <Settings size={20} />,
+  dashboard: <Home size={26} />,
+  pos: <ShoppingBag size={26} />,
+  inventory: <Package size={26} />,
+  orders: <FileText size={26} />,
+  settings: <Settings size={26} />,
 };
 
 function PageLoader() {
@@ -123,19 +123,19 @@ export default function App() {
   return (
     <div className={`min-h-screen ${th.bg}`}>
       {/* Header */}
-      <header className={`fixed top-0 left-0 right-0 z-40 h-14 flex items-center justify-between px-4 border-b backdrop-blur-xl ${th.dark ? "bg-[#1E293B]/85" : "bg-white/85"} ${th.bdr}`}>
+      <header className={`fixed top-0 left-0 right-0 z-40 h-[72px] flex items-center justify-between px-4 border-b backdrop-blur-xl ${th.dark ? "bg-[#1E293B]/85" : "bg-white/85"} ${th.bdr}`}>
         <div className="flex items-center gap-3">
-          <BakeryLogo size={32} />
+          <BakeryLogo size={44} />
           <div>
-            <p className={`text-sm font-extrabold leading-tight tracking-tight ${th.tx}`}>{t[currentPage as keyof typeof t] as string || t.appName}</p>
-            <p className={`text-[10px] ${th.txm}`}>{user.name} · {(t.roles as Record<string, string>)[user.role]}</p>
+            <p className={`text-base font-extrabold leading-tight tracking-tight ${th.tx}`}>{t[currentPage as keyof typeof t] as string || t.appName}</p>
+            <p className={`text-xs ${th.txm}`}>{user.name} · {(t.roles as Record<string, string>)[user.role]}</p>
           </div>
         </div>
         <NotificationBell />
       </header>
 
       {/* Content */}
-      <main className="pt-[68px] pb-24 px-4 max-w-5xl mx-auto">
+      <main className="pt-[84px] pb-28 px-4 max-w-5xl mx-auto">
         <ErrorBoundary onReset={() => setPage("dashboard")}>
           <Suspense fallback={<PageLoader />}>
             <div key={currentPage} className="animate-page-enter">
@@ -147,17 +147,17 @@ export default function App() {
 
       {/* Bottom Nav */}
       <nav aria-label="Main navigation" className={`fixed bottom-0 left-0 right-0 z-40 border-t backdrop-blur-xl pb-safe ${th.dark ? "bg-[#1E293B]/92" : "bg-white/92"} ${th.bdr}`}>
-        <div role="tablist" className="flex items-center justify-around max-w-md mx-auto h-16">
+        <div role="tablist" className="flex items-center justify-around max-w-md mx-auto h-20">
           {navItems.map((id, idx) => {
             const active = currentPage === id;
             return (
               <button key={id} role="tab" aria-selected={active} tabIndex={active ? 0 : -1}
                 onClick={() => setPage(id)} onKeyDown={(e) => handleNavKeyDown(e, idx)}
-                className={`flex flex-col items-center gap-0.5 py-2 px-3 rounded-2xl transition-colors ${active ? th.acc : th.txf}`}>
-                <div className={`p-1.5 rounded-xl transition-colors ${active ? th.accBg : ""}`}>
+                className={`flex flex-col items-center gap-1 py-2 px-3 rounded-2xl transition-colors ${active ? th.acc : th.txf}`}>
+                <div className={`p-2 rounded-xl transition-colors ${active ? th.accBg : ""}`}>
                   {NAV_ICONS[id]}
                 </div>
-                <span className="text-[10px] font-semibold">{t[id as keyof typeof t] as string}</span>
+                <span className="text-xs font-semibold">{t[id as keyof typeof t] as string}</span>
               </button>
             );
           })}
