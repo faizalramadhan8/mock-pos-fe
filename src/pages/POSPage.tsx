@@ -8,7 +8,7 @@ import { CategoryIconMap } from "@/components/icons";
 import { useThemeClasses } from "@/hooks/useThemeClasses";
 import { useDebounce } from "@/hooks/useDebounce";
 import { useBarcodeScanner } from "@/hooks/useBarcodeScanner";
-import { formatCurrency as $, printReceipt, compressImage, genId, formatTime, printBarcodeLabel } from "@/utils";
+import { formatCurrency as $, printReceipt, compressImage, genId, formatTime, printBarcodeLabel, printBarcodeLabels } from "@/utils";
 import { calcItemDiscount } from "@/utils/calc";
 import Barcode from "react-barcode";
 import type { PaymentMethod, UnitType, DiscountType, Product, Order, Member } from "@/types";
@@ -39,7 +39,6 @@ export function POSPage() {
   const addOrder = useOrderStore(s => s.addOrder);
   const allOrders = useOrderStore(s => s.orders);
   const consumeFIFO = useBatchStore(s => s.consumeFIFO);
-  const batches = useBatchStore(s => s.batches);
   const user = useAuthStore(s => s.user)!;
   const ppnRate = useSettingsStore(s => s.ppnRate);
   const bankAccounts = useSettingsStore(s => s.bankAccounts);
@@ -90,6 +89,7 @@ export function POSPage() {
   const [orderHistoryOpen, setOrderHistoryOpen] = useState(false);
   const [labelModalOpen, setLabelModalOpen] = useState(false);
   const [labelSearch, setLabelSearch] = useState("");
+  const [selectedLabels, setSelectedLabels] = useState<Set<string>>(new Set());
   const labelWidth = useSettingsStore(s => s.labelWidth);
   const labelHeight = useSettingsStore(s => s.labelHeight);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -1000,88 +1000,86 @@ export function POSPage() {
         )}
       </Modal>
       {/* Order History modal */}
-      <Modal open={labelModalOpen} onClose={() => { setLabelModalOpen(false); setLabelSearch(""); }} title="Cetak Label Batch">
+      <Modal open={labelModalOpen} onClose={() => { setLabelModalOpen(false); setLabelSearch(""); setSelectedLabels(new Set()); }} title="Cetak Label Barcode">
         <div className="flex flex-col gap-3">
           <div className="relative">
             <Search size={16} className={`absolute left-3 top-1/2 -translate-y-1/2 ${th.txf}`} />
             <input autoFocus value={labelSearch} onChange={e => setLabelSearch(e.target.value)}
-              placeholder="Cari nama produk / batch / SKU…"
+              placeholder="Cari nama produk / SKU / barcode…"
               className={`w-full pl-10 pr-3 py-3 text-sm rounded-2xl border ${th.inp}`} />
           </div>
           <p className={`text-xs ${th.txm}`}>
-            Ukuran label: {labelWidth}mm × {labelHeight}mm · Pilih batch untuk cetak label dengan tanggal kadaluarsa.
+            Ukuran label: {labelWidth}mm × {labelHeight}mm · Centang produk lalu tekan Cetak.
           </p>
           <div className={`border rounded-2xl overflow-hidden max-h-[50vh] overflow-y-auto ${th.bdr}`}>
             {(() => {
-              // Sort batches by oldest ED first (FIFO)
-              const sortedBatches = [...batches].sort((a, b) => {
-                if (!a.expiryDate && !b.expiryDate) return 0;
-                if (!a.expiryDate) return 1;
-                if (!b.expiryDate) return -1;
-                return a.expiryDate.localeCompare(b.expiryDate);
-              });
               const q = labelSearch.trim().toLowerCase();
-              const rows = sortedBatches
-                .map(b => ({ batch: b, product: products.find(p => p.id === b.productId) }))
-                .filter(r => r.product && r.product.isActive)
-                .filter(r => {
-                  if (!q) return true;
-                  const p = r.product!;
-                  return (
+              const list = q
+                ? products.filter(p => p.isActive && (
                     p.name.toLowerCase().includes(q) ||
                     p.nameId.toLowerCase().includes(q) ||
                     p.sku.toLowerCase().includes(q) ||
-                    (p.barcode || "").toLowerCase().includes(q) ||
-                    (r.batch.batchNumber || "").toLowerCase().includes(q)
-                  );
-                });
-              if (rows.length === 0) {
-                return <p className={`text-sm text-center py-6 ${th.txf}`}>
-                  {q ? "Batch tidak ditemukan" : "Belum ada batch. Barang masuk dicatat oleh admin."}
-                </p>;
+                    (p.barcode || "").toLowerCase().includes(q)
+                  ))
+                : products.filter(p => p.isActive);
+              if (list.length === 0) {
+                return <p className={`text-sm text-center py-6 ${th.txf}`}>Tidak ada produk</p>;
               }
-              const now = new Date();
-              return rows.map(({ batch, product }) => {
-                const p = product!;
-                let edLabel = "Tanpa ED";
-                let edColor = th.txf;
-                if (batch.expiryDate) {
-                  const ed = new Date(batch.expiryDate);
-                  const days = Math.ceil((ed.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-                  edLabel = ed.toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" });
-                  if (days <= 0) { edLabel += " (KADALUARSA)"; edColor = "text-[#D4627A]"; }
-                  else if (days <= 30) { edLabel += ` · ${days}hr lagi`; edColor = "text-[#D4627A]"; }
-                  else if (days <= 90) { edLabel += ` · ${days}hr lagi`; edColor = "text-[#E89B48]"; }
-                  else edColor = th.txm;
-                }
+              return list.map(p => {
+                const checked = selectedLabels.has(p.id);
                 return (
-                  <div key={batch.id} className={`flex items-center justify-between gap-3 px-3 py-2.5 border-b last:border-0 ${th.bdrSoft}`}>
+                  <label key={p.id} className={`flex items-center gap-3 px-3 py-2.5 border-b last:border-0 cursor-pointer ${th.bdrSoft}`}>
+                    <input type="checkbox" checked={checked}
+                      onChange={e => {
+                        const next = new Set(selectedLabels);
+                        if (e.target.checked) next.add(p.id); else next.delete(p.id);
+                        setSelectedLabels(next);
+                      }}
+                      className="w-4 h-4 rounded accent-[#1E40AF] shrink-0" />
                     <div className="min-w-0 flex-1">
                       <p className={`text-sm font-bold truncate ${th.tx}`}>{lang === "id" ? p.nameId : p.name}</p>
-                      <p className={`text-xs font-mono ${th.txf}`}>
-                        {batch.batchNumber || "—"} · {batch.quantity} {p.unit}
-                      </p>
-                      <p className={`text-xs font-bold ${edColor}`}>
-                        ED: {edLabel}
-                      </p>
+                      <p className={`text-xs font-mono ${th.txf}`}>{p.sku}</p>
                     </div>
                     <button
                       type="button"
-                      onClick={() => {
-                        printBarcodeLabel(p, lang, { width: labelWidth, height: labelHeight }, {
-                          expiryDate: batch.expiryDate || undefined,
-                        });
+                      onClick={(e) => {
+                        e.preventDefault();
+                        printBarcodeLabel(p, lang, { width: labelWidth, height: labelHeight });
                         toast.success("Label dicetak");
                       }}
-                      className={`shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-[#60A5FA] to-[#1E40AF]`}
+                      className={`shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border ${th.bdr} ${th.acc}`}
                     >
-                      <Printer size={12} /> Cetak
+                      <Printer size={12} /> 1
                     </button>
-                  </div>
+                  </label>
                 );
               });
             })()}
           </div>
+          {selectedLabels.size > 0 && (
+            <div className={`flex items-center justify-between gap-3 pt-2 border-t ${th.bdr}`}>
+              <button
+                type="button"
+                onClick={() => setSelectedLabels(new Set())}
+                className={`text-xs font-bold ${th.txm} underline`}
+              >
+                Batal ({selectedLabels.size})
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const size = { width: labelWidth, height: labelHeight };
+                  const picks = products.filter(p => selectedLabels.has(p.id));
+                  printBarcodeLabels(picks, lang, size);
+                  toast.success(`${picks.length} label dicetak`);
+                  setSelectedLabels(new Set());
+                }}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-[#60A5FA] to-[#1E40AF]`}
+              >
+                <Printer size={12} /> Cetak {selectedLabels.size} Label
+              </button>
+            </div>
+          )}
         </div>
       </Modal>
 
