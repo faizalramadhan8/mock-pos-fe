@@ -151,7 +151,7 @@ export function DashboardPage() {
           <div className={`rounded-[22px] border p-4 ${th.card} ${th.bdr}`}>
             <div className="flex items-center justify-between mb-3">
               <p className={`text-xs font-bold uppercase tracking-wider ${th.txm}`}>
-                Laporan Keuntungan
+                Laporan Keuangan
               </p>
             </div>
             <div className="flex flex-wrap gap-1 mb-3">
@@ -180,23 +180,23 @@ export function DashboardPage() {
             )}
             <div className="grid grid-cols-2 gap-2 mb-2">
               <div className={`rounded-xl p-3 ${th.dark ? "bg-[#60A5FA]/10" : "bg-blue-50"}`}>
-                <p className={`text-xs font-semibold ${th.acc}`}>GROSS (Omzet)</p>
+                <p className={`text-xs font-semibold ${th.acc}`}>Harga Jual</p>
                 <p className={`text-base font-black mt-0.5 ${th.acc}`}>{$(gross)}</p>
                 <p className={`text-xs mt-0.5 ${th.txm}`}>{ranged.length} transaksi · {itemsCount} item</p>
               </div>
               <div className={`rounded-xl p-3 ${th.dark ? "bg-[#4A8B3F]/10" : "bg-green-50"}`}>
-                <p className="text-xs font-semibold text-[#4A8B3F]">NET (Keuntungan)</p>
+                <p className="text-xs font-semibold text-[#4A8B3F]">Gain</p>
                 <p className="text-base font-black mt-0.5 text-[#4A8B3F]">{$(net)}</p>
-                <p className={`text-xs mt-0.5 ${th.txm}`}>Margin {margin.toFixed(1)}%</p>
+                <p className={`text-xs mt-0.5 ${th.txm}`}>{margin.toFixed(1)}% dari harga jual</p>
               </div>
             </div>
             <div className={`rounded-xl p-3 ${th.dark ? "bg-[#E89B48]/10" : "bg-orange-50"}`}>
               <div className="flex items-center justify-between">
-                <p className="text-xs font-semibold text-[#E89B48]">HPP (Harga Pokok)</p>
+                <p className="text-xs font-semibold text-[#E89B48]">Modal (Harga Beli)</p>
                 <p className="text-sm font-black text-[#E89B48]">{$(cogs)}</p>
               </div>
               <p className={`text-xs mt-1 ${th.txm}`}>
-                NET = GROSS − HPP. Keuntungan = harga jual dikurangi harga beli per item.
+                Gain = Harga Jual − Modal. Gain = harga jual dikurangi harga beli per item.
               </p>
             </div>
 
@@ -207,14 +207,14 @@ export function DashboardPage() {
                   onClick={() => setProfitPerProdOpen(v => !v)}
                   className={`w-full text-xs font-bold py-2 rounded-lg border ${th.bdr} ${th.txm}`}
                 >
-                  {profitPerProdOpen ? "Tutup Rincian per Produk" : `Lihat Keuntungan per Produk (${perProdRows.length})`}
+                  {profitPerProdOpen ? "Tutup Rincian per Produk" : `Lihat Gain per Produk (${perProdRows.length})`}
                 </button>
                 {profitPerProdOpen && (
                   <>
                     <div className="flex items-center gap-1 mt-2 mb-2">
                       <span className={`text-xs ${th.txm}`}>Urut:</span>
                       {(["net", "gross", "qty", "margin"] as const).map(s => {
-                        const label = s === "net" ? "Untung" : s === "gross" ? "Omzet" : s === "qty" ? "Qty" : "Margin%";
+                        const label = s === "net" ? "Gain" : s === "gross" ? "Harga Jual" : s === "qty" ? "Qty" : "Margin%";
                         return (
                           <button key={s} onClick={() => setProfitSort(s)}
                             className={`text-xs font-bold px-2 py-0.5 rounded-md ${
@@ -226,20 +226,25 @@ export function DashboardPage() {
                       })}
                     </div>
                     <div className={`border rounded-xl overflow-hidden max-h-80 overflow-y-auto ${th.bdr}`}>
-                      {perProdRows.map((p, idx) => (
-                        <div key={idx} className={`px-3 py-2.5 border-b last:border-0 ${th.bdrSoft}`}>
-                          <div className="flex items-start justify-between gap-2 mb-1">
-                            <p className={`text-sm font-bold truncate ${th.tx}`}>{p.name}</p>
-                            <p className="text-sm font-black text-[#4A8B3F] shrink-0">{$(p.net)}</p>
+                      {perProdRows.map((p, idx) => {
+                        const marginColor = p.margin >= 20 ? "text-[#4A8B3F]" : p.margin >= 10 ? "text-[#E89B48]" : "text-[#D4627A]";
+                        return (
+                          <div key={idx} className={`px-3 py-2.5 border-b last:border-0 ${th.bdrSoft}`}>
+                            <div className="flex items-start justify-between gap-2 mb-1">
+                              <p className={`text-sm font-bold truncate ${th.tx}`}>{p.name}</p>
+                              <p className="text-sm font-black text-[#4A8B3F] shrink-0">
+                                Gain {$(p.net)}
+                              </p>
+                            </div>
+                            <div className={`flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs ${th.txm}`}>
+                              <span>Qty: <b className={th.tx}>{p.qty}</b></span>
+                              <span>Harga Jual: <b className={th.acc}>{$(p.gross)}</b></span>
+                              <span>Modal: <b className="text-[#E89B48]">{$(p.cogs)}</b></span>
+                              <span>Margin: <b className={marginColor}>{$(p.net)}</b> <span className={marginColor}>({p.margin.toFixed(1)}%)</span></span>
+                            </div>
                           </div>
-                          <div className={`flex items-center gap-3 text-xs ${th.txm}`}>
-                            <span>Qty: <b className={th.tx}>{p.qty}</b></span>
-                            <span>Omzet: <b className={th.acc}>{$(p.gross)}</b></span>
-                            <span>HPP: <b className="text-[#E89B48]">{$(p.cogs)}</b></span>
-                            <span>Margin: <b className={p.margin >= 20 ? "text-[#4A8B3F]" : p.margin >= 10 ? "text-[#E89B48]" : "text-[#D4627A]"}>{p.margin.toFixed(1)}%</b></span>
-                          </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </>
                 )}
