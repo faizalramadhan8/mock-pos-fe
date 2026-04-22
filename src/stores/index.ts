@@ -397,11 +397,15 @@ export const useCartStore = create<CartState>()(
       setPayment: (p) => set({ payment: p }),
       setMember: (m) => {
         const isMember = m !== null;
-        // Recompute existing cart items based on new member status
+        // Recompute existing cart items based on new member status.
+        // When switching from non-member → member, clear the customer name/phone
+        // (they're non-member fields; member info lives on `member`). When
+        // clearing member, preserve any free-text note in `customer`.
         const products = useProductStore.getState().products;
         set(s => ({
           member: m,
-          customer: m ? m.name : s.customer,
+          customer: m ? "" : s.customer,
+          customerPhone: m ? "" : s.customerPhone,
           items: s.items.map(i => {
             const product = products.find(p => p.id === i.productId);
             if (!product) return i;

@@ -354,46 +354,68 @@ export function POSPage() {
         </div>
       )}
 
-      {/* Member / Customer selector */}
-      <div className="relative" ref={memberDropdownRef}>
-        <input
-          value={customer}
-          onChange={e => { setCustomer(e.target.value); setMemberQuery(e.target.value); setShowMemberDropdown(true); }}
-          onFocus={() => setShowMemberDropdown(true)}
-          placeholder={activeMember ? "Tambah catatan pelanggan…" : (t.searchMemberPhone as string || t.searchMember as string)}
-          className={`w-full px-4 py-3 text-sm rounded-2xl border ${th.inp}`}
-        />
-        {!activeMember && customer && !showMemberDropdown && (
+      {/* Member search (separate from customer details) */}
+      {!activeMember && (
+        <div className="relative" ref={memberDropdownRef}>
+          <input
+            value={memberQuery}
+            onChange={e => { setMemberQuery(e.target.value); setShowMemberDropdown(true); }}
+            onFocus={() => setShowMemberDropdown(true)}
+            placeholder={t.searchMemberPhone as string || t.searchMember as string}
+            className={`w-full px-4 py-3 text-sm rounded-2xl border ${th.inp}`}
+          />
+          {showMemberDropdown && (
+            <div className={`absolute top-full left-0 right-0 z-20 mt-1 rounded-xl border shadow-lg overflow-hidden ${th.card} ${th.bdr}`}>
+              {filteredMembers.length > 0 && filteredMembers.map(m => (
+                <button key={m.id} onClick={() => { setMember({ id: m.id, name: m.name, phone: m.phone }); setMemberQuery(""); setShowMemberDropdown(false); setCustomer(""); setCustomerPhone(""); }}
+                  className={`w-full text-left px-4 py-2.5 flex items-center justify-between hover:opacity-70 border-b last:border-0 ${th.bdrSoft}`}>
+                  <div className="min-w-0">
+                    <p className={`text-sm font-bold truncate ${th.tx}`}>{m.name}</p>
+                    <p className={`text-xs ${th.txm} truncate`}>
+                      {[m.phone, m.memberNumber && `#${m.memberNumber}`].filter(Boolean).join(" · ")}
+                    </p>
+                  </div>
+                </button>
+              ))}
+              <button onClick={() => { setShowAddMember(true); setShowMemberDropdown(false); setNewMemberName(memberQuery); }}
+                className={`w-full text-left px-4 py-2.5 flex items-center gap-2 ${th.acc}`}>
+                <UserPlus size={13} />
+                <span className="text-sm font-bold">{t.addMember}</span>
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Non-member customer details — separate Name + Phone fields */}
+      {!activeMember && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <input
+            value={customer}
+            onChange={e => setCustomer(e.target.value)}
+            placeholder="Nama customer (opsional)"
+            className={`w-full px-4 py-3 text-sm rounded-2xl border ${th.inp}`}
+          />
           <input
             value={customerPhone}
             onChange={e => setCustomerPhone(e.target.value)}
-            placeholder="Nomor HP (untuk kirim struk via WhatsApp, opsional)"
+            placeholder="Nomor HP (opsional — untuk kirim struk WA)"
             type="tel"
             inputMode="tel"
-            className={`w-full mt-2 px-4 py-3 text-sm rounded-2xl border ${th.inp}`}
+            className={`w-full px-4 py-3 text-sm rounded-2xl border ${th.inp}`}
           />
-        )}
-        {showMemberDropdown && (
-          <div className={`absolute top-full left-0 right-0 z-20 mt-1 rounded-xl border shadow-lg overflow-hidden ${th.card} ${th.bdr}`}>
-            {filteredMembers.length > 0 && filteredMembers.map(m => (
-              <button key={m.id} onClick={() => { setMember({ id: m.id, name: m.name, phone: m.phone }); setMemberQuery(""); setShowMemberDropdown(false); }}
-                className={`w-full text-left px-4 py-2.5 flex items-center justify-between hover:opacity-70 border-b last:border-0 ${th.bdrSoft}`}>
-                <div className="min-w-0">
-                  <p className={`text-sm font-bold truncate ${th.tx}`}>{m.name}</p>
-                  <p className={`text-xs ${th.txm} truncate`}>
-                    {[m.phone, m.memberNumber && `#${m.memberNumber}`].filter(Boolean).join(" · ")}
-                  </p>
-                </div>
-              </button>
-            ))}
-            <button onClick={() => { setShowAddMember(true); setShowMemberDropdown(false); setNewMemberName(memberQuery || customer); }}
-              className={`w-full text-left px-4 py-2.5 flex items-center gap-2 ${th.acc}`}>
-              <UserPlus size={13} />
-              <span className="text-sm font-bold">{t.addMember}</span>
-            </button>
-          </div>
-        )}
-      </div>
+        </div>
+      )}
+
+      {/* Member-mode note field (add customer note after member selected) */}
+      {activeMember && (
+        <input
+          value={customer}
+          onChange={e => setCustomer(e.target.value)}
+          placeholder="Tambah catatan pelanggan (opsional)"
+          className={`w-full px-4 py-3 text-sm rounded-2xl border ${th.inp}`}
+        />
+      )}
 
       {/* Add Member mini-modal */}
       {showAddMember && (
