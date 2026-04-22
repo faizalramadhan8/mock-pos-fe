@@ -594,20 +594,16 @@ export function InventoryPage() {
                 <div className="flex items-center gap-2.5 shrink-0">
                   <div className="text-right">
                     <p className={`text-2xl font-black leading-none ${
-                      product.stock === 0
+                      product.stock === 0 || product.stock <= product.minStock
                         ? "text-[#D4627A]"
-                        : product.stock <= product.minStock
-                        ? "text-[#E89B48]"
                         : "text-[#4A8B3F]"
                     }`}>
                       {product.stock}
                       <span className={`text-xs font-bold ml-1 ${th.txm}`}>{product.unit}</span>
                     </p>
                     <span className={`inline-block mt-1 text-xs font-bold px-2.5 py-1 rounded-lg ${
-                      product.stock === 0
+                      product.stock === 0 || product.stock <= product.minStock
                         ? (th.dark ? "bg-[#D4627A]/20 text-[#D4627A]" : "bg-red-100 text-[#D4627A]")
-                        : product.stock <= product.minStock
-                        ? (th.dark ? "bg-[#E89B48]/20 text-[#E89B48]" : "bg-orange-100 text-[#E89B48]")
                         : (th.dark ? "bg-[#4A8B3F]/20 text-[#4A8B3F]" : "bg-green-100 text-[#4A8B3F]")
                     }`}>
                       {product.stock === 0 ? t.outOfStock : product.stock <= product.minStock ? t.lowStock : t.normalStock}
@@ -761,12 +757,10 @@ export function InventoryPage() {
                       <p className={`text-xs font-mono ${th.txm}`}>
                         {new Date(batch.expiryDate).toLocaleDateString("en", { day: "numeric", month: "short", year: "numeric" })}
                       </p>
-                      <span className={`text-xs font-bold px-2 py-0.5 rounded-md ${
-                        isExpired
-                          ? (th.dark ? "bg-[#D4627A]/15 text-[#D4627A]" : "bg-red-50 text-[#D4627A]")
-                          : isUrgent
-                          ? (th.dark ? "bg-[#60A5FA]/15 text-[#60A5FA]" : "bg-[#EFF6FF] text-[#1E40AF]")
-                          : (th.dark ? "bg-[#E89B48]/10 text-[#E89B48]" : "bg-amber-50 text-[#E89B48]")
+                      <span className={`text-base font-black px-2.5 py-1 rounded-lg ${
+                        isExpired || isUrgent
+                          ? (th.dark ? "bg-[#D4627A]/20 text-[#D4627A]" : "bg-red-100 text-[#D4627A]")
+                          : "text-[#D4627A]"
                       }`}>
                         {isExpired ? t.alreadyExpired : `${t.expiringIn} ${days} ${t.days}`}
                       </span>

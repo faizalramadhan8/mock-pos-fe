@@ -1,11 +1,15 @@
 import type { User, Category, Product, Order, StockMovement, StockBatch, Supplier, Role, PageId, UnitOfMeasure, PaymentTerms } from "@/types";
 
+// Kasir: hanya POS + buka/tutup register + catat member saat checkout.
+// Admin toko (staff): POS + Inventory + Orders (cek barang/stok masuk).
+//   Tidak akses Dashboard (laporan total tidak boleh dilihat kasir/staff).
+// Admin & Owner (superadmin): semua.
 export const ROLE_PERMISSIONS: Record<Role, PageId[]> = {
   superadmin: ["dashboard", "pos", "inventory", "orders", "settings"],
   admin: ["dashboard", "pos", "inventory", "orders", "settings"],
+  staff: ["pos", "inventory", "orders", "settings"],
   cashier: ["pos", "settings"],
-  staff: ["dashboard", "inventory", "settings"],
-  user: ["dashboard", "orders", "settings"],
+  user: ["pos", "settings"],
 };
 
 export const INVENTORY_WRITE_ROLES: Role[] = ["superadmin", "admin", "staff"];

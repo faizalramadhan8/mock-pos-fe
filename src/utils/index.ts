@@ -118,7 +118,11 @@ export function printReceipt(order: Order, opts?: { cashierName?: string }) {
   @media print { body { width:${BODY_W}; } }
 </style></head><body>
   <div class="c">
-    <h2>${escapeHtml(name)}</h2>
+    <div style="display:inline-block;background:#C4302B;color:#fff;padding:2mm 3mm;border-radius:1.5mm;margin-bottom:1mm;line-height:1.1">
+      <div style="font-size:6px;letter-spacing:0.3px">Toko Bahan Kue</div>
+      <div style="font-size:14px;letter-spacing:1.2px;font-weight:900">SANTI</div>
+    </div>
+    <h2 style="color:#C4302B">${escapeHtml(name)}</h2>
     <p>${escapeHtml(addr)}</p>
     <p>${escapeHtml(phone)}</p>
   </div>

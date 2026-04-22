@@ -100,17 +100,48 @@ export const CategoryIconMap: Record<string, React.FC<IconProps>> = {
   flavor: FlavorIcon,
 };
 
-// Logo — served from /public/main_logo.jpeg. Size prop controls the rendered
-// pixel size; border-radius scales proportionally so it looks good at any size.
-export const BakeryLogo = ({ size = 40, className = "" }: { size?: number; className?: string }) => (
-  <img
-    src="/main_logo.jpeg"
-    alt="TBK Santi"
-    width={size}
-    height={size}
-    loading="eager"
-    decoding="async"
-    style={{ width: size, height: size, borderRadius: Math.round(size * 0.22) }}
-    className={`object-cover shrink-0 ${className}`}
-  />
-);
+// Logo — inline SVG badge matching the owner's reference (red rounded rectangle
+// with small top line "Toko Bahan Kue" and large bold "SANTI" below). The
+// `size` prop controls the HEIGHT; the width is ~1.4× that for a landscape
+// badge shape that fits the full "Toko Bahan Kue" line without cropping.
+export const BakeryLogo = ({ size = 40, className = "" }: { size?: number; className?: string }) => {
+  const height = size;
+  const width = Math.round(size * 1.4);
+  return (
+    <svg
+      width={width}
+      height={height}
+      viewBox="0 0 112 80"
+      xmlns="http://www.w3.org/2000/svg"
+      className={`shrink-0 ${className}`}
+      aria-label="Toko Bahan Kue Santi"
+      role="img"
+    >
+      <rect x="2" y="2" width="108" height="76" rx="14" fill="#C4302B" />
+      <text
+        x="56"
+        y="30"
+        textAnchor="middle"
+        fontFamily="Arial Narrow, Arial, sans-serif"
+        fontSize="14"
+        fontWeight="700"
+        fill="#FFFFFF"
+        letterSpacing="0.6"
+      >
+        Toko Bahan Kue
+      </text>
+      <text
+        x="56"
+        y="64"
+        textAnchor="middle"
+        fontFamily="Arial Narrow, Arial Black, sans-serif"
+        fontSize="32"
+        fontWeight="900"
+        fill="#FFFFFF"
+        letterSpacing="3"
+      >
+        SANTI
+      </text>
+    </svg>
+  );
+};

@@ -49,7 +49,7 @@ export const ProductCard = memo(function ProductCard({ product: p, inCart, lang,
             </span>
           )}
           {p.stock > 0 && p.stock <= p.minStock && (
-            <span className={`text-base font-black px-2.5 py-1 rounded-lg ${th.dark ? "bg-[#E89B48]/20 text-[#E89B48]" : "bg-orange-100 text-[#E89B48]"}`}>
+            <span className={`text-base font-black px-2.5 py-1 rounded-lg ${th.dark ? "bg-[#D4627A]/20 text-[#D4627A]" : "bg-red-100 text-[#D4627A]"}`}>
               {p.stock} {t.left}
             </span>
           )}

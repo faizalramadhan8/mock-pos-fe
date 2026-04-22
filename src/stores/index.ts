@@ -38,6 +38,7 @@ const mapSupplier = (s: any): Supplier => ({
 const mapOrderItem = (i: any): OrderItem => ({
   productId: i.product_id, name: i.name, quantity: i.quantity,
   unitType: i.unit_type || 'individual', unitPrice: i.unit_price,
+  purchasePrice: typeof i.purchase_price === 'number' ? i.purchase_price : undefined,
   regularPrice: typeof i.regular_price === 'number' ? i.regular_price : undefined,
   discountType: i.discount_type, discountValue: i.discount_value,
   discountAmount: i.discount_amount,
@@ -47,6 +48,7 @@ const mapOrder = (o: any): Order => ({
   id: o.id, items: (o.items || []).map(mapOrderItem),
   subtotal: o.subtotal, ppnRate: o.ppn_rate, ppn: o.ppn, total: o.total,
   payment: o.payment, status: o.status, customer: o.customer || '',
+  customerPhone: o.customer_phone || undefined,
   memberId: o.member_id || undefined,
   member: o.member ? { id: o.member.id, name: o.member.name, phone: o.member.phone } : undefined,
   memberSavings: o.member_savings || 0,
@@ -349,11 +351,13 @@ interface ActiveMember { id: string; name: string; phone: string; }
 interface CartState {
   items: CartItem[];
   customer: string;
+  customerPhone: string;
   payment: PaymentMethod;
   member: ActiveMember | null;
   orderDiscountType: DiscountType | null;
   orderDiscountValue: number;
   setCustomer: (n: string) => void;
+  setCustomerPhone: (p: string) => void;
   setPayment: (p: PaymentMethod) => void;
   setMember: (m: ActiveMember | null) => void;
   addItem: (product: Product, unitType: UnitType, lang: Lang) => void;
@@ -383,11 +387,13 @@ export const useCartStore = create<CartState>()(
     (set, get) => ({
       items: [],
       customer: "",
+      customerPhone: "",
       payment: "cash",
       member: null,
       orderDiscountType: null,
       orderDiscountValue: 0,
       setCustomer: (n) => set({ customer: n }),
+      setCustomerPhone: (p) => set({ customerPhone: p }),
       setPayment: (p) => set({ payment: p }),
       setMember: (m) => {
         const isMember = m !== null;
@@ -430,7 +436,7 @@ export const useCartStore = create<CartState>()(
         items: s.items.map(i => i.id === id ? { ...i, discountType: type || undefined, discountValue: type ? value : undefined } : i),
       })),
       setOrderDiscount: (type, value) => set({ orderDiscountType: type, orderDiscountValue: type ? value : 0 }),
-      clearCart: () => set({ items: [], customer: "", payment: "cash", member: null, orderDiscountType: null, orderDiscountValue: 0 }),
+      clearCart: () => set({ items: [], customer: "", customerPhone: "", payment: "cash", member: null, orderDiscountType: null, orderDiscountValue: 0 }),
       total: () => get().items.reduce((s, i) => s + i.unitPrice * i.quantity, 0),
       count: () => get().items.reduce((s, i) => s + i.quantity, 0),
     }),
@@ -470,7 +476,8 @@ export const useOrderStore = create<OrderState>((set, get) => ({
           discount_amount: i.discountAmount,
         })),
         subtotal: order.subtotal, ppn_rate: order.ppnRate, ppn: order.ppn, total: order.total,
-        payment: order.payment, customer: order.customer, member_id: order.memberId,
+        payment: order.payment, customer: order.customer, customer_phone: order.customerPhone,
+        member_id: order.memberId,
         payment_proof: order.paymentProof,
         order_discount_type: order.orderDiscountType, order_discount_value: order.orderDiscountValue,
         order_discount: order.orderDiscount,

@@ -88,6 +88,7 @@ export interface Order {
   payment: PaymentMethod;
   status: OrderStatus;
   customer: string;
+  customerPhone?: string;
   memberId?: string;
   member?: { id: string; name: string; phone: string };
   memberSavings?: number;
@@ -105,6 +106,7 @@ export interface OrderItem {
   quantity: number;
   unitType: UnitType;
   unitPrice: number;
+  purchasePrice?: number;
   regularPrice?: number;
   discountType?: DiscountType;
   discountValue?: number;

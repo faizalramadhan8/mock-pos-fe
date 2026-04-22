@@ -8,13 +8,13 @@ import { CategoryIconMap } from "@/components/icons";
 import { useThemeClasses } from "@/hooks/useThemeClasses";
 import { useDebounce } from "@/hooks/useDebounce";
 import { useBarcodeScanner } from "@/hooks/useBarcodeScanner";
-import { formatCurrency as $, printReceipt, compressImage, genId, formatTime } from "@/utils";
+import { formatCurrency as $, printReceipt, compressImage, genId, formatTime, printBarcodeLabel } from "@/utils";
 import { calcItemDiscount } from "@/utils/calc";
 import Barcode from "react-barcode";
 import type { PaymentMethod, UnitType, DiscountType, Product, Order, Member } from "@/types";
 import toast from "react-hot-toast";
 import {
-  Search, ScanLine, ShoppingBag, Minus, Plus, Trash2, ImagePlus, X, UserPlus, Tag, Percent, Wallet, FileText,
+  Search, ScanLine, ShoppingBag, Minus, Plus, Trash2, ImagePlus, X, UserPlus, Tag, Percent, Wallet, FileText, Printer, Barcode as BarcodeIcon,
 } from "lucide-react";
 
 export function POSPage() {
@@ -25,6 +25,8 @@ export function POSPage() {
   const adjustStock = useProductStore(s => s.adjustStock);
   const cartItems = useCartStore(s => s.items);
   const customer = useCartStore(s => s.customer);
+  const customerPhone = useCartStore(s => s.customerPhone);
+  const setCustomerPhone = useCartStore(s => s.setCustomerPhone);
   const payment = useCartStore(s => s.payment);
   const addItem = useCartStore(s => s.addItem);
   const updateQty = useCartStore(s => s.updateQty);
@@ -50,6 +52,7 @@ export function POSPage() {
   const [query, setQuery] = useState("");
   const PAGE_SIZE = 60;
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const [shiftDetailOpen, setShiftDetailOpen] = useState(false);
   const [discountItemId, setDiscountItemId] = useState<string | null>(null);
   const [discountInput, setDiscountInput] = useState("");
   const [discountMode, setDiscountMode] = useState<DiscountType>("percent");
@@ -84,6 +87,10 @@ export function POSPage() {
   const [openRegisterOpen, setOpenRegisterOpen] = useState(false);
   const [openingCashInput, setOpeningCashInput] = useState("");
   const [orderHistoryOpen, setOrderHistoryOpen] = useState(false);
+  const [labelModalOpen, setLabelModalOpen] = useState(false);
+  const [labelSearch, setLabelSearch] = useState("");
+  const labelWidth = useSettingsStore(s => s.labelWidth);
+  const labelHeight = useSettingsStore(s => s.labelHeight);
   const searchRef = useRef<HTMLInputElement>(null);
 
   // Keyboard shortcut: "/" to focus search
@@ -302,7 +309,7 @@ export function POSPage() {
         memberId: activeMember.id,
         member: activeMember,
         memberSavings: totalSavings,
-      } : {}),
+      } : (customerPhone.trim() ? { customerPhone: customerPhone.trim() } : {})),
       createdAt: new Date().toISOString(), createdBy: user.id,
       ...((payment === "qris" || payment === "transfer") && proofImage ? { paymentProof: proofImage } : {}),
       ...(orderDiscountType ? { orderDiscountType, orderDiscountValue, orderDiscount: orderDiscAmount } : {}),
@@ -355,6 +362,16 @@ export function POSPage() {
           placeholder={activeMember ? "Tambah catatan pelanggan…" : (t.searchMemberPhone as string || t.searchMember as string)}
           className={`w-full px-4 py-3 text-sm rounded-2xl border ${th.inp}`}
         />
+        {!activeMember && customer && !showMemberDropdown && (
+          <input
+            value={customerPhone}
+            onChange={e => setCustomerPhone(e.target.value)}
+            placeholder="Nomor HP (untuk kirim struk via WhatsApp, opsional)"
+            type="tel"
+            inputMode="tel"
+            className={`w-full mt-2 px-4 py-3 text-sm rounded-2xl border ${th.inp}`}
+          />
+        )}
         {showMemberDropdown && (
           <div className={`absolute top-full left-0 right-0 z-20 mt-1 rounded-xl border shadow-lg overflow-hidden ${th.card} ${th.bdr}`}>
             {filteredMembers.length > 0 && filteredMembers.map(m => (
@@ -620,6 +637,10 @@ export function POSPage() {
           className={`shrink-0 flex items-center justify-center w-11 py-3 rounded-2xl text-xs font-bold border ${th.bdr} ${th.txm}`}>
           <FileText size={14} />
         </button>
+        <button onClick={() => setLabelModalOpen(true)} aria-label="Cetak Label"
+          className={`shrink-0 flex items-center justify-center w-11 py-3 rounded-2xl text-xs font-bold border ${th.bdr} ${th.txm}`}>
+          <BarcodeIcon size={14} />
+        </button>
         {canManageRegister && (
           <button onClick={() => setCloseRegisterOpen(true)} aria-label={t.closeRegister as string}
             className={`shrink-0 flex items-center justify-center gap-1.5 w-11 sm:w-auto sm:px-3.5 py-3 rounded-2xl text-xs font-bold border ${th.bdr} ${th.txm}`}>
@@ -627,6 +648,79 @@ export function POSPage() {
           </button>
         )}
         </div>
+
+        {/* Shift summary — only this cashier's orders this shift (or today) */}
+        {(() => {
+          const sessionStart = activeSession
+            ? new Date(activeSession.openedAt)
+            : (() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), d.getDate()); })();
+          const mine = allOrders.filter(o =>
+            o.status === "completed" && o.createdBy === user.id && new Date(o.createdAt) >= sessionStart
+          );
+          const byMethod = { cash: 0, qris: 0, transfer: 0, card: 0 } as Record<string, number>;
+          mine.forEach(o => { byMethod[o.payment] = (byMethod[o.payment] || 0) + o.total; });
+          const total = mine.reduce((s, o) => s + o.total, 0);
+          // Aggregate items sold this shift
+          const itemsMap = new Map<string, { name: string; qty: number; total: number }>();
+          mine.forEach(o => {
+            (o.items || []).forEach(it => {
+              const key = it.productId || it.name;
+              const prev = itemsMap.get(key) || { name: it.name, qty: 0, total: 0 };
+              prev.qty += it.quantity;
+              prev.total += it.unitPrice * it.quantity;
+              itemsMap.set(key, prev);
+            });
+          });
+          const itemsSold = Array.from(itemsMap.values()).sort((a, b) => b.qty - a.qty);
+          return (
+            <div className={`rounded-[18px] border p-3.5 mb-5 ${th.card2} ${th.bdr}`}>
+              <div className="flex items-center justify-between mb-2">
+                <p className={`text-sm font-extrabold ${th.tx}`}>
+                  {activeSession ? "Shift Ini" : "Hari Ini"} · {mine.length} transaksi
+                </p>
+                <p className={`text-base font-black ${th.acc}`}>{$(total)}</p>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <div className={`rounded-xl px-2 py-1.5 text-center ${th.dark ? "bg-[#4A8B3F]/10" : "bg-green-50"}`}>
+                  <p className={`text-xs font-semibold text-[#4A8B3F]`}>Tunai</p>
+                  <p className={`text-sm font-black text-[#4A8B3F]`}>{$(byMethod.cash || 0)}</p>
+                </div>
+                <div className={`rounded-xl px-2 py-1.5 text-center ${th.dark ? "bg-[#60A5FA]/10" : "bg-blue-50"}`}>
+                  <p className={`text-xs font-semibold ${th.acc}`}>QRIS</p>
+                  <p className={`text-sm font-black ${th.acc}`}>{$(byMethod.qris || 0)}</p>
+                </div>
+                <div className={`rounded-xl px-2 py-1.5 text-center ${th.dark ? "bg-[#E89B48]/10" : "bg-orange-50"}`}>
+                  <p className={`text-xs font-semibold text-[#E89B48]`}>Transfer</p>
+                  <p className={`text-sm font-black text-[#E89B48]`}>{$((byMethod.transfer || 0) + (byMethod.card || 0))}</p>
+                </div>
+              </div>
+              {itemsSold.length > 0 && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setShiftDetailOpen(v => !v)}
+                    className={`mt-2.5 w-full text-xs font-bold py-1.5 rounded-lg border ${th.bdr} ${th.txm}`}
+                  >
+                    {shiftDetailOpen ? "Tutup Rincian" : `Lihat Rincian Barang (${itemsSold.length})`}
+                  </button>
+                  {shiftDetailOpen && (
+                    <div className={`mt-2 border rounded-xl overflow-hidden max-h-60 overflow-y-auto ${th.bdr}`}>
+                      {itemsSold.map((it, idx) => (
+                        <div key={idx} className={`flex items-center justify-between px-3 py-2 border-b last:border-0 ${th.bdrSoft}`}>
+                          <div className="min-w-0 flex-1 mr-2">
+                            <p className={`text-xs font-bold truncate ${th.tx}`}>{it.name}</p>
+                            <p className={`text-xs ${th.txm}`}>{it.qty}× · {$(it.total)}</p>
+                          </div>
+                          <span className={`text-sm font-black shrink-0 ${th.acc}`}>{it.qty}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          );
+        })()}
 
         {/* Category pills with fade gradient */}
         <div className="relative mb-5">
@@ -905,6 +999,55 @@ export function POSPage() {
         )}
       </Modal>
       {/* Order History modal */}
+      <Modal open={labelModalOpen} onClose={() => { setLabelModalOpen(false); setLabelSearch(""); }} title="Cetak Label Barcode">
+        <div className="flex flex-col gap-3">
+          <div className="relative">
+            <Search size={16} className={`absolute left-3 top-1/2 -translate-y-1/2 ${th.txf}`} />
+            <input autoFocus value={labelSearch} onChange={e => setLabelSearch(e.target.value)}
+              placeholder="Cari nama / SKU / barcode…"
+              className={`w-full pl-10 pr-3 py-3 text-sm rounded-2xl border ${th.inp}`} />
+          </div>
+          <p className={`text-xs ${th.txm}`}>
+            Ukuran label: {labelWidth}mm × {labelHeight}mm · Pilih produk untuk cetak 1 label.
+          </p>
+          <div className={`border rounded-2xl overflow-hidden max-h-[50vh] overflow-y-auto ${th.bdr}`}>
+            {(() => {
+              const q = labelSearch.trim().toLowerCase();
+              const list = q
+                ? products.filter(p =>
+                    p.isActive && (
+                      p.name.toLowerCase().includes(q) ||
+                      p.nameId.toLowerCase().includes(q) ||
+                      p.sku.toLowerCase().includes(q) ||
+                      (p.barcode || "").toLowerCase().includes(q)
+                    ))
+                : products.filter(p => p.isActive).slice(0, 50);
+              if (list.length === 0) {
+                return <p className={`text-sm text-center py-6 ${th.txf}`}>Tidak ada produk</p>;
+              }
+              return list.map(p => (
+                <div key={p.id} className={`flex items-center justify-between gap-3 px-3 py-2.5 border-b last:border-0 ${th.bdrSoft}`}>
+                  <div className="min-w-0 flex-1">
+                    <p className={`text-sm font-bold truncate ${th.tx}`}>{lang === "id" ? p.nameId : p.name}</p>
+                    <p className={`text-xs font-mono ${th.txf}`}>{p.sku}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      printBarcodeLabel(p, lang, { width: labelWidth, height: labelHeight });
+                      toast.success("Label dicetak");
+                    }}
+                    className={`shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-[#60A5FA] to-[#1E40AF]`}
+                  >
+                    <Printer size={12} /> Cetak
+                  </button>
+                </div>
+              ));
+            })()}
+          </div>
+        </div>
+      </Modal>
+
       <Modal open={orderHistoryOpen} onClose={() => setOrderHistoryOpen(false)} title={t.orderHistory as string}>
         <div className="flex flex-col gap-2">
           {sessionOrders.length === 0 ? (

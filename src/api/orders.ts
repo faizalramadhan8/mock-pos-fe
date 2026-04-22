@@ -7,6 +7,7 @@ export interface OrderItemRes {
   quantity: number;
   unit_type: string;
   unit_price: number;
+  purchase_price?: number;
   regular_price?: number;
   discount_type?: string;
   discount_value?: number;
@@ -23,6 +24,7 @@ export interface OrderRes {
   payment: string;
   status: string;
   customer?: string;
+  customer_phone?: string;
   member_id?: string;
   member?: { id: string; name: string; phone: string };
   member_savings?: number;
@@ -85,6 +87,7 @@ export const orderApi = {
     total: number;
     payment: string;
     customer?: string;
+    customer_phone?: string;
     member_id?: string;
     payment_proof?: string;
     order_discount_type?: string;
