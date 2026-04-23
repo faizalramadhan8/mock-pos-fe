@@ -53,9 +53,10 @@ export function useNotifications(): AppNotification[] {
       });
     });
 
-    // Expiring soon (within 14 days)
-    const in14Days = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
-    batches.filter(b => b.quantity > 0 && b.expiryDate && new Date(b.expiryDate) > now && new Date(b.expiryDate) <= in14Days).forEach(b => {
+    // Expiring soon (within 30 days — owner request: notifikasi 1 bulan
+    // sebelum tanggal kadaluarsa, misal ED 18 Juni → notif mulai 18 Mei).
+    const in30Days = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+    batches.filter(b => b.quantity > 0 && b.expiryDate && new Date(b.expiryDate) > now && new Date(b.expiryDate) <= in30Days).forEach(b => {
       const product = products.find(p => p.id === b.productId);
       const daysLeft = Math.ceil((new Date(b.expiryDate).getTime() - now.getTime()) / (24 * 60 * 60 * 1000));
       notifs.push({

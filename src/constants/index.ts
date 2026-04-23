@@ -16,7 +16,19 @@ export const INVENTORY_WRITE_ROLES: Role[] = ["superadmin", "admin", "staff"];
 
 export const UNIT_OPTIONS: UnitOfMeasure[] = ["kg","gr","ltr","ml","pcs","pack","btl","can","bar","blk","tray","sachet"];
 
-export const PAYMENT_TERMS_OPTIONS: PaymentTerms[] = ["COD","NET30","NET60","NET90"];
+// Payment terms untuk catat faktur barang masuk (Santi: Cash / 1 minggu /
+// 2 minggu / 1 bulan). NET60/NET90 tidak ditawarkan lagi tapi tetap ada di
+// type agar baca data lama tidak error.
+export const PAYMENT_TERMS_OPTIONS: PaymentTerms[] = ["COD","NET7","NET14","NET30"];
+
+export const PAYMENT_TERMS_LABELS: Record<PaymentTerms, string> = {
+  COD: "Cash",
+  NET7: "Tempo 1 Minggu",
+  NET14: "Tempo 2 Minggu",
+  NET30: "Tempo 1 Bulan",
+  NET60: "Tempo 2 Bulan",
+  NET90: "Tempo 3 Bulan",
+};
 
 export const CATEGORY_SKU_PREFIX: Record<string, string> = {
   c1: "FLR", c2: "SUG", c3: "DRY", c4: "CHO",

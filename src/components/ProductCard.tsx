@@ -65,11 +65,11 @@ export const ProductCard = memo(function ProductCard({ product: p, inCart, lang,
           )}
         </div>
 
-        {/* Product name — hero, up to 2 lines, word-break so long names
-            never truncate mid-character. Minimum height reserves 2 lines so
-            cards in the same row stay aligned even when one name is short. */}
+        {/* Product name — hero, pink (brand color) and same display size as
+            the price. Owner preference: eye should hit the product name
+            first, price second. Size parity makes both scannable. */}
         <p
-          className={`font-display text-[17px] font-black leading-[1.2] tracking-tight ${th.tx}`}
+          className={`font-display text-[22px] font-black leading-[1.15] tracking-tight ${th.acc}`}
           style={{
             fontVariationSettings: '"wght" 900',
             display: "-webkit-box",
@@ -77,18 +77,17 @@ export const ProductCard = memo(function ProductCard({ product: p, inCart, lang,
             WebkitBoxOrient: "vertical",
             overflow: "hidden",
             overflowWrap: "anywhere",
-            minHeight: "calc(17px * 1.2 * 2)",
+            minHeight: "calc(22px * 1.15 * 2)",
           }}
         >
           {lang === "id" ? p.nameId : p.name}
         </p>
 
-        {/* Price — single-line wrap-capable; number always intact on its own
-            line if needed. No truncate on the number itself — the full
-            Rupiah must always be readable. */}
+        {/* Price — warm ink (black-ish), same size as name. No truncate on
+            the number itself — the full Rupiah must always be readable. */}
         <div className="flex items-baseline flex-wrap gap-x-1.5 gap-y-0">
           <span
-            className={`font-display text-[22px] font-black tracking-tight leading-none ${th.acc}`}
+            className={`font-display text-[22px] font-black tracking-tight leading-none ${th.tx}`}
             style={{ fontVariationSettings: '"wght" 800', whiteSpace: "nowrap" }}
           >
             {$(p.sellingPrice)}

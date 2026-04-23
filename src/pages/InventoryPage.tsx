@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { useCategoryStore, useProductStore, useInventoryStore, useBatchStore, useAuthStore, useLangStore, useSupplierStore, useSettingsStore } from "@/stores";
-import { INVENTORY_WRITE_ROLES, UNIT_OPTIONS, PAYMENT_TERMS_OPTIONS } from "@/constants";
+import { INVENTORY_WRITE_ROLES, UNIT_OPTIONS, PAYMENT_TERMS_OPTIONS, PAYMENT_TERMS_LABELS } from "@/constants";
 import { Modal } from "@/components/Modal";
 import { ProductImage } from "@/components/ProductImage";
 import { ProductDetailModal } from "@/components/ProductDetailModal";
@@ -74,6 +74,7 @@ export function InventoryPage() {
     name: "", nameId: "", sku: "", category: defaultCatId, supplier: "",
     purchasePrice: "", sellingPrice: "", memberPrice: "",
     qtyPerBox: "12", stock: "0", unit: "kg" as UnitOfMeasure, image: "", minStock: "10",
+    expiryDate: "",
   });
   const [addCatOpen, setAddCatOpen] = useState(false);
   const [newCat, setNewCat] = useState({ name: "", nameId: "", color: "#F472B6" });
@@ -99,6 +100,8 @@ export function InventoryPage() {
     name: "", nameId: "", sku: "", category: defaultCatId, supplier: "",
     purchasePrice: "", sellingPrice: "", memberPrice: "",
     qtyPerBox: "12", stock: "0", unit: "kg" as UnitOfMeasure, image: "", minStock: "10",
+    expiryDate: "", // ED baru; kalau diisi → auto-bikin batch tambahan
+    addStock: "",  // qty yang mau ditambahkan ke stok + batch baru
   });
 
   // Supplier modal state
@@ -196,20 +199,36 @@ export function InventoryPage() {
     if (Object.keys(errs).length) { setProdFormErrors(errs); return; }
     setProdFormErrors({});
     const memberPriceVal = parseInt(newProd.memberPrice);
+    const prodId = genId();
+    const stockQty = parseInt(newProd.stock) || 0;
     addProduct({
-      id: genId(), sku: newProd.sku, name: newProd.name, nameId: newProd.nameId,
+      id: prodId, sku: newProd.sku, name: newProd.name, nameId: newProd.nameId,
       category: newProd.category,
       ...(newProd.supplier ? { supplierId: newProd.supplier } : {}),
       purchasePrice: parseInt(newProd.purchasePrice) || 0,
       sellingPrice: parseInt(newProd.sellingPrice) || 0,
       ...(Number.isFinite(memberPriceVal) && memberPriceVal > 0 ? { memberPrice: memberPriceVal } : {}),
       qtyPerBox: parseInt(newProd.qtyPerBox) || 12,
-      stock: parseInt(newProd.stock) || 0, unit: newProd.unit,
+      stock: stockQty, unit: newProd.unit,
       image: newProd.image || "", minStock: parseInt(newProd.minStock) || 10, isActive: true,
       createdAt: new Date().toISOString(),
     });
+    // Auto-create an initial batch if ED + stock provided — so the expiry
+    // notification (Dashboard + NotificationBell) works even when owner
+    // inputs stock via Add Product instead of the Stock In tab.
+    if (newProd.expiryDate && stockQty > 0) {
+      addBatch({
+        id: genId(),
+        productId: prodId,
+        quantity: stockQty,
+        expiryDate: newProd.expiryDate,
+        receivedAt: new Date().toISOString(),
+        note: "Initial stock",
+        batchNumber: genBatchNumber(),
+      });
+    }
     setAddProdOpen(false);
-    setNewProd({ name: "", nameId: "", sku: "", category: defaultCatId, supplier: "", purchasePrice: "", sellingPrice: "", memberPrice: "", qtyPerBox: "12", stock: "0", unit: "kg", image: "", minStock: "10" });
+    setNewProd({ name: "", nameId: "", sku: "", category: defaultCatId, supplier: "", purchasePrice: "", sellingPrice: "", memberPrice: "", qtyPerBox: "12", stock: "0", unit: "kg", image: "", minStock: "10", expiryDate: "" });
     setProdFormErrors({});
     toast.success(t.productAdded as string);
   };
@@ -224,6 +243,7 @@ export function InventoryPage() {
       purchasePrice: String(p.purchasePrice), sellingPrice: String(p.sellingPrice),
       memberPrice: typeof p.memberPrice === "number" && p.memberPrice > 0 ? String(p.memberPrice) : "",
       qtyPerBox: String(p.qtyPerBox), stock: String(p.stock), unit: p.unit, image: p.image, minStock: String(p.minStock),
+      expiryDate: "", addStock: "",
     });
     setEditProdOpen(true);
   };
@@ -233,6 +253,13 @@ export function InventoryPage() {
     const memberPriceVal = parseInt(editProd.memberPrice);
     // 0 (or invalid) signals BE to clear member_price; positive number sets it
     const memberPriceToSend = Number.isFinite(memberPriceVal) && memberPriceVal > 0 ? memberPriceVal : 0;
+    // If owner enters an "addStock" + new ED, we treat it as a new batch
+    // (not a stock override). Base stock += addStock, and a fresh batch row
+    // is created so FIFO picks up the new expiry date. This avoids the
+    // confusion of "which batch does the edited ED belong to?".
+    const addQty = parseInt(editProd.addStock) || 0;
+    const baseStock = parseInt(editProd.stock) || 0;
+    const finalStock = baseStock + addQty;
     updateProduct(editProdId, {
       name: editProd.name, nameId: editProd.nameId, sku: editProd.sku,
       category: editProd.category,
@@ -241,8 +268,19 @@ export function InventoryPage() {
       sellingPrice: parseInt(editProd.sellingPrice) || 0,
       memberPrice: memberPriceToSend,
       qtyPerBox: parseInt(editProd.qtyPerBox) || 12,
-      stock: parseInt(editProd.stock) || 0, unit: editProd.unit, image: editProd.image || "", minStock: parseInt(editProd.minStock) || 10,
+      stock: finalStock, unit: editProd.unit, image: editProd.image || "", minStock: parseInt(editProd.minStock) || 10,
     });
+    if (editProd.expiryDate && addQty > 0) {
+      addBatch({
+        id: genId(),
+        productId: editProdId,
+        quantity: addQty,
+        expiryDate: editProd.expiryDate,
+        receivedAt: new Date().toISOString(),
+        note: "Tambahan dari Edit Produk",
+        batchNumber: genBatchNumber(),
+      });
+    }
     setEditProdOpen(false);
     setEditProdId(null);
     toast.success(t.productUpdated as string);
@@ -732,20 +770,42 @@ export function InventoryPage() {
         </>
       )}
 
-      {/* ======= STOCK IN TAB ======= */}
+      {/* ======= STOCK IN / FAKTUR MASUK TAB ======= */}
       {activeTab === "stockIn" && (
         <>
           {canWrite && (
             <button onClick={() => { setStockModal("in"); setForm({ prod: "", qty: "", unit: "individual", price: "", note: "", expiryDate: "", supplierId: "", paymentTerms: "COD", paymentStatus: "unpaid" }); }}
-              className="w-full py-3 rounded-2xl text-sm font-bold text-white bg-[#E11D48] flex items-center justify-center gap-2">
-              <ArrowDownCircle size={16} /> {t.stockIn}
+              className="w-full py-3.5 rounded-2xl text-sm font-black text-white bg-gradient-to-br from-[#FB7185] to-[#E11D48] shadow-[0_4px_14px_-4px_rgba(225,29,72,0.45)] flex items-center justify-center gap-2">
+              <ArrowDownCircle size={16} strokeWidth={3} /> Catat Faktur Barang Masuk
             </button>
           )}
-          <div className={`rounded-[18px] border p-3.5 ${th.card} ${th.bdr}`}>
-            <p className={`text-xs font-semibold uppercase tracking-wider ${th.txm}`}>{t.totalIn}</p>
-            <p className="text-xl font-black mt-1 text-[#E11D48]">+{totalInCount}</p>
-          </div>
+          {/* Summary ringkas: total barang masuk + total faktur belum lunas */}
+          {(() => {
+            const unpaidCount = unpaidInvoices.length;
+            const unpaidTotal = unpaidInvoices.reduce((s, m) => s + m.unitPrice * m.quantity, 0);
+            return (
+              <div className="grid grid-cols-2 gap-3">
+                <div className={`rounded-[18px] border p-4 ${th.card} ${th.bdr}`}>
+                  <p className={`text-xs font-semibold uppercase tracking-wider ${th.txm}`}>Total Barang Masuk</p>
+                  <p className={`font-display text-2xl font-black mt-1 leading-none ${th.tx}`} style={{ fontVariationSettings: '"wght" 900' }}>
+                    +{totalInCount}
+                  </p>
+                  <p className={`text-xs mt-1 ${th.txf}`}>item sepanjang waktu</p>
+                </div>
+                <div className={`rounded-[18px] border p-4 ${th.card} ${th.bdr}`}>
+                  <p className={`text-xs font-semibold uppercase tracking-wider ${th.txm}`}>Faktur Belum Lunas</p>
+                  <p className={`font-display text-2xl font-black mt-1 leading-none ${unpaidCount > 0 ? "text-[#BE123C]" : th.tx}`} style={{ fontVariationSettings: '"wght" 900' }}>
+                    {$(unpaidTotal)}
+                  </p>
+                  <p className={`text-xs mt-1 ${th.txf}`}>{unpaidCount} faktur</p>
+                </div>
+              </div>
+            );
+          })()}
           <div className={`rounded-[22px] border overflow-hidden ${th.card} ${th.bdr}`}>
+            <div className={`px-5 py-3.5 border-b ${th.bdr}`}>
+              <p className={`text-sm font-extrabold tracking-tight ${th.tx}`}>Riwayat Faktur Masuk</p>
+            </div>
             {renderMovementList(stockInMovements, showAllIn, setShowAllIn, stockInMovements.length)}
           </div>
         </>
@@ -984,7 +1044,7 @@ export function InventoryPage() {
                         <button key={pt} onClick={() => setForm({ ...form, paymentTerms: pt })}
                           className={`py-2 rounded-xl text-xs font-bold ${
                             form.paymentTerms === pt ? "text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48]" : `border ${th.bdr} ${th.txm}`
-                          }`}>{pt}</button>
+                          }`}>{PAYMENT_TERMS_LABELS[pt]}</button>
                       ))}
                     </div>
                   </div>
@@ -1189,6 +1249,20 @@ export function InventoryPage() {
                 className={inp} min="0" />
             </div>
           </div>
+          {/* Tanggal Kadaluarsa — optional. Kalau diisi + Stok Awal > 0,
+              sistem auto-bikin batch dengan ED itu sehingga notifikasi
+              "Segera Kadaluarsa" trigger 30 hari sebelum tanggal. */}
+          <div>
+            <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>
+              Tanggal Kadaluarsa <span className={`font-normal ${th.txm}`}>(opsional)</span>
+            </p>
+            <input type="date" value={newProd.expiryDate}
+              onChange={e => setNewProd({ ...newProd, expiryDate: e.target.value })}
+              className={inp} />
+            <p className={`text-xs mt-1 ${th.txf}`}>
+              Notifikasi otomatis muncul 30 hari sebelum tanggal ini.
+            </p>
+          </div>
           <div className="flex gap-2 mt-1">
             <button onClick={() => setAddProdOpen(false)} className={`flex-1 py-3 rounded-2xl text-sm font-bold border ${th.bdr} ${th.txm}`}>{t.cancel}</button>
             <button onClick={doAddProduct} disabled={!newProd.name || !newProd.nameId || !newProd.sku}
@@ -1367,7 +1441,7 @@ export function InventoryPage() {
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>{lang === "id" ? "Stok" : "Stock"}</p>
+              <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>{lang === "id" ? "Stok Saat Ini" : "Current Stock"}</p>
               <input type="number" value={editProd.stock} onChange={e => setEditProd({ ...editProd, stock: e.target.value })}
                 className={inp} min="0" />
             </div>
@@ -1377,6 +1451,33 @@ export function InventoryPage() {
                 className={inp} min="0" />
             </div>
           </div>
+
+          {/* Tambah Stok + ED baru — untuk barang yang baru datang dengan
+              ED berbeda. Sistem bikin batch baru, stok total ditambah
+              otomatis. "Stok Saat Ini" di atas tidak perlu diubah manual. */}
+          <div className={`rounded-xl border p-3.5 ${th.bdr} bg-[#FFE4E9]/30`}>
+            <p className={`text-xs font-bold mb-2 ${th.acc}`}>
+              + Tambah Stok Baru dengan ED
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <p className={`text-xs font-semibold mb-1 ${th.txm}`}>Jumlah tambahan</p>
+                <input type="number" value={editProd.addStock}
+                  onChange={e => setEditProd({ ...editProd, addStock: e.target.value })}
+                  placeholder="0" className={inp} min="0" />
+              </div>
+              <div>
+                <p className={`text-xs font-semibold mb-1 ${th.txm}`}>Tanggal Kadaluarsa</p>
+                <input type="date" value={editProd.expiryDate}
+                  onChange={e => setEditProd({ ...editProd, expiryDate: e.target.value })}
+                  className={inp} />
+              </div>
+            </div>
+            <p className={`text-xs mt-2 ${th.txf}`}>
+              Kalau diisi, stok akan ditambah <b>{parseInt(editProd.addStock) || 0}</b> dan dibuat batch baru dengan ED itu. Notifikasi muncul 30 hari sebelumnya.
+            </p>
+          </div>
+
           <div className="flex gap-2 mt-1">
             <button onClick={() => setEditProdOpen(false)} className={`flex-1 py-3 rounded-2xl text-sm font-bold border ${th.bdr} ${th.txm}`}>{t.cancel}</button>
             <button onClick={doEditProduct} disabled={!editProd.name || !editProd.nameId || !editProd.sku}
