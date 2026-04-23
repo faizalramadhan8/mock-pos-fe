@@ -14,7 +14,7 @@ import type { UnitType, StockType, StockMovement, PaymentTerms, PaymentStatus, U
 import toast from "react-hot-toast";
 import {
   Package, Plus, ChevronDown, ArrowDownCircle, ArrowUpCircle, Barcode,
-  LayoutGrid, Clock, AlertTriangle, Truck, X, Check, Receipt, Pencil, Download, Search, Printer, Trash2,
+  LayoutGrid, AlertTriangle, Truck, Check, Receipt, Pencil, Download, Search, Printer, Trash2,
 } from "lucide-react";
 
 type InventoryTab = "overview" | "stockIn" | "stockOut" | "expiry" | "history" | "suppliers";
@@ -112,7 +112,6 @@ export function InventoryPage() {
     { id: "stockIn", label: t.invStockIn as string, icon: <ArrowDownCircle size={14} /> },
     { id: "stockOut", label: t.invStockOut as string, icon: <ArrowUpCircle size={14} /> },
     { id: "expiry", label: t.invExpiry as string, icon: <AlertTriangle size={14} /> },
-    { id: "history", label: t.invHistory as string, icon: <Clock size={14} /> },
     { id: "suppliers", label: t.invSuppliers as string, icon: <Truck size={14} /> },
   ];
 
@@ -421,18 +420,6 @@ export function InventoryPage() {
               </button>
             </>
           )}
-          {activeTab === "history" && (
-            <>
-              <button onClick={async () => { await exportInventory(movements, products, "csv"); toast.success(t.exportSuccess as string); }}
-                className={`flex items-center gap-1 px-2 py-1.5 rounded-xl text-xs font-bold ${th.elev} ${th.txm}`}>
-                <Download size={11} /> CSV
-              </button>
-              <button onClick={async () => { await exportInventory(movements, products, "xlsx"); toast.success(t.exportSuccess as string); }}
-                className={`flex items-center gap-1 px-2 py-1.5 rounded-xl text-xs font-bold ${th.elev} ${th.txm}`}>
-                <Download size={11} /> Excel
-              </button>
-            </>
-          )}
         </div>
       </div>
 
@@ -453,16 +440,19 @@ export function InventoryPage() {
         <div className={`absolute right-0 top-0 bottom-1 w-8 pointer-events-none bg-gradient-to-l ${th.dark ? "from-[#140B0F]" : "from-[#FBE8EE]"}`} />
       </div>
 
-      {/* Admin-only action buttons */}
+      {/* Admin-only action buttons — Tambah Produk is the primary action
+          (solid pink, larger-weight), Tambah Kategori is secondary (outline
+          pink). Previously both were equal-weight dashed outlines which
+          buried the main CTA. */}
       {canWrite && activeTab === "overview" && (
-        <div className="grid grid-cols-2 gap-2.5">
+        <div className="grid grid-cols-[1.5fr_1fr] gap-2.5">
           <button onClick={() => { const catId = categories.length > 0 ? categories[0].id : ""; setNewProd(p => ({ ...p, category: catId, sku: generateSku(catId, products, categories) })); setAddProdOpen(true); }}
-            className={`py-3 rounded-2xl text-sm font-bold border-2 border-dashed flex items-center justify-center gap-2 ${th.bdr} ${th.acc}`}>
-            <Plus size={16} /> {t.addProduct}
+            className="press-spring py-3 rounded-2xl text-sm font-black flex items-center justify-center gap-2 text-white bg-gradient-to-br from-[#FB7185] to-[#E11D48] shadow-[0_4px_14px_-4px_rgba(225,29,72,0.45)]">
+            <Plus size={16} strokeWidth={3} /> {t.addProduct}
           </button>
           <button onClick={() => setAddCatOpen(true)}
-            className={`py-3 rounded-2xl text-sm font-bold border-2 border-dashed flex items-center justify-center gap-2 ${th.bdr} ${th.txm}`}>
-            <Plus size={16} /> {t.addCategory}
+            className={`press-spring py-3 rounded-2xl text-sm font-bold border-2 border-[#FFB5C0] flex items-center justify-center gap-2 ${th.acc}`}>
+            <Plus size={16} strokeWidth={2.5} /> {t.addCategory}
           </button>
         </div>
       )}
@@ -521,31 +511,40 @@ export function InventoryPage() {
             );
           })()}
 
-          {/* Stats */}
-          <div className="grid grid-cols-5 gap-2">
-            {[
-              { l: t.all, v: products.length, clr: "#E11D48", f: "all" as const },
-              { l: t.lowStock, v: lowStockCount, clr: "#E11D48", f: "low" as const },
-              { l: t.outOfStock, v: outOfStockCount, clr: "#C4504A", f: "out" as const },
-              { l: t.inactive, v: inactiveCount, clr: "#A98C94", f: "inactive" as const },
-              { l: "💎 Member", v: memberPriceCount, clr: "#E11D48", f: "member" as const },
-            ].map(s => (
-              <button key={s.f} onClick={() => setOverviewFilter(s.f)}
-                className={`rounded-[14px] border p-2.5 text-left transition-all ${
-                  overviewFilter === s.f ? `ring-2 ring-[${s.clr}]/30` : ""
-                } ${th.card} ${th.bdr}`}>
-                <p className={`text-xs font-semibold uppercase tracking-wider ${th.txm}`}>{s.l}</p>
-                <p className="text-lg font-black mt-0.5" style={{ color: s.clr }}>{s.v}</p>
-              </button>
-            ))}
-          </div>
-
           {/* Product search */}
           <div className="relative">
             <Search size={16} className={`absolute left-3.5 top-1/2 -translate-y-1/2 ${th.txf}`} />
             <input value={productSearch} onChange={e => setProductSearch(e.target.value)}
               placeholder={t.searchProducts as string}
               className={`w-full pl-10 pr-4 py-3 text-sm rounded-2xl border focus:outline-none focus:ring-2 focus:ring-[#E11D48]/20 font-medium ${th.inp}`} />
+          </div>
+
+          {/* Filter chips — compact, inline with count badges. Replaces the
+              5-tile stats grid which was cramped on mobile and mixed two
+              concerns (display + filter). Now: filter only. */}
+          <div className="flex flex-wrap gap-1.5">
+            {[
+              { l: t.all as string, v: products.length, f: "all" as const },
+              { l: t.lowStock as string, v: lowStockCount, f: "low" as const, alert: lowStockCount > 0 },
+              { l: t.outOfStock as string, v: outOfStockCount, f: "out" as const, alert: outOfStockCount > 0 },
+              { l: t.inactive as string, v: inactiveCount, f: "inactive" as const },
+              { l: "Punya Harga Member", v: memberPriceCount, f: "member" as const },
+            ].map(s => {
+              const active = overviewFilter === s.f;
+              return (
+                <button key={s.f} onClick={() => setOverviewFilter(s.f)}
+                  className={`shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-bold transition-all ${
+                    active
+                      ? "text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48]"
+                      : `border ${th.bdr} ${s.alert ? "text-[#BE123C]" : th.txm}`
+                  }`}>
+                  <span>{s.l}</span>
+                  <span className={`text-xs font-mono ${
+                    active ? "bg-white/25 px-1.5 py-0.5 rounded-md" : "opacity-70"
+                  }`}>{s.v}</span>
+                </button>
+              );
+            })}
           </div>
 
           {/* Product list */}
@@ -652,7 +651,7 @@ export function InventoryPage() {
                         : th.tx
                     }`} style={{ fontVariationSettings: '"opsz" 72, "wght" 800' }}>
                       {product.stock}
-                      <span className={`text-xs font-bold ml-1 ${th.txm}`}>{product.unit}</span>
+                      <span className={`text-xs font-bold ml-1 ${th.txm}`}>Stok</span>
                     </p>
                     <span className={`inline-block mt-1 text-xs font-bold px-2.5 py-1 rounded-lg ${
                       product.stock === 0 || product.stock <= product.minStock
@@ -823,30 +822,6 @@ export function InventoryPage() {
               })}
             </div>
           )}
-        </>
-      )}
-
-      {/* ======= HISTORY TAB ======= */}
-      {activeTab === "history" && (
-        <>
-          <div className="grid grid-cols-3 gap-3">
-            {[
-              { l: t.totalIn, v: `+${totalInCount}`, clr: "#E11D48" },
-              { l: t.totalOut, v: `-${totalOutCount}`, clr: "#C4504A" },
-              { l: t.netChange, v: `${totalInCount - totalOutCount >= 0 ? "+" : ""}${totalInCount - totalOutCount}`, clr: "#E11D48" },
-            ].map((s, i) => (
-              <div key={i} className={`rounded-[18px] border p-3.5 ${th.card} ${th.bdr}`}>
-                <p className={`text-xs font-semibold uppercase tracking-wider ${th.txm}`}>{s.l}</p>
-                <p className="text-xl font-black mt-1" style={{ color: s.clr }}>{s.v}</p>
-              </div>
-            ))}
-          </div>
-          <div className={`rounded-[22px] border overflow-hidden ${th.card} ${th.bdr}`}>
-            <div className={`px-5 py-3.5 border-b ${th.bdr}`}>
-              <p className={`text-sm font-extrabold tracking-tight ${th.tx}`}>{t.movementLog}</p>
-            </div>
-            {renderMovementList(movements, showAllHistory, setShowAllHistory, movements.length)}
-          </div>
         </>
       )}
 

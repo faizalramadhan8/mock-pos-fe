@@ -184,65 +184,75 @@ export function OrdersPage() {
       )}
 
       {activeTab === "orders" && <>
-      {/* Date range pills */}
-      <div className="flex gap-2 overflow-x-auto scrollbar-hide">
-        {(["today", "yesterday", "week", "month", "all"] as DateRange[]).map(r => (
-          <FilterPill key={r} th={th} active={dateRange === r} onClick={() => setDateRange(r)}>
-            {dateRangeLabel(r)}
-          </FilterPill>
-        ))}
+      {/* Condensed filter bar — search + 3 dropdowns on one row.
+          Previously 3 rows of pills + search took ~200px vertical; this
+          single row fits everything in ~48px. Native <select> is chosen
+          over custom dropdown for accessibility and fewer dependencies. */}
+      <div className="flex flex-wrap gap-2 items-stretch">
+        <div className="relative flex-1 min-w-[200px]">
+          <Search size={16} className={`absolute left-3.5 top-1/2 -translate-y-1/2 ${th.txf}`} />
+          <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+            placeholder={t.searchOrders as string}
+            className={`w-full pl-10 pr-4 py-3 text-sm rounded-2xl border focus:outline-none focus:ring-2 focus:ring-[#E11D48]/20 font-medium ${th.inp}`} />
+        </div>
+        <select value={dateRange} onChange={e => setDateRange(e.target.value as DateRange)}
+          className={`px-4 py-3 text-sm font-bold rounded-2xl border appearance-none cursor-pointer ${th.inp}`}>
+          {(["today", "yesterday", "week", "month", "all"] as DateRange[]).map(r => (
+            <option key={r} value={r}>{dateRangeLabel(r)}</option>
+          ))}
+        </select>
+        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
+          className={`px-4 py-3 text-sm font-bold rounded-2xl border appearance-none cursor-pointer ${th.inp}`}>
+          {["all", "completed", "pending", "cancelled", "refunded"].map(f => (
+            <option key={f} value={f}>{statusLabel(f)}</option>
+          ))}
+        </select>
+        <select value={paymentFilter} onChange={e => setPaymentFilter(e.target.value)}
+          className={`px-4 py-3 text-sm font-bold rounded-2xl border appearance-none cursor-pointer ${th.inp}`}>
+          <option value="all">{lang === "id" ? "Semua Bayar" : "All Payment"}</option>
+          <option value="cash">{lang === "id" ? "Tunai" : "Cash"}</option>
+          <option value="transfer">Transfer</option>
+          <option value="qris">QRIS</option>
+        </select>
       </div>
 
-      {/* Search */}
-      <div className="relative">
-        <Search size={16} className={`absolute left-3.5 top-1/2 -translate-y-1/2 ${th.txf}`} />
-        <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
-          placeholder={t.searchOrders as string}
-          className={`w-full pl-10 pr-4 py-3 text-sm rounded-2xl border focus:outline-none focus:ring-2 focus:ring-[#E11D48]/20 font-medium ${th.inp}`} />
-      </div>
-
-      {/* Summary cards — hero total (revenue) is the one accented metric;
-          other three stay neutral so the eye lands on the total first. */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-        {[
-          { label: t.totalRevenue, value: $(stats.revenue), hero: true },
-          { label: t.ordersCount, value: String(stats.completedCount), hero: false },
-          { label: t.avgOrder, value: $(stats.avg), hero: false },
-          { label: t.cancelledCount, value: String(stats.cancelledCount), hero: false },
-        ].map((card, i) => (
-          <div key={i} className={`rounded-[20px] border p-4 ${th.card} ${th.bdr}`}>
-            <p className={`text-sm font-semibold ${th.txm}`}>{card.label}</p>
-            <p
-              className={`font-display ${card.hero ? "text-2xl" : "text-xl"} font-black tracking-tight mt-1 leading-none ${card.hero ? th.acc : th.tx}`}
-              style={{ fontVariationSettings: '"opsz" 96, "wght" 900' }}
-            >
-              {card.value}
-            </p>
+      {/* Summary — 1 compact line.  Since Dashboard already surfaces the
+          same revenue/gain numbers, we don't need 4 prominent cards here.
+          The row just helps anchor the list with a quick sanity read. */}
+      <div className={`rounded-2xl border p-4 ${th.card2} ${th.bdr}`}>
+        <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1">
+          <div>
+            <span className={`text-sm ${th.txm}`}>Total Pendapatan</span>
+            <span className={`font-display text-lg font-black ml-2 ${th.acc}`} style={{ fontVariationSettings: '"wght" 900' }}>
+              {$(stats.revenue)}
+            </span>
           </div>
-        ))}
-      </div>
-
-      {/* Status filter pills */}
-      <div className="flex gap-2 overflow-x-auto scrollbar-hide">
-        {["all", "completed", "pending", "cancelled", "refunded"].map(f => (
-          <FilterPill key={f} th={th} active={statusFilter === f} onClick={() => setStatusFilter(f)}>
-            {statusLabel(f)}
-          </FilterPill>
-        ))}
-      </div>
-
-      {/* Payment method filter pills — no emoji, plain label only */}
-      <div className="flex gap-2 overflow-x-auto scrollbar-hide">
-        {[
-          { k: "all", l: lang === "id" ? "Semua Bayar" : "All Payment" },
-          { k: "cash", l: lang === "id" ? "Tunai" : "Cash" },
-          { k: "transfer", l: "Transfer" },
-          { k: "qris", l: "QRIS" },
-        ].map(f => (
-          <FilterPill key={f.k} th={th} active={paymentFilter === f.k} onClick={() => setPaymentFilter(f.k)}>
-            {f.l}
-          </FilterPill>
-        ))}
+          <span className={`text-sm ${th.txm}`}>·</span>
+          <div>
+            <span className={`text-sm ${th.txm}`}>{t.ordersCount}</span>
+            <span className={`font-display text-base font-black ml-2 ${th.tx}`} style={{ fontVariationSettings: '"wght" 800' }}>
+              {stats.completedCount}
+            </span>
+          </div>
+          <span className={`text-sm ${th.txm}`}>·</span>
+          <div>
+            <span className={`text-sm ${th.txm}`}>{t.avgOrder}</span>
+            <span className={`font-display text-base font-black ml-2 ${th.tx}`} style={{ fontVariationSettings: '"wght" 800' }}>
+              {$(stats.avg)}
+            </span>
+          </div>
+          {stats.cancelledCount > 0 && (
+            <>
+              <span className={`text-sm ${th.txm}`}>·</span>
+              <div>
+                <span className="text-sm text-[#BE123C]">Batal</span>
+                <span className="font-display text-base font-black ml-2 text-[#BE123C]" style={{ fontVariationSettings: '"wght" 800' }}>
+                  {stats.cancelledCount}
+                </span>
+              </div>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Order list */}
@@ -280,15 +290,12 @@ export function OrdersPage() {
                 }`}>{o.status === "cancelled" ? t.cancelled : o.status === "refunded" ? t.refunded : t[o.payment]}</span>
               </div>
             </div>
-            <div className="flex flex-wrap gap-1.5 ml-5 mt-2">
-              {o.items.map((item, i) => (
-                <span key={i}
-                  onClick={(e) => { e.stopPropagation(); if (products.find(p => p.id === item.productId)) setDetailProductId(item.productId); }}
-                  className={`text-sm px-2.5 py-1 rounded-lg font-semibold cursor-pointer active:opacity-70 ${th.elev} ${th.txm}`}>
-                  {item.name} ×{item.quantity}
-                </span>
-              ))}
-            </div>
+            {/* Compact item count — full item breakdown available in row-click
+                detail modal. Previously listed every item as a pill chip
+                which made 5-item orders take ~100px vertical each. */}
+            <p className={`text-sm ml-5 mt-1.5 ${th.txm}`}>
+              {o.items.length} item · {o.items.reduce((s, i) => s + i.quantity, 0)} qty
+            </p>
           </div>
         ))}
         {visibleCount < filtered.length && (
