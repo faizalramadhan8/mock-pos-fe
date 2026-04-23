@@ -175,7 +175,7 @@ export function SettingsPage() {
                 onClick={() => setActiveTab(tab.id)}
                 className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-sm font-bold whitespace-nowrap transition-all ${
                   active
-                    ? "text-white bg-gradient-to-r from-[#60A5FA] to-[#1E40AF] shadow-sm"
+                    ? "text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48] shadow-sm"
                     : `${th.elev} ${th.txm}`
                 }`}
               >
@@ -208,7 +208,7 @@ export function SettingsPage() {
                 <button key={String(o.k)} onClick={() => dark !== o.k && toggle()}
                   className={`py-3.5 rounded-2xl text-sm font-bold flex items-center justify-center gap-2 transition-all ${
                     dark === o.k
-                      ? "text-white bg-gradient-to-r from-[#60A5FA] to-[#1E40AF]"
+                      ? "text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48]"
                       : `border ${th.bdr} ${th.txm}`
                   }`}>{o.ic} {o.l}</button>
               ))}
@@ -226,7 +226,7 @@ export function SettingsPage() {
                 <button key={o.k} onClick={() => setLang(o.k)}
                   className={`py-3.5 rounded-2xl text-sm font-bold transition-all ${
                     lang === o.k
-                      ? "text-white bg-gradient-to-r from-[#60A5FA] to-[#1E40AF]"
+                      ? "text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48]"
                       : `border ${th.bdr} ${th.txm}`
                   }`}>{o.f} {o.l}</button>
               ))}
@@ -259,7 +259,7 @@ export function SettingsPage() {
                 className={`w-full px-4 py-2.5 text-sm rounded-xl border ${th.inp}`}
               />
               {cpNew && cpConfirm && cpNew !== cpConfirm && (
-                <p className="text-xs text-red-400 font-medium">
+                <p className="text-xs text-[#BE123C] font-medium">
                   {lang === "id" ? "Password baru tidak cocok" : "Passwords don't match"}
                 </p>
               )}
@@ -277,7 +277,7 @@ export function SettingsPage() {
                     setCpLoading(false);
                   }
                 }}
-                className="w-full py-2.5 rounded-xl text-sm font-bold text-white bg-[#1E40AF] disabled:opacity-40"
+                className="w-full py-2.5 rounded-xl text-sm font-bold text-white bg-[#E11D48] disabled:opacity-40"
               >
                 {cpLoading
                   ? (lang === "id" ? "Menyimpan…" : "Saving…")
@@ -347,7 +347,7 @@ export function SettingsPage() {
                   onClick={() => { setLabelWidth(s.width); setLabelHeight(s.height); }}
                   className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${
                     labelWidth === s.width && labelHeight === s.height
-                      ? `${th.accBg} ${th.acc} border-[#1E40AF]`
+                      ? `${th.accBg} ${th.acc} border-[#E11D48]`
                       : `${th.card2} ${th.bdr}`
                   }`}>
                   {s.width}&times;{s.height}
@@ -372,7 +372,7 @@ export function SettingsPage() {
 
           {/* Save — clearly scoped to store info + tax */}
           <button onClick={handleSave}
-            className="w-full py-3 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-[#60A5FA] to-[#1E40AF]">
+            className="w-full py-3 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48]">
             {t.save}
           </button>
 
@@ -387,7 +387,7 @@ export function SettingsPage() {
                 <p className={`text-xs mt-0.5 ${th.txm}`}>{t.bankDesc}</p>
               </div>
               <button onClick={() => setShowAddBank(true)}
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-[#60A5FA] to-[#1E40AF] shrink-0">
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48] shrink-0">
                 <Plus size={13} /> {t.addBankAccount}
               </button>
             </div>
@@ -425,7 +425,7 @@ export function SettingsPage() {
                             </button>
                           </div>
                         ) : (
-                          <button onClick={() => setConfirmRemoveBankId(acc.id)} aria-label="Remove bank account" className="text-[#D4627A]/50 hover:text-[#D4627A] p-1">
+                          <button onClick={() => setConfirmRemoveBankId(acc.id)} aria-label="Remove bank account" className="text-[#BE123C]/50 hover:text-[#BE123C] p-1">
                             <Trash2 size={14} />
                           </button>
                         )}
@@ -450,7 +450,7 @@ export function SettingsPage() {
               <p className={`text-xs mt-0.5 ${th.txm}`}>{t.teamDesc}</p>
             </div>
             <button onClick={() => setShowRegister(true)}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-[#60A5FA] to-[#1E40AF] shrink-0">
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48] shrink-0">
               <UserPlus size={13} /> {t.registerStaff}
             </button>
           </div>
@@ -481,8 +481,8 @@ export function SettingsPage() {
                       </div>
                       <span className={`text-xs font-bold px-2 py-0.5 rounded-md shrink-0 ${
                         u.role === "cashier"
-                          ? (th.dark ? "bg-[#5B8DEF]/15 text-[#5B8DEF]" : "bg-blue-50 text-[#5B8DEF]")
-                          : (th.dark ? "bg-[#6F9A4D]/15 text-[#6F9A4D]" : "bg-green-50 text-[#6F9A4D]")
+                          ? (th.dark ? "bg-[#E11D48]/15 text-[#E11D48]" : "bg-[#FFE4E9] text-[#E11D48]")
+                          : (th.dark ? "bg-[#E11D48]/15 text-[#E11D48]" : "bg-[#FFE4E9] text-[#E11D48]")
                       }`}>{(t.roles as Record<string, string>)[u.role]}</span>
                       {expanded ? <ChevronUp size={14} className={th.txm} /> : <ChevronDown size={14} className={th.txm} />}
                     </button>
@@ -514,7 +514,7 @@ export function SettingsPage() {
                               setNewPasswordInput("");
                               toast.success(t.passwordUpdated as string);
                             }} disabled={!newPasswordInput.trim()}
-                              className="px-3 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-[#60A5FA] to-[#1E40AF] disabled:opacity-40">{t.save}</button>
+                              className="px-3 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48] disabled:opacity-40">{t.save}</button>
                           </div>
                         </div>
 
@@ -526,7 +526,7 @@ export function SettingsPage() {
                             auditLog("user_toggled", user!.id, user!.name, `${u.name} → ${willDeactivate ? "inactive" : "active"}`);
                             toast.success((willDeactivate ? t.userDeactivated : t.userActivated) as string);
                           }}
-                            className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-bold border ${th.bdr} ${inactive ? "text-[#4A8B3F]" : "text-[#E89B48]"}`}>
+                            className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-bold border ${th.bdr} ${inactive ? "text-[#E11D48]" : "text-[#E11D48]"}`}>
                             <Power size={12} />
                             {inactive ? t.activateUser : t.deactivateUser}
                           </button>
@@ -580,11 +580,11 @@ export function SettingsPage() {
             <div className={`rounded-[22px] border overflow-hidden ${th.card} ${th.bdr}`}>
               {auditEntries.slice(0, activityVisible).map((entry, i) => {
                 const actionColor =
-                  entry.action === "order_created" ? "text-[#4A8B3F]"
+                  entry.action === "order_created" ? "text-[#E11D48]"
                   : entry.action === "order_voided" ? "text-[#C4504A]"
-                  : entry.action === "order_refunded" ? "text-[#E89B48]"
-                  : entry.action === "register_closed" ? "text-[#5B8DEF]"
-                  : entry.action === "product_added" || entry.action === "product_edited" ? "text-[#8B6FC0]"
+                  : entry.action === "order_refunded" ? "text-[#E11D48]"
+                  : entry.action === "register_closed" ? "text-[#E11D48]"
+                  : entry.action === "product_added" || entry.action === "product_edited" ? "text-[#E11D48]"
                   : th.txm;
                 const actionLabel = entry.action.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
                 return (
@@ -633,7 +633,7 @@ export function SettingsPage() {
                       onChange={e => { setBankQuery(e.target.value); setBankForm(f => ({ ...f, bankName: "" })); setShowBankDropdown(true); setBankFormErrors(p => ({ ...p, bankName: false })); }}
                       onFocus={() => setShowBankDropdown(true)}
                       placeholder={t.searchBank as string}
-                      className={`w-full pl-9 pr-9 py-3 text-sm rounded-2xl border ${th.inp} ${bankFormErrors.bankName ? "!border-red-400" : ""}`}
+                      className={`w-full pl-9 pr-9 py-3 text-sm rounded-2xl border ${th.inp} ${bankFormErrors.bankName ? "!border-[#BE123C]" : ""}`}
                     />
                     {bankForm.bankName && (
                       <button onClick={() => { setBankForm(f => ({ ...f, bankName: "" })); setBankQuery(""); }}
@@ -653,30 +653,30 @@ export function SettingsPage() {
                     </div>
                   )}
                 </div>
-                {bankFormErrors.bankName && <p className="text-red-400 text-xs mt-1 font-medium">{t.required}</p>}
+                {bankFormErrors.bankName && <p className="text-[#BE123C] text-xs mt-1 font-medium">{t.required}</p>}
               </div>
               <div>
                 <p className={`text-xs font-semibold mb-1.5 ${th.txm}`}>{t.accountNumber}</p>
                 <input value={bankForm.accountNumber}
                   onChange={e => { setBankForm(f => ({ ...f, accountNumber: e.target.value })); setBankFormErrors(p => ({ ...p, accountNumber: false })); }}
                   placeholder="1234567890" inputMode="numeric"
-                  className={`w-full px-4 py-3 text-sm rounded-2xl border ${th.inp} ${bankFormErrors.accountNumber ? "!border-red-400" : ""}`} />
-                {bankFormErrors.accountNumber && <p className="text-red-400 text-xs mt-1 font-medium">{t.required}</p>}
+                  className={`w-full px-4 py-3 text-sm rounded-2xl border ${th.inp} ${bankFormErrors.accountNumber ? "!border-[#BE123C]" : ""}`} />
+                {bankFormErrors.accountNumber && <p className="text-[#BE123C] text-xs mt-1 font-medium">{t.required}</p>}
               </div>
               <div>
                 <p className={`text-xs font-semibold mb-1.5 ${th.txm}`}>{t.accountHolder}</p>
                 <input value={bankForm.accountHolder}
                   onChange={e => { setBankForm(f => ({ ...f, accountHolder: e.target.value })); setBankFormErrors(p => ({ ...p, accountHolder: false })); }}
                   placeholder={t.accountHolder as string}
-                  className={`w-full px-4 py-3 text-sm rounded-2xl border ${th.inp} ${bankFormErrors.accountHolder ? "!border-red-400" : ""}`} />
-                {bankFormErrors.accountHolder && <p className="text-red-400 text-xs mt-1 font-medium">{t.required}</p>}
+                  className={`w-full px-4 py-3 text-sm rounded-2xl border ${th.inp} ${bankFormErrors.accountHolder ? "!border-[#BE123C]" : ""}`} />
+                {bankFormErrors.accountHolder && <p className="text-[#BE123C] text-xs mt-1 font-medium">{t.required}</p>}
               </div>
               <div className="flex gap-2 mt-1">
                 <button onClick={() => { setShowAddBank(false); setBankForm({ bankName: "", accountNumber: "", accountHolder: "" }); setBankQuery(""); setShowBankDropdown(false); }}
                   className={`flex-1 py-3 rounded-2xl text-sm font-bold border ${th.bdr} ${th.txm}`}>{t.cancel}</button>
                 <button onClick={handleAddBank}
                   disabled={!bankForm.bankName || !bankForm.accountNumber.trim() || !bankForm.accountHolder.trim()}
-                  className="flex-1 py-3 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-[#60A5FA] to-[#1E40AF] disabled:opacity-40">{t.save}</button>
+                  className="flex-1 py-3 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48] disabled:opacity-40">{t.save}</button>
               </div>
             </div>
           </div>
@@ -698,16 +698,16 @@ export function SettingsPage() {
             <div className="flex flex-col gap-2.5">
               <div>
                 <input value={regForm.name} onChange={e => { setRegForm(f => ({ ...f, name: e.target.value })); setRegFormErrors(p => ({ ...p, name: false })); }}
-                  className={`${inp} ${regFormErrors.name ? "!border-red-400" : ""}`} placeholder={t.fullName as string} />
-                {regFormErrors.name && <p className="text-red-400 text-xs mt-1 font-medium">{t.required}</p>}
+                  className={`${inp} ${regFormErrors.name ? "!border-[#BE123C]" : ""}`} placeholder={t.fullName as string} />
+                {regFormErrors.name && <p className="text-[#BE123C] text-xs mt-1 font-medium">{t.required}</p>}
               </div>
               <input value={regForm.nik} onChange={e => setRegForm(f => ({ ...f, nik: e.target.value }))}
                 className={inp} placeholder={t.nik as string} inputMode="numeric" />
               <div>
                 <input value={regForm.email} onChange={e => { setRegForm(f => ({ ...f, email: e.target.value })); setRegFormErrors(p => ({ ...p, email: false, invalidEmail: false })); }}
-                  className={`${inp} ${regFormErrors.email || regFormErrors.invalidEmail ? "!border-red-400" : ""}`} placeholder={t.email as string} type="email" />
-                {regFormErrors.email && <p className="text-red-400 text-xs mt-1 font-medium">{t.required}</p>}
-                {regFormErrors.invalidEmail && <p className="text-red-400 text-xs mt-1 font-medium">{t.invalidEmail}</p>}
+                  className={`${inp} ${regFormErrors.email || regFormErrors.invalidEmail ? "!border-[#BE123C]" : ""}`} placeholder={t.email as string} type="email" />
+                {regFormErrors.email && <p className="text-[#BE123C] text-xs mt-1 font-medium">{t.required}</p>}
+                {regFormErrors.invalidEmail && <p className="text-[#BE123C] text-xs mt-1 font-medium">{t.invalidEmail}</p>}
               </div>
               <input value={regForm.phone} onChange={e => setRegForm(f => ({ ...f, phone: e.target.value }))}
                 className={inp} placeholder={t.msisdn as string} type="tel" inputMode="tel" />
@@ -722,7 +722,7 @@ export function SettingsPage() {
                     <button key={r} onClick={() => setRegForm(f => ({ ...f, role: r }))}
                       className={`py-3 rounded-2xl text-sm font-bold ${
                         regForm.role === r
-                          ? "text-white bg-gradient-to-r from-[#60A5FA] to-[#1E40AF]"
+                          ? "text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48]"
                           : `border ${th.bdr} ${th.txm}`
                       }`}>{(t.roles as Record<string, string>)[r]}</button>
                   ))}
@@ -730,15 +730,15 @@ export function SettingsPage() {
               </div>
 
               {/* Default password hint */}
-              <div className={`rounded-xl p-3 ${th.dark ? "bg-[#E89B48]/10" : "bg-amber-50"}`}>
-                <p className={`text-xs font-semibold ${th.dark ? "text-[#E89B48]" : "text-amber-700"}`}>
+              <div className={`rounded-xl p-3 ${th.dark ? "bg-[#E11D48]/10" : "bg-[#FFE4E9]"}`}>
+                <p className={`text-xs font-semibold ${th.dark ? "text-[#E11D48]" : "text-[#E11D48]"}`}>
                   {t.defaultPassword}: <span className="font-mono">{DEFAULT_PASSWORD}</span>
                 </p>
               </div>
 
               <button onClick={handleRegister}
                 disabled={!regForm.name.trim() || !regForm.email.trim()}
-                className={`w-full py-3.5 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-[#60A5FA] to-[#1E40AF] mt-1 ${
+                className={`w-full py-3.5 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48] mt-1 ${
                   !regForm.name.trim() || !regForm.email.trim() ? "opacity-40" : ""
                 }`}>{t.registerStaff}</button>
             </div>

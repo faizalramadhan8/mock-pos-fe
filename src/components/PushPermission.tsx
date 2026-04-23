@@ -13,7 +13,7 @@ export function PushPermission() {
   if (!supported || subscribed || hidden) return null;
 
   return (
-    <div className={`mx-3 my-2 p-3 rounded-xl border ${th.dark ? "bg-[#1E40AF]/10 border-[#1E40AF]/20" : "bg-[#EFF6FF] border-[#E2E8F0]"}`}>
+    <div className={`mx-3 my-2 p-3 rounded-xl border ${th.dark ? "bg-[#E11D48]/10 border-[#E11D48]/20" : "bg-[#FFE4E9] border-[#F9C5D0]"}`}>
       <div className="flex items-start gap-2.5">
         <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${th.accBg} ${th.acc}`}>
           <Bell size={13} />
@@ -30,7 +30,7 @@ export function PushPermission() {
           <button
             onClick={subscribe}
             disabled={loading}
-            className={`mt-2 px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-gradient-to-r from-[#60A5FA] to-[#1E40AF] disabled:opacity-60`}
+            className={`mt-2 px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48] disabled:opacity-60`}
           >
             {loading ? "..." : lang === "id" ? "Aktifkan" : "Enable"}
           </button>

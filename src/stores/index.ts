@@ -46,6 +46,7 @@ const mapOrderItem = (i: any): OrderItem => ({
 
 const mapOrder = (o: any): Order => ({
   id: o.id, items: (o.items || []).map(mapOrderItem),
+  payments: (o.payments || []).map((p: any) => ({ id: p.id, method: p.method, amount: p.amount })),
   subtotal: o.subtotal, ppnRate: o.ppn_rate, ppn: o.ppn, total: o.total,
   payment: o.payment, status: o.status, customer: o.customer || '',
   customerPhone: o.customer_phone || undefined,
@@ -460,6 +461,11 @@ interface OrderState {
   addOrder: (order: Order) => Promise<Order>;
   cancelOrder: (id: string) => void;
   refundOrder: (id: string) => void;
+  // Pending order actions — customer pesan online, bayar belakangan.
+  createPendingOrder: (order: Order, bankAccountId?: string) => Promise<Order>;
+  markAsPaid: (id: string, payments: { method: string; amount: number }[]) => Promise<void>;
+  cancelPending: (id: string) => Promise<void>;
+  resendInvoice: (id: string, bankAccountId?: string) => Promise<void>;
 }
 export const useOrderStore = create<OrderState>((set, get) => ({
   orders: [],
@@ -480,7 +486,11 @@ export const useOrderStore = create<OrderState>((set, get) => ({
           discount_amount: i.discountAmount,
         })),
         subtotal: order.subtotal, ppn_rate: order.ppnRate, ppn: order.ppn, total: order.total,
-        payment: order.payment, customer: order.customer, customer_phone: order.customerPhone,
+        payment: order.payment,
+        ...(order.payments && order.payments.length > 0 ? {
+          payments: order.payments.map(p => ({ method: p.method, amount: p.amount })),
+        } : {}),
+        customer: order.customer, customer_phone: order.customerPhone,
         member_id: order.memberId,
         payment_proof: order.paymentProof,
         order_discount_type: order.orderDiscountType, order_discount_value: order.orderDiscountValue,
@@ -524,6 +534,67 @@ export const useOrderStore = create<OrderState>((set, get) => ({
   refundOrder: (id) => set(s => ({
     orders: s.orders.map(o => o.id === id ? { ...o, status: "refunded" as const } : o),
   })),
+
+  // Pending order actions ──────────────────────────────────────────────
+  createPendingOrder: async (order, bankAccountId) => {
+    try {
+      const res = await orderApi.createPending({
+        items: order.items.map(i => ({
+          product_id: i.productId, name: i.name, quantity: i.quantity,
+          unit_type: i.unitType || 'individual', unit_price: i.unitPrice,
+          regular_price: i.regularPrice,
+          discount_type: i.discountType, discount_value: i.discountValue,
+          discount_amount: i.discountAmount,
+        })),
+        subtotal: order.subtotal, ppn_rate: order.ppnRate, ppn: order.ppn, total: order.total,
+        customer: order.customer, customer_phone: order.customerPhone || "",
+        member_id: order.memberId,
+        order_discount_type: order.orderDiscountType, order_discount_value: order.orderDiscountValue,
+        order_discount: order.orderDiscount,
+        bank_account_id: bankAccountId,
+      });
+      const saved = res.body ? mapOrder(res.body) : order;
+      set(s => ({ orders: [saved, ...s.orders] }));
+      return saved;
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to create pending order');
+      throw e;
+    }
+  },
+
+  markAsPaid: async (id, payments) => {
+    try {
+      const res = await orderApi.markAsPaid(id, payments);
+      const saved = res.body ? mapOrder(res.body) : null;
+      set(s => ({
+        orders: s.orders.map(o => o.id === id && saved ? saved : o),
+      }));
+      await useProductStore.getState().fetchProducts();
+      await useBatchStore.getState().fetchBatches();
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to mark paid');
+      throw e;
+    }
+  },
+
+  cancelPending: async (id) => {
+    try {
+      await orderApi.cancelPending(id);
+      set(s => ({ orders: s.orders.map(o => o.id === id ? { ...o, status: "cancelled" as const } : o) }));
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to cancel');
+      throw e;
+    }
+  },
+
+  resendInvoice: async (id, bankAccountId) => {
+    try {
+      await orderApi.resendInvoice(id, bankAccountId);
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to send invoice');
+      throw e;
+    }
+  },
 }));
 
 // ─── Inventory ───

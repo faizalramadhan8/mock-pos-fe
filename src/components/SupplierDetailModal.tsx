@@ -85,7 +85,7 @@ export function SupplierDetailModal({ supplierId, onClose }: SupplierDetailModal
     <Modal open={!!supplierId} onClose={onClose} title={t.supplierDetail as string}>
       {/* Header */}
       <div className="flex flex-col items-center mb-5">
-        <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-3 ${th.dark ? "bg-[#60A5FA]/15" : "bg-[#1E40AF]/[0.07]"}`}>
+        <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-3 ${th.dark ? "bg-[#FB7185]/15" : "bg-[#E11D48]/[0.07]"}`}>
           <span className={`text-2xl font-black ${th.acc}`}>{supplier.name.charAt(0)}</span>
         </div>
         <p className={`text-base font-extrabold tracking-tight ${th.tx}`}>{supplier.name}</p>
@@ -124,7 +124,7 @@ export function SupplierDetailModal({ supplierId, onClose }: SupplierDetailModal
             <p className={`text-xs font-bold uppercase tracking-wider ${th.txf}`}>
               {lang === "id" ? "Produk" : "Products"} ({supplierProducts.length})
               {lowStockProducts.length > 0 && (
-                <span className={`ml-2 px-2 py-0.5 rounded-md ${th.dark ? "bg-[#D4627A]/15 text-[#D4627A]" : "bg-red-50 text-[#D4627A]"}`}>
+                <span className={`ml-2 px-2 py-0.5 rounded-md ${th.dark ? "bg-[#BE123C]/15 text-[#BE123C]" : "bg-[#FCE4EC] text-[#BE123C]"}`}>
                   <AlertTriangle size={9} className="inline mr-1" />
                   {lowStockProducts.length} {lang === "id" ? "stok rendah" : "low"}
                 </span>
@@ -138,10 +138,10 @@ export function SupplierDetailModal({ supplierId, onClose }: SupplierDetailModal
                 <label key={p.id} className={`flex items-center gap-2 px-4 py-2 border-b last:border-0 cursor-pointer ${th.bdrSoft}`}>
                   <input type="checkbox" checked={!!reorderChecks[p.id]}
                     onChange={(e) => setReorderChecks({ ...reorderChecks, [p.id]: e.target.checked })}
-                    className="w-4 h-4 rounded accent-[#1E40AF] shrink-0" />
+                    className="w-4 h-4 rounded accent-[#E11D48] shrink-0" />
                   <div className="flex-1 min-w-0">
                     <p className={`text-xs font-bold truncate ${th.tx}`}>{lang === "id" ? p.nameId : p.name}</p>
-                    <p className={`text-xs ${low ? "text-[#D4627A] font-bold" : th.txf}`}>
+                    <p className={`text-xs ${low ? "text-[#BE123C] font-bold" : th.txf}`}>
                       {lang === "id" ? "Stok" : "Stock"}: {p.stock} {p.unit} · min {p.minStock}
                       {low && ` · ${lang === "id" ? "RENDAH" : "LOW"}`}
                     </p>
@@ -175,7 +175,7 @@ export function SupplierDetailModal({ supplierId, onClose }: SupplierDetailModal
               }}
               className={`mt-2 w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold ${
                 reorderText.trim()
-                  ? "text-white bg-gradient-to-r from-[#60A5FA] to-[#1E40AF]"
+                  ? "text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48]"
                   : `${th.txf} ${th.card2} cursor-not-allowed`
               }`}
             >
@@ -194,7 +194,7 @@ export function SupplierDetailModal({ supplierId, onClose }: SupplierDetailModal
       {unpaidInvoices.length > 0 && (
         <div className={`rounded-2xl border overflow-hidden mb-3 ${th.bdr} ${th.card2}`}>
           <div className={`px-4 py-2.5 border-b ${th.bdr} flex items-center gap-2`}>
-            <Receipt size={13} className="text-[#D4627A]" />
+            <Receipt size={13} className="text-[#BE123C]" />
             <p className={`text-xs font-bold uppercase tracking-wider ${th.txf}`}>{t.unpaidInvoices} ({unpaidInvoices.length})</p>
           </div>
           {unpaidInvoices.map(inv => {
@@ -209,7 +209,7 @@ export function SupplierDetailModal({ supplierId, onClose }: SupplierDetailModal
                   <p className={`text-xs ${th.txf}`}>
                     {inv.quantity} · {$(inv.unitPrice * inv.quantity)}
                   </p>
-                  <p className={`text-xs ${isOverdue ? "text-[#D4627A] font-bold" : th.txm}`}>
+                  <p className={`text-xs ${isOverdue ? "text-[#BE123C] font-bold" : th.txm}`}>
                     {t.dueDate}: {inv.dueDate ? formatDate(inv.dueDate) : "—"}
                     {isOverdue && ` · ${t.overdue}`}
                   </p>
@@ -221,7 +221,7 @@ export function SupplierDetailModal({ supplierId, onClose }: SupplierDetailModal
                       updatePaymentStatus(inv.id, "paid");
                       toast.success(t.paid as string);
                     }}
-                    className={`shrink-0 ml-2 flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold ${th.dark ? "bg-[#4A8B3F]/15 text-[#4A8B3F]" : "bg-green-50 text-[#4A8B3F]"}`}
+                    className={`shrink-0 ml-2 flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold ${th.dark ? "bg-[#E11D48]/15 text-[#E11D48]" : "bg-[#FFE4E9] text-[#E11D48]"}`}
                   >
                     <Check size={10} /> {t.markAsPaid}
                   </button>
@@ -247,7 +247,7 @@ export function SupplierDetailModal({ supplierId, onClose }: SupplierDetailModal
             return (
               <div key={m.id} className={`flex items-center justify-between px-4 py-2.5 border-b last:border-0 ${th.bdrSoft}`}>
                 <div className="flex items-center gap-2 min-w-0">
-                  <ArrowDownCircle size={13} className="shrink-0 text-[#4A8B3F]" />
+                  <ArrowDownCircle size={13} className="shrink-0 text-[#E11D48]" />
                   <div className="min-w-0">
                     <p className={`text-xs font-bold truncate ${th.tx}`}>
                       {lang === "id" ? prod?.nameId : prod?.name}
@@ -256,7 +256,7 @@ export function SupplierDetailModal({ supplierId, onClose }: SupplierDetailModal
                   </div>
                 </div>
                 <div className="text-right shrink-0">
-                  <p className={`text-xs font-bold text-[#4A8B3F]`}>+{m.quantity} · {$(m.unitPrice * m.quantity)}</p>
+                  <p className={`text-xs font-bold text-[#E11D48]`}>+{m.quantity} · {$(m.unitPrice * m.quantity)}</p>
                   <p className={`text-xs ${th.txf}`}>{formatDate(m.createdAt)} {formatTime(m.createdAt)}</p>
                 </div>
               </div>

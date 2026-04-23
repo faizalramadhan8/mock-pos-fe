@@ -15,6 +15,35 @@ import toast from "react-hot-toast";
 
 type OrdersTab = "orders" | "members";
 
+// Shared pill button for filters/tabs on this page. One shape, one active
+// color (pink gradient), one inactive treatment — enforces visual discipline
+// across all pill rows (tabs, date range, status, payment method).
+function FilterPill({
+  active,
+  onClick,
+  children,
+  th,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  th: any;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-[14px] text-sm font-bold transition-all ${
+        active
+          ? "text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48]"
+          : `border ${th.bdr} ${th.card} ${th.txm}`
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
 export function OrdersPage() {
   const th = useThemeClasses();
   const { t, lang } = useLangStore();
@@ -144,17 +173,12 @@ export function OrdersPage() {
       {canViewMembers && (
         <div className="flex gap-2 overflow-x-auto scrollbar-hide">
           {([
-            { id: "orders" as OrdersTab, label: "Transaksi", icon: <Receipt size={13} /> },
-            { id: "members" as OrdersTab, label: "Members", icon: <Users size={13} /> },
+            { id: "orders" as OrdersTab, label: "Transaksi", icon: <Receipt size={14} /> },
+            { id: "members" as OrdersTab, label: "Members", icon: <Users size={14} /> },
           ]).map(tab => (
-            <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-              className={`shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-[14px] text-xs font-bold transition-all ${
-                activeTab === tab.id
-                  ? "text-white bg-gradient-to-r from-[#60A5FA] to-[#1E40AF]"
-                  : `${th.elev} ${th.txm}`
-              }`}>
+            <FilterPill key={tab.id} th={th} active={activeTab === tab.id} onClick={() => setActiveTab(tab.id)}>
               {tab.icon} {tab.label}
-            </button>
+            </FilterPill>
           ))}
         </div>
       )}
@@ -163,12 +187,9 @@ export function OrdersPage() {
       {/* Date range pills */}
       <div className="flex gap-2 overflow-x-auto scrollbar-hide">
         {(["today", "yesterday", "week", "month", "all"] as DateRange[]).map(r => (
-          <button key={r} onClick={() => setDateRange(r)}
-            className={`shrink-0 px-3.5 py-2 rounded-[14px] text-xs font-bold transition-all ${
-              dateRange === r
-                ? "text-white bg-gradient-to-r from-[#60A5FA] to-[#1E40AF]"
-                : `${th.elev} ${th.txm}`
-            }`}>{dateRangeLabel(r)}</button>
+          <FilterPill key={r} th={th} active={dateRange === r} onClick={() => setDateRange(r)}>
+            {dateRangeLabel(r)}
+          </FilterPill>
         ))}
       </div>
 
@@ -177,20 +198,26 @@ export function OrdersPage() {
         <Search size={16} className={`absolute left-3.5 top-1/2 -translate-y-1/2 ${th.txf}`} />
         <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
           placeholder={t.searchOrders as string}
-          className={`w-full pl-10 pr-4 py-3 text-sm rounded-2xl border focus:outline-none focus:ring-2 focus:ring-[#1E40AF]/20 font-medium ${th.inp}`} />
+          className={`w-full pl-10 pr-4 py-3 text-sm rounded-2xl border focus:outline-none focus:ring-2 focus:ring-[#E11D48]/20 font-medium ${th.inp}`} />
       </div>
 
-      {/* Summary cards */}
+      {/* Summary cards — hero total (revenue) is the one accented metric;
+          other three stay neutral so the eye lands on the total first. */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
         {[
-          { label: t.totalRevenue, value: $(stats.revenue), color: th.acc },
-          { label: t.ordersCount, value: String(stats.completedCount), color: th.dark ? "text-[#4A8B3F]" : "text-[#4A8B3F]" },
-          { label: t.avgOrder, value: $(stats.avg), color: th.dark ? "text-[#5B8DEF]" : "text-[#5B8DEF]" },
-          { label: t.cancelledCount, value: String(stats.cancelledCount), color: "text-[#C4504A]" },
+          { label: t.totalRevenue, value: $(stats.revenue), hero: true },
+          { label: t.ordersCount, value: String(stats.completedCount), hero: false },
+          { label: t.avgOrder, value: $(stats.avg), hero: false },
+          { label: t.cancelledCount, value: String(stats.cancelledCount), hero: false },
         ].map((card, i) => (
-          <div key={i} className={`rounded-[18px] border p-3.5 ${th.card} ${th.bdr}`}>
-            <p className={`text-xs font-semibold ${th.txm}`}>{card.label}</p>
-            <p className={`text-lg font-black tracking-tight mt-0.5 ${card.color}`}>{card.value}</p>
+          <div key={i} className={`rounded-[20px] border p-4 ${th.card} ${th.bdr}`}>
+            <p className={`text-sm font-semibold ${th.txm}`}>{card.label}</p>
+            <p
+              className={`font-display ${card.hero ? "text-2xl" : "text-xl"} font-black tracking-tight mt-1 leading-none ${card.hero ? th.acc : th.tx}`}
+              style={{ fontVariationSettings: '"opsz" 96, "wght" 900' }}
+            >
+              {card.value}
+            </p>
           </div>
         ))}
       </div>
@@ -198,25 +225,23 @@ export function OrdersPage() {
       {/* Status filter pills */}
       <div className="flex gap-2 overflow-x-auto scrollbar-hide">
         {["all", "completed", "pending", "cancelled", "refunded"].map(f => (
-          <button key={f} onClick={() => setStatusFilter(f)}
-            className={`shrink-0 px-3.5 py-2 rounded-[14px] text-xs font-bold ${
-              statusFilter === f ? "text-white bg-gradient-to-r from-[#60A5FA] to-[#1E40AF]" : `border ${th.card} ${th.bdr} ${th.txm}`
-            }`}>{statusLabel(f)}</button>
+          <FilterPill key={f} th={th} active={statusFilter === f} onClick={() => setStatusFilter(f)}>
+            {statusLabel(f)}
+          </FilterPill>
         ))}
       </div>
 
-      {/* Payment method filter pills */}
+      {/* Payment method filter pills — no emoji, plain label only */}
       <div className="flex gap-2 overflow-x-auto scrollbar-hide">
         {[
           { k: "all", l: lang === "id" ? "Semua Bayar" : "All Payment" },
-          { k: "cash", l: lang === "id" ? "💵 Tunai" : "💵 Cash" },
-          { k: "transfer", l: "🏦 Transfer" },
-          { k: "qris", l: "📱 QRIS" },
+          { k: "cash", l: lang === "id" ? "Tunai" : "Cash" },
+          { k: "transfer", l: "Transfer" },
+          { k: "qris", l: "QRIS" },
         ].map(f => (
-          <button key={f.k} onClick={() => setPaymentFilter(f.k)}
-            className={`shrink-0 px-3.5 py-2 rounded-[14px] text-xs font-bold ${
-              paymentFilter === f.k ? "text-white bg-gradient-to-r from-[#5B8DEF] to-[#3B6FCF]" : `border ${th.card} ${th.bdr} ${th.txm}`
-            }`}>{f.l}</button>
+          <FilterPill key={f.k} th={th} active={paymentFilter === f.k} onClick={() => setPaymentFilter(f.k)}>
+            {f.l}
+          </FilterPill>
         ))}
       </div>
 
@@ -233,32 +258,33 @@ export function OrdersPage() {
         ) : visibleOrders.map(o => (
           <div key={o.id} onClick={() => setDetailOrderId(o.id)}
             className={`px-5 py-4 border-b last:border-0 cursor-pointer active:opacity-70 ${th.bdrSoft}`}>
-            <div className="flex items-center justify-between mb-1.5">
-              <div className="flex items-center gap-2.5">
-                <div className={`w-2 h-2 rounded-full ${o.status === "completed" ? "bg-[#4A8B3F]" : o.status === "pending" ? "bg-[#60A5FA]" : o.status === "refunded" ? "bg-[#E89B48]" : "bg-[#C4504A]"}`} />
-                <div>
-                  <p className={`text-sm font-bold ${th.tx}`}>{o.id}</p>
-                  <p className={`text-xs ${th.txm}`}>{o.customer} · {formatTime(o.createdAt)}</p>
+            <div className="flex items-center justify-between mb-1.5 gap-3">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${o.status === "completed" ? "bg-[#E11D48]" : o.status === "pending" ? "bg-[#FB7185]" : o.status === "refunded" ? "bg-[#E11D48]" : "bg-[#C4504A]"}`} />
+                <div className="min-w-0">
+                  <p className={`text-sm font-bold font-mono truncate ${th.tx}`}>{o.id}</p>
+                  <p className={`text-sm mt-0.5 ${th.txm} truncate`}>{o.customer} · {formatTime(o.createdAt)}</p>
                 </div>
               </div>
-              <div className="text-right">
-                <p className={`font-black ${o.status === "cancelled" || o.status === "refunded" ? "line-through opacity-50" : ""} ${th.tx}`}>{$(o.total)}</p>
-                <span className={`text-xs font-bold px-2 py-0.5 rounded-md ${
+              <div className="text-right shrink-0">
+                <p
+                  className={`font-display text-xl font-black leading-none ${o.status === "cancelled" || o.status === "refunded" ? "line-through opacity-50" : ""} ${th.tx}`}
+                  style={{ fontVariationSettings: '"opsz" 96, "wght" 900' }}
+                >
+                  {$(o.total)}
+                </p>
+                <span className={`inline-block mt-1 text-sm font-bold px-2.5 py-0.5 rounded-lg ${
                   o.status === "cancelled"
-                    ? (th.dark ? "bg-[#C4504A]/15 text-[#C4504A]" : "bg-red-50 text-[#C4504A]")
-                    : o.status === "refunded"
-                    ? (th.dark ? "bg-[#E89B48]/15 text-[#E89B48]" : "bg-amber-50 text-[#E89B48]")
-                    : o.payment === "cash" ? (th.dark ? "bg-[#4A8B3F]/15 text-[#4A8B3F]" : "bg-green-50 text-[#4A8B3F]")
-                    : o.payment === "card" ? (th.dark ? "bg-[#5B8DEF]/15 text-[#5B8DEF]" : "bg-blue-50 text-[#5B8DEF]")
-                    : (th.dark ? "bg-[#8B6FC0]/15 text-[#8B6FC0]" : "bg-purple-50 text-[#8B6FC0]")
+                    ? (th.dark ? "bg-[#C4504A]/15 text-[#C4504A]" : "bg-[#FCE4EC] text-[#C4504A]")
+                    : (th.dark ? "bg-[#E11D48]/15 text-[#FB7185]" : "bg-[#FFE4E9] text-[#E11D48]")
                 }`}>{o.status === "cancelled" ? t.cancelled : o.status === "refunded" ? t.refunded : t[o.payment]}</span>
               </div>
             </div>
-            <div className="flex flex-wrap gap-1 ml-5">
+            <div className="flex flex-wrap gap-1.5 ml-5 mt-2">
               {o.items.map((item, i) => (
                 <span key={i}
                   onClick={(e) => { e.stopPropagation(); if (products.find(p => p.id === item.productId)) setDetailProductId(item.productId); }}
-                  className={`text-xs px-2 py-0.5 rounded-md font-medium cursor-pointer active:opacity-70 ${th.elev} ${th.txm}`}>
+                  className={`text-sm px-2.5 py-1 rounded-lg font-semibold cursor-pointer active:opacity-70 ${th.elev} ${th.txm}`}>
                   {item.name} ×{item.quantity}
                 </span>
               ))}
@@ -290,7 +316,7 @@ export function OrdersPage() {
             </div>
             <button
               onClick={() => { setNewMember(emptyMemberForm); setAddMemberOpen(true); }}
-              className={`flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl text-xs font-bold text-white bg-[#1E40AF]`}
+              className={`flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl text-xs font-bold text-white bg-[#E11D48]`}
             >
               <Plus size={13} /> Member
             </button>
@@ -329,7 +355,9 @@ export function OrdersPage() {
                     onClick={() => setStatsMember({ id: m.id, name: m.name, phone: m.phone })}
                     className={`flex items-center justify-between px-4 py-3 border-b last:border-0 cursor-pointer active:opacity-70 ${th.bdrSoft}`}>
                     <div className="flex items-center gap-3 min-w-0 flex-1">
-                      <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm ${th.accBg} ${th.acc}`}>💎</div>
+                      <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-black ${th.accBg} ${th.acc}`}>
+                        {m.name.charAt(0).toUpperCase()}
+                      </div>
                       <div className="min-w-0">
                         <p className={`text-sm font-bold truncate ${th.tx}`}>{m.name}</p>
                         <p className={`text-xs font-mono ${th.txf} truncate`}>
@@ -354,7 +382,7 @@ export function OrdersPage() {
                       <button
                         onClick={(e) => { e.stopPropagation(); setConfirmDeleteMemberId(m.id); }}
                         aria-label="Delete member"
-                        className={`w-7 h-7 rounded-lg flex items-center justify-center ${th.dark ? "bg-[#D4627A]/15 text-[#D4627A]" : "bg-red-50 text-[#D4627A]"}`}
+                        className={`w-7 h-7 rounded-lg flex items-center justify-center ${th.dark ? "bg-[#BE123C]/15 text-[#BE123C]" : "bg-[#FCE4EC] text-[#BE123C]"}`}
                       >
                         <Trash2 size={12} />
                       </button>
@@ -387,21 +415,9 @@ export function OrdersPage() {
               className={`w-full px-3.5 py-2.5 text-sm rounded-xl border ${th.inp}`}
               placeholder="08xxxxxxxxxx" />
           </div>
-          <div>
-            <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>No. Member</p>
-            <input value={newMember.memberNumber}
-              onChange={e => setNewMember({ ...newMember, memberNumber: e.target.value })}
-              className={`w-full px-3.5 py-2.5 text-sm rounded-xl border ${th.inp}`}
-              placeholder="Contoh: 1207022025" />
-          </div>
-          <div>
-            <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>Alamat</p>
-            <textarea value={newMember.address}
-              onChange={e => setNewMember({ ...newMember, address: e.target.value })}
-              rows={2}
-              className={`w-full px-3.5 py-2.5 text-sm rounded-xl border resize-none ${th.inp}`}
-              placeholder="Alamat lengkap" />
-          </div>
+          <p className={`text-xs ${th.txf}`}>
+            Nomor anggota dan alamat bisa diisi nanti lewat tombol Edit.
+          </p>
           <div className="flex gap-2 mt-2">
             <button onClick={() => setAddMemberOpen(false)}
               className={`flex-1 py-2.5 rounded-xl text-sm font-bold border ${th.bdr} ${th.txm}`}>
@@ -423,7 +439,7 @@ export function OrdersPage() {
                 toast.success("Member berhasil ditambah");
               }}
               disabled={!newMember.name.trim() || !newMember.phone.trim()}
-              className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white bg-[#1E40AF] disabled:opacity-40"
+              className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white bg-[#E11D48] disabled:opacity-40"
             >
               Simpan
             </button>
@@ -481,7 +497,7 @@ export function OrdersPage() {
                   toast.success("Member berhasil diperbarui");
                 }}
                 disabled={!editMember.name.trim() || !editMember.phone.trim()}
-                className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white bg-[#1E40AF] disabled:opacity-40"
+                className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white bg-[#E11D48] disabled:opacity-40"
               >
                 Simpan
               </button>

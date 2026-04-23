@@ -40,12 +40,12 @@ export function OrderDetailModal({ orderId, onClose }: OrderDetailModalProps) {
   if (!order) return null;
 
   const statusColor = order.status === "completed"
-    ? (th.dark ? "bg-[#4A8B3F]/15 text-[#4A8B3F]" : "bg-green-50 text-[#4A8B3F]")
+    ? (th.dark ? "bg-[#E11D48]/15 text-[#E11D48]" : "bg-[#FFE4E9] text-[#E11D48]")
     : order.status === "pending"
-    ? (th.dark ? "bg-[#60A5FA]/15 text-[#60A5FA]" : "bg-[#EFF6FF] text-[#1E40AF]")
+    ? (th.dark ? "bg-[#FB7185]/15 text-[#FB7185]" : "bg-[#FFE4E9] text-[#E11D48]")
     : order.status === "refunded"
-    ? (th.dark ? "bg-[#E89B48]/15 text-[#E89B48]" : "bg-amber-50 text-[#E89B48]")
-    : (th.dark ? "bg-[#C4504A]/15 text-[#C4504A]" : "bg-red-50 text-[#C4504A]");
+    ? (th.dark ? "bg-[#E11D48]/15 text-[#E11D48]" : "bg-[#FFE4E9] text-[#E11D48]")
+    : (th.dark ? "bg-[#C4504A]/15 text-[#C4504A]" : "bg-[#FCE4EC] text-[#C4504A]");
 
   const statusText = order.status === "completed" ? t.completed
     : order.status === "cancelled" ? t.cancelled
@@ -53,10 +53,10 @@ export function OrderDetailModal({ orderId, onClose }: OrderDetailModalProps) {
     : t.pending;
 
   const paymentColor = order.payment === "cash"
-    ? (th.dark ? "bg-[#4A8B3F]/15 text-[#4A8B3F]" : "bg-green-50 text-[#4A8B3F]")
+    ? (th.dark ? "bg-[#E11D48]/15 text-[#E11D48]" : "bg-[#FFE4E9] text-[#E11D48]")
     : order.payment === "card"
-    ? (th.dark ? "bg-[#5B8DEF]/15 text-[#5B8DEF]" : "bg-blue-50 text-[#5B8DEF]")
-    : (th.dark ? "bg-[#8B6FC0]/15 text-[#8B6FC0]" : "bg-purple-50 text-[#8B6FC0]");
+    ? (th.dark ? "bg-[#E11D48]/15 text-[#E11D48]" : "bg-[#FFE4E9] text-[#E11D48]")
+    : (th.dark ? "bg-[#E11D48]/15 text-[#E11D48]" : "bg-[#FFE4E9] text-[#E11D48]");
 
   // Refund calculations
   const toggleRefundItem = (idx: number) => {
@@ -188,7 +188,7 @@ export function OrderDetailModal({ orderId, onClose }: OrderDetailModalProps) {
                           <>
                             <span className="line-through opacity-60">{$(item.regularPrice)}</span>{" "}
                             <span className={th.acc}>{$(item.unitPrice)}</span>{" "}
-                            <span className="text-xs font-bold px-1 py-0.5 rounded bg-[#1E40AF]/15 text-[#1E40AF]">💎</span>
+                            <span className="text-xs font-bold px-1 py-0.5 rounded bg-[#E11D48]/15 text-[#E11D48]">💎</span>
                           </>
                         ) : (
                           <span>{$(item.unitPrice)}</span>
@@ -201,10 +201,10 @@ export function OrderDetailModal({ orderId, onClose }: OrderDetailModalProps) {
                 </div>
                 {disc > 0 && (
                   <div className="flex justify-between mt-0.5 ml-10">
-                    <span className="text-xs text-[#E89B48]">
+                    <span className="text-xs text-[#E11D48]">
                       {t.discount} {item.discountType === "percent" ? `${item.discountValue}%` : ""}
                     </span>
-                    <span className="text-xs font-bold text-[#E89B48]">-{$(disc)}</span>
+                    <span className="text-xs font-bold text-[#E11D48]">-{$(disc)}</span>
                   </div>
                 )}
               </div>
@@ -228,14 +228,14 @@ export function OrderDetailModal({ orderId, onClose }: OrderDetailModalProps) {
               )}
               {itemDiscTotal > 0 && (
                 <div className="flex justify-between mb-1.5">
-                  <span className="text-xs text-[#E89B48]">{t.itemDiscount}</span>
-                  <span className="text-sm font-semibold text-[#E89B48]">-{$(itemDiscTotal)}</span>
+                  <span className="text-xs text-[#E11D48]">{t.itemDiscount}</span>
+                  <span className="text-sm font-semibold text-[#E11D48]">-{$(itemDiscTotal)}</span>
                 </div>
               )}
               {orderDisc > 0 && (
                 <div className="flex justify-between mb-1.5">
-                  <span className="text-xs text-[#E89B48]">{t.orderDiscount}{order.orderDiscountType === "percent" ? ` ${order.orderDiscountValue}%` : ""}</span>
-                  <span className="text-sm font-semibold text-[#E89B48]">-{$(orderDisc)}</span>
+                  <span className="text-xs text-[#E11D48]">{t.orderDiscount}{order.orderDiscountType === "percent" ? ` ${order.orderDiscountValue}%` : ""}</span>
+                  <span className="text-sm font-semibold text-[#E11D48]">-{$(orderDisc)}</span>
                 </div>
               )}
               {order.ppnRate > 0 && (
@@ -292,7 +292,7 @@ export function OrderDetailModal({ orderId, onClose }: OrderDetailModalProps) {
         {canRefund && order.status === "completed" && !showRefund && (
           <div className="mt-4">
             <button onClick={() => { setShowRefund(true); setRefundSelections({}); setRefundReason(""); }}
-              className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-2xl text-sm font-bold text-[#E89B48] border border-[#E89B48]/20">
+              className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-2xl text-sm font-bold text-[#E11D48] border border-[#E11D48]/20">
               <RotateCcw size={13} /> {t.refundOrder}
             </button>
           </div>
@@ -300,17 +300,17 @@ export function OrderDetailModal({ orderId, onClose }: OrderDetailModalProps) {
 
         {/* Refund panel */}
         {showRefund && (
-          <div className={`mt-4 rounded-2xl border p-4 ${th.dark ? "border-[#E89B48]/30 bg-[#E89B48]/5" : "border-amber-200 bg-amber-50/50"}`}>
+          <div className={`mt-4 rounded-2xl border p-4 ${th.dark ? "border-[#E11D48]/30 bg-[#E11D48]/5" : "border-[#FFB5C0] bg-[#FFE4E9]/50"}`}>
             <div className="flex items-center justify-between mb-3">
-              <p className={`text-sm font-bold ${th.dark ? "text-[#E89B48]" : "text-amber-700"}`}>{t.selectItemsToRefund}</p>
-              <button onClick={refundAll} className="text-xs font-bold text-[#E89B48]">{t.refundAll}</button>
+              <p className={`text-sm font-bold ${th.dark ? "text-[#E11D48]" : "text-[#E11D48]"}`}>{t.selectItemsToRefund}</p>
+              <button onClick={refundAll} className="text-xs font-bold text-[#E11D48]">{t.refundAll}</button>
             </div>
             {order.items.map((item, idx) => {
               const selected = refundSelections[idx] !== undefined;
               return (
                 <div key={idx} className={`flex items-center gap-2.5 py-2 ${idx > 0 ? `border-t ${th.bdr}/30` : ""}`}>
                   <button onClick={() => toggleRefundItem(idx)} aria-label="Select item for refund" className="shrink-0">
-                    {selected ? <CheckSquare size={16} className="text-[#E89B48]" /> : <Square size={16} className={th.txf} />}
+                    {selected ? <CheckSquare size={16} className="text-[#E11D48]" /> : <Square size={16} className={th.txf} />}
                   </button>
                   <div className="flex-1 min-w-0">
                     <p className={`text-xs font-bold truncate ${th.tx}`}>{item.name}</p>
@@ -335,15 +335,15 @@ export function OrderDetailModal({ orderId, onClose }: OrderDetailModalProps) {
             </div>
             {selectedCount > 0 && (
               <div className={`flex justify-between mt-3 pt-3 border-t ${th.bdr}/30`}>
-                <span className={`text-sm font-bold ${th.dark ? "text-[#E89B48]" : "text-amber-700"}`}>{t.refundAmount}</span>
-                <span className="text-sm font-black text-[#E89B48]">{$(refundTotal)}</span>
+                <span className={`text-sm font-bold ${th.dark ? "text-[#E11D48]" : "text-[#E11D48]"}`}>{t.refundAmount}</span>
+                <span className="text-sm font-black text-[#E11D48]">{$(refundTotal)}</span>
               </div>
             )}
             <div className="flex gap-2 mt-3">
               <button onClick={() => setShowRefund(false)}
                 className={`flex-1 py-2.5 rounded-xl text-sm font-bold border ${th.bdr} ${th.txm}`}>{t.cancel}</button>
               <button onClick={doRefund} disabled={selectedCount === 0 || !refundReason.trim()}
-                className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white bg-[#E89B48] disabled:opacity-40">{t.confirm}</button>
+                className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white bg-[#E11D48] disabled:opacity-40">{t.confirm}</button>
             </div>
           </div>
         )}
@@ -357,7 +357,7 @@ export function OrderDetailModal({ orderId, onClose }: OrderDetailModalProps) {
                 <Ban size={13} /> {t.voidOrder}
               </button>
             ) : (
-              <div className={`rounded-2xl border p-4 ${th.dark ? "border-[#C4504A]/30 bg-[#C4504A]/10" : "border-red-200 bg-red-50"}`}>
+              <div className={`rounded-2xl border p-4 ${th.dark ? "border-[#C4504A]/30 bg-[#C4504A]/10" : "border-[#BE123C] bg-[#FCE4EC]"}`}>
                 <p className={`text-sm font-bold mb-3 ${th.dark ? "text-[#E8A0A0]" : "text-[#C4504A]"}`}>{t.voidConfirm}</p>
                 <div className="flex gap-2">
                   <button onClick={() => setShowVoidConfirm(false)}

@@ -39,8 +39,8 @@ export function DeviceApprovalPage({ kind }: Props) {
     day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit",
   }).format(new Date());
 
-  let accent = "#1E40AF";
-  let barGradient = "from-[#1E40AF] to-[#60A5FA]";
+  let accent = "#E11D48";
+  let barGradient = "from-[#E11D48] to-[#FB7185]";
   let title = "Memproses...";
   let description: React.ReactNode = "Mohon tunggu sebentar.";
   let icon = <div className="w-8 h-8 border-[3px] border-current border-t-transparent rounded-full animate-spin" />;
@@ -73,8 +73,8 @@ export function DeviceApprovalPage({ kind }: Props) {
     <div
       className={`min-h-screen flex flex-col items-center justify-center px-5 py-6 ${
         th.dark
-          ? "bg-gradient-to-br from-[#0F172A] to-[#020617]"
-          : "bg-gradient-to-br from-[#F0F9FF] via-[#F1F5F9] to-[#DBEAFE]/20"
+          ? "bg-gradient-to-br from-[#2B1318] to-[#140B0F]"
+          : "bg-gradient-to-br from-[#F0F9FF] via-[#FBE8EE] to-[#FFD1DB]/20"
       }`}
       style={{
         paddingTop: "max(1.5rem, env(safe-area-inset-top))",
@@ -90,7 +90,7 @@ export function DeviceApprovalPage({ kind }: Props) {
         role={liveRegion}
         aria-live="polite"
         className={`w-full max-w-sm rounded-3xl overflow-hidden ${th.card} border ${th.bdr} ${
-          th.dark ? "" : "shadow-xl shadow-[#1E3A8A]/[0.08]"
+          th.dark ? "" : "shadow-xl shadow-[#9F1239]/[0.08]"
         } animate-page-enter`}
       >
         <div className={`h-1 bg-gradient-to-r ${barGradient}`} aria-hidden="true" />
@@ -109,7 +109,7 @@ export function DeviceApprovalPage({ kind }: Props) {
             <>
               <div
                 className={`mt-5 pt-4 border-t flex justify-between text-xs ${th.txf}`}
-                style={{ borderColor: th.dark ? "#334155" : "#E2E8F0" }}
+                style={{ borderColor: th.dark ? "#3D2230" : "#F9C5D0" }}
               >
                 <span>Security</span>
                 <time>{now}</time>
@@ -119,7 +119,7 @@ export function DeviceApprovalPage({ kind }: Props) {
                 type="button"
                 onClick={() => window.close()}
                 className={`mt-4 min-h-[40px] px-6 rounded-full text-xs font-semibold transition-colors ${
-                  th.dark ? "bg-[#F1F5F9] text-[#1E293B]" : "bg-[#1E293B] text-white"
+                  th.dark ? "bg-[#FBE8EE] text-[#261620]" : "bg-[#261620] text-white"
                 }`}
               >
                 Tutup

@@ -14,9 +14,16 @@ export interface OrderItemRes {
   discount_amount?: number;
 }
 
+export interface OrderPaymentRes {
+  id: string;
+  method: string;
+  amount: number;
+}
+
 export interface OrderRes {
   id: string;
   items: OrderItemRes[];
+  payments?: OrderPaymentRes[];
   subtotal: number;
   ppn_rate: number;
   ppn: number;
@@ -86,6 +93,7 @@ export const orderApi = {
     ppn: number;
     total: number;
     payment: string;
+    payments?: { method: string; amount: number }[];
     customer?: string;
     customer_phone?: string;
     member_id?: string;
@@ -98,6 +106,36 @@ export const orderApi = {
   cancel: (id: string) => api.patch<OrderRes>(`/orders/${id}/cancel`),
 
   resendWA: (id: string) => api.post<null>(`/orders/${id}/send-wa`, {}),
+
+  // Pending order flow — customer pesan online, bayar belakangan.
+  createPending: (data: {
+    items: {
+      product_id: string; name: string; quantity: number; unit_type?: string;
+      unit_price: number; regular_price?: number;
+      discount_type?: string; discount_value?: number; discount_amount?: number;
+    }[];
+    subtotal: number;
+    ppn_rate: number;
+    ppn: number;
+    total: number;
+    customer?: string;
+    customer_phone: string;
+    member_id?: string;
+    order_discount_type?: string;
+    order_discount_value?: number;
+    order_discount?: number;
+    bank_account_id?: string;
+  }) => api.post<OrderRes>('/orders/pending', data),
+
+  markAsPaid: (id: string, payments: { method: string; amount: number }[]) =>
+    api.post<OrderRes>(`/orders/${id}/mark-paid`, { payments }),
+
+  cancelPending: (id: string) => api.post<null>(`/orders/${id}/cancel-pending`, {}),
+
+  resendInvoice: (id: string, bankAccountId?: string) => {
+    const q = bankAccountId ? `?bank_account_id=${encodeURIComponent(bankAccountId)}` : "";
+    return api.post<null>(`/orders/${id}/resend-invoice${q}`, {});
+  },
 };
 
 export const refundApi = {

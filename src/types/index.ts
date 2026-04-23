@@ -78,9 +78,16 @@ export interface CartItem {
   discountValue?: number;
 }
 
+export interface OrderPaymentSplit {
+  id?: string;
+  method: PaymentMethod;
+  amount: number;
+}
+
 export interface Order {
   id: string;
   items: OrderItem[];
+  payments?: OrderPaymentSplit[];
   subtotal: number;
   ppnRate: number;
   ppn: number;

@@ -94,7 +94,7 @@ export function ProductDetailModal({ productId, onClose }: ProductDetailModalPro
               </div>
               <div className="flex justify-between items-baseline">
                 <span className={`text-xs ${th.txm}`}>{t.profitMargin}</span>
-                <span className={`text-sm font-bold ${margin > 0 ? "text-[#4A8B3F]" : "text-[#D4627A]"}`}>{margin}%</span>
+                <span className={`text-sm font-bold ${margin > 0 ? "text-[#E11D48]" : "text-[#BE123C]"}`}>{margin}%</span>
               </div>
             </>
           )}
@@ -111,13 +111,13 @@ export function ProductDetailModal({ productId, onClose }: ProductDetailModalPro
           </div>
           <div className="flex items-center gap-2">
             {product.stock === 0 && (
-              <span className={`text-xs font-bold px-2 py-0.5 rounded-md ${th.dark ? "bg-[#D4627A]/15 text-[#D4627A]" : "bg-red-50 text-[#D4627A]"}`}>{t.outOfStock}</span>
+              <span className={`text-xs font-bold px-2 py-0.5 rounded-md ${th.dark ? "bg-[#BE123C]/15 text-[#BE123C]" : "bg-[#FCE4EC] text-[#BE123C]"}`}>{t.outOfStock}</span>
             )}
             {product.stock > 0 && product.stock <= product.minStock && (
-              <span className={`text-xs font-bold px-2 py-0.5 rounded-md ${th.dark ? "bg-[#60A5FA]/15 text-[#60A5FA]" : "bg-[#EFF6FF] text-[#1E40AF]"}`}>{t.lowStock}</span>
+              <span className={`text-xs font-bold px-2 py-0.5 rounded-md ${th.dark ? "bg-[#FB7185]/15 text-[#FB7185]" : "bg-[#FFE4E9] text-[#E11D48]"}`}>{t.lowStock}</span>
             )}
             {product.stock > product.minStock && (
-              <span className={`text-xs font-bold px-2 py-0.5 rounded-md ${th.dark ? "bg-[#4A8B3F]/15 text-[#6F9A4D]" : "bg-[#F0F8EC] text-[#4A8B3F]"}`}>{t.normalStock}</span>
+              <span className={`text-xs font-bold px-2 py-0.5 rounded-md ${th.dark ? "bg-[#E11D48]/15 text-[#E11D48]" : "bg-[#F0F8EC] text-[#E11D48]"}`}>{t.normalStock}</span>
             )}
             {!product.isActive && (
               <span className={`text-xs font-bold px-2 py-0.5 rounded-md ${th.elev} ${th.txf}`}>{t.inactive}</span>
@@ -146,10 +146,10 @@ export function ProductDetailModal({ productId, onClose }: ProductDetailModalPro
                   </div>
                   <span className={`text-xs font-bold px-2 py-0.5 rounded-md ${
                     isExpired
-                      ? (th.dark ? "bg-[#D4627A]/15 text-[#D4627A]" : "bg-red-50 text-[#D4627A]")
+                      ? (th.dark ? "bg-[#BE123C]/15 text-[#BE123C]" : "bg-[#FCE4EC] text-[#BE123C]")
                       : isUrgent
-                        ? (th.dark ? "bg-[#60A5FA]/15 text-[#60A5FA]" : "bg-[#EFF6FF] text-[#1E40AF]")
-                        : (th.dark ? "bg-[#4A8B3F]/15 text-[#6F9A4D]" : "bg-[#F0F8EC] text-[#4A8B3F]")
+                        ? (th.dark ? "bg-[#FB7185]/15 text-[#FB7185]" : "bg-[#FFE4E9] text-[#E11D48]")
+                        : (th.dark ? "bg-[#E11D48]/15 text-[#E11D48]" : "bg-[#F0F8EC] text-[#E11D48]")
                   }`}>
                     {isExpired ? (t.expired as string) : `${days} ${t.days}`}
                   </span>
@@ -176,8 +176,8 @@ export function ProductDetailModal({ productId, onClose }: ProductDetailModalPro
                 <div key={m.id} className={`flex items-center justify-between py-1.5 border-b last:border-0 ${th.bdrSoft}`}>
                   <div className="flex items-center gap-2 min-w-0">
                     {m.type === "in"
-                      ? <ArrowDownCircle size={14} className="shrink-0 text-[#4A8B3F]" />
-                      : <ArrowUpCircle size={14} className="shrink-0 text-[#D4627A]" />
+                      ? <ArrowDownCircle size={14} className="shrink-0 text-[#E11D48]" />
+                      : <ArrowUpCircle size={14} className="shrink-0 text-[#BE123C]" />
                     }
                     <div className="min-w-0">
                       <p className={`text-xs font-bold ${th.tx}`}>

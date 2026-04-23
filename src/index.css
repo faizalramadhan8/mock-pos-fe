@@ -1,14 +1,52 @@
+/* Unified font: Proxima Nova for both text AND numbers (owner request).
+   Proxima Nova is a commercial font; when present on the user's system or
+   served via Adobe Fonts it will be used. Fallback is Mulish — a Google-
+   Fonts humanist sans drawn specifically as a free Proxima-Nova lookalike,
+   ensuring consistent look on browsers that do not have the commercial font.
+   MUST be first: @import must precede all other statements per CSS spec. */
+@import url("https://fonts.googleapis.com/css2?family=Mulish:ital,wght@0,300..900;1,300..900&display=swap");
 @import "tailwindcss";
 
-/* Owner request: perbesar tulisan global. Ubah angka di bawah untuk
-   menyesuaikan (default browser = 16px). Semua ukuran lain ikut skalanya
-   karena Tailwind pakai rem. */
+/* Base size: 20px for legibility on 50+ eyes. Every rem-based Tailwind size
+   (text-sm, text-base, text-2xl…) scales off this. */
 html {
   font-size: 20px;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
-/* Hide spinner arrows on number inputs — owner accidentally clicked them
-   and changed prices by ±1 (21500 → 21499). Users type numbers directly. */
+body {
+  /* Unified Proxima Nova stack. If the user has Proxima Nova self-hosted or
+     via Adobe Fonts it wins; otherwise Mulish (free Google Font lookalike)
+     renders nearly identically. System-ui is a last-mile safety net. */
+  font-family: "Proxima Nova", "Proxima Nova Alt", "ProximaNova-Regular",
+               "Mulish", -apple-system, BlinkMacSystemFont, "Segoe UI",
+               Roboto, Helvetica, Arial, system-ui, sans-serif;
+  font-feature-settings: "ss01", "ss02", "tnum";  /* tabular nums for prices */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overscroll-behavior: none;
+  margin: 0;
+  background: #FFF4F6;
+  color: #2B1318;
+}
+
+/* .font-display — same Proxima Nova family, tuned for large display usage:
+   tighter letter-spacing + tabular figures so price columns align. */
+.font-display {
+  font-family: "Proxima Nova", "Proxima Nova Alt", "ProximaNova-Regular",
+               "Mulish", -apple-system, BlinkMacSystemFont, "Segoe UI",
+               Roboto, Helvetica, Arial, system-ui, sans-serif;
+  font-feature-settings: "tnum", "lnum";
+  letter-spacing: -0.02em;
+}
+
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+.pb-safe { padding-bottom: env(safe-area-inset-bottom, 0px); }
+
+/* Hide spinner arrows on <input type="number"> — owner reported accidentally
+   clicking them and changing prices by ±1 (21500 → 21499). */
 input[type="number"]::-webkit-inner-spin-button,
 input[type="number"]::-webkit-outer-spin-button {
   -webkit-appearance: none;
@@ -18,30 +56,22 @@ input[type="number"] {
   -moz-appearance: textfield;
 }
 
-body {
-  /* Owner preference: Arial Narrow. Fallback chain covers mobile (Roboto
-     Condensed ships on most Android) and macOS (Helvetica Neue Condensed). */
-  font-family: "Arial Narrow", "Helvetica Neue Condensed", "Roboto Condensed",
-               "Arial Narrow Bold", Arial, Helvetica, "Segoe UI", system-ui, sans-serif;
-  font-stretch: condensed;
-  -webkit-font-smoothing: antialiased;
-  overscroll-behavior: none;
-  margin: 0;
-}
-
-.scrollbar-hide::-webkit-scrollbar { display: none; }
-.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
-.pb-safe { padding-bottom: env(safe-area-inset-bottom, 0px); }
-
+/* Motion ──────────────────────────────────────────────────────────────── */
 @keyframes slideUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes spin { to { transform: rotate(360deg); } }
+@keyframes pageEnter { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes cardPop { from { opacity: 0; transform: translateY(6px) scale(0.985); } to { opacity: 1; transform: translateY(0) scale(1); } }
+
 .animate-slide-up { animation: slideUp .25s ease-out; }
 .animate-fade-in { animation: fadeIn .2s ease-out; }
 .animate-spin { animation: spin 1s linear infinite; }
-
-@keyframes pageEnter { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 .animate-page-enter { animation: pageEnter .2s ease-out; }
+.animate-card-pop { animation: cardPop .28s cubic-bezier(.2,.7,.2,1) both; }
+
+/* Subtle press-feedback utility for key CTAs */
+.press-spring { transition: transform .08s ease-out; }
+.press-spring:active { transform: scale(0.96); }
 
 @media (hover: none) {
   button, a, [role="button"] { -webkit-tap-highlight-color: transparent; }
@@ -50,4 +80,13 @@ body {
 /* Print: hide app shell, only receipt popup prints */
 @media print {
   body > * { display: none !important; }
+}
+
+/* Reduce motion for users who prefer it */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

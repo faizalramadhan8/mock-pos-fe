@@ -1,6 +1,5 @@
 import { memo } from "react";
-import { Info } from "lucide-react";
-import { ProductImage } from "./ProductImage";
+import { Info, Plus, Package } from "lucide-react";
 import { useThemeClasses } from "@/hooks/useThemeClasses";
 import { formatCurrency as $ } from "@/utils";
 import type { Product, UnitType, Lang } from "@/types";
@@ -15,60 +14,127 @@ interface ProductCardProps {
   onDetail?: (productId: string) => void;
 }
 
+// Text-only ProductCard. Optimised for ~180-260px column widths on the
+// kasir tablet. Vertical-first layout so nothing ever overflows:
+//   SKU · info          (header row)
+//   Product Name         (2-line clamp, large display)
+//   Rp price / unit      (single line, whitespace-nowrap)
+//   Stock pill           (one colour per state)
+//   Primary CTA          (full-width)
+//   Secondary box CTA    (below, compact)
+// No product image — owner decision. The decorative blush is subtle
+// (20% opacity, smaller) so it supports but never competes with text.
 export const ProductCard = memo(function ProductCard({ product: p, inCart, lang, t, onAdd, onDetail }: ProductCardProps) {
   const th = useThemeClasses();
+  const outOfStock = p.stock === 0;
+  const lowStock = p.stock > 0 && p.stock <= p.minStock;
+
+  const stockChip = outOfStock || lowStock
+    ? "bg-[#FCE4EC] text-[#BE123C] dark:bg-[#BE123C]/25 dark:text-[#FB7185]"
+    : `${th.accBg} ${th.acc}`;
 
   return (
-    <div className={`rounded-[20px] border overflow-hidden transition-all ${
-      inCart ? "border-[#1E40AF] ring-1 ring-[#1E40AF]/20" : th.bdr
-    } ${th.card} ${p.stock === 0 ? "opacity-40" : ""}`}>
-      <div className="p-3.5 relative">
-        {onDetail && (
-          <button
-            onClick={(e) => { e.stopPropagation(); onDetail(p.id); }}
-            className={`absolute top-2 right-2 z-10 p-1.5 rounded-lg ${th.elev} ${th.txm} hover:opacity-70`}
-          >
-            <Info size={14} />
-          </button>
-        )}
-        <div className={`flex justify-center py-3 rounded-2xl mb-3 ${th.ring}`}>
-          <ProductImage product={p} size={72} />
+    <div
+      className={`group relative rounded-2xl border overflow-hidden transition-all duration-200 press-spring ${
+        inCart
+          ? "border-[#E11D48] ring-2 ring-[#FFB5C0]/50 shadow-[0_6px_18px_-10px_rgba(225,29,72,0.35)]"
+          : `${th.bdr} hover:border-[#FFB5C0]`
+      } ${th.card} ${outOfStock ? "opacity-55" : ""}`}
+    >
+      {/* Soft blush — smaller, lower opacity so it never dominates */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -top-8 -right-8 w-24 h-24 rounded-full opacity-20 blur-2xl"
+        style={{ background: "radial-gradient(circle, #FFB5C0 0%, transparent 70%)" }}
+      />
+
+      <div className="relative p-3.5 flex flex-col gap-2.5">
+        {/* Header row: SKU + info icon (small, discrete) */}
+        <div className="flex items-start justify-between gap-2">
+          <p className={`text-[10px] font-mono uppercase tracking-[0.12em] ${th.txf} leading-tight`}>
+            {p.sku}
+          </p>
+          {onDetail && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onDetail(p.id); }}
+              aria-label="Detail produk"
+              className={`-m-1.5 p-1.5 rounded-full ${th.txf} hover:${th.acc} transition-colors`}
+            >
+              <Info size={14} strokeWidth={2.2} />
+            </button>
+          )}
         </div>
-        <p className={`text-xs font-mono ${th.txf}`}>{p.sku}</p>
-        <p className={`text-sm font-bold leading-tight mt-0.5 truncate tracking-tight ${th.tx}`}>
+
+        {/* Product name — hero, up to 2 lines, word-break so long names
+            never truncate mid-character. Minimum height reserves 2 lines so
+            cards in the same row stay aligned even when one name is short. */}
+        <p
+          className={`font-display text-[17px] font-black leading-[1.2] tracking-tight ${th.tx}`}
+          style={{
+            fontVariationSettings: '"wght" 900',
+            display: "-webkit-box",
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: "vertical",
+            overflow: "hidden",
+            overflowWrap: "anywhere",
+            minHeight: "calc(17px * 1.2 * 2)",
+          }}
+        >
           {lang === "id" ? p.nameId : p.name}
         </p>
-        <div className="flex items-baseline gap-1 mt-1.5">
-          <span className={`text-sm font-black tracking-tight ${th.acc}`}>{$(p.sellingPrice)}</span>
-          <span className={`text-xs ${th.txf}`}>/{p.unit}</span>
+
+        {/* Price — single-line wrap-capable; number always intact on its own
+            line if needed. No truncate on the number itself — the full
+            Rupiah must always be readable. */}
+        <div className="flex items-baseline flex-wrap gap-x-1.5 gap-y-0">
+          <span
+            className={`font-display text-[22px] font-black tracking-tight leading-none ${th.acc}`}
+            style={{ fontVariationSettings: '"wght" 800', whiteSpace: "nowrap" }}
+          >
+            {$(p.sellingPrice)}
+          </span>
+          <span className={`text-sm ${th.txm}`}>/ {p.unit}</span>
         </div>
-        <div className="mt-1.5">
-          {p.stock === 0 && (
-            <span className={`text-base font-black px-2.5 py-1 rounded-lg ${th.dark ? "bg-[#D4627A]/20 text-[#D4627A]" : "bg-red-100 text-[#D4627A]"}`}>
-              {t.soldOut}
-            </span>
-          )}
-          {p.stock > 0 && p.stock <= p.minStock && (
-            <span className={`text-base font-black px-2.5 py-1 rounded-lg ${th.dark ? "bg-[#D4627A]/20 text-[#D4627A]" : "bg-red-100 text-[#D4627A]"}`}>
-              {p.stock} {t.left}
-            </span>
-          )}
-          {p.stock > p.minStock && (
-            <span className={`text-base font-black px-2.5 py-1 rounded-lg ${th.dark ? "bg-[#4A8B3F]/20 text-[#4A8B3F]" : "bg-green-100 text-[#4A8B3F]"}`}>
-              {p.stock} {t.inStock}
-            </span>
-          )}
+
+        {/* Member price — inline compact, only if applicable */}
+        {typeof p.memberPrice === "number" && p.memberPrice > 0 && p.memberPrice < p.sellingPrice && (
+          <p className={`text-xs font-bold truncate ${th.acc}`}>
+            Member {$(p.memberPrice)}
+          </p>
+        )}
+
+        {/* Stock pill — compact, pink family (not black) */}
+        <div>
+          <span className={`inline-flex items-center gap-1 text-sm font-black px-2.5 py-1 rounded-full ${stockChip}`}>
+            <Package size={12} strokeWidth={2.5} />
+            {outOfStock ? t.soldOut : lowStock ? `${p.stock} ${t.left}` : `${p.stock} ${t.inStock}`}
+          </span>
         </div>
       </div>
-      <div className="grid grid-cols-2 gap-1.5 px-3.5 pb-3.5">
-        <button onClick={() => onAdd(p, "individual")} disabled={p.stock === 0}
-          className={`py-2 rounded-xl text-xs font-bold disabled:opacity-30 border ${th.bdr} ${th.card2} ${th.acc}`}>
+
+      {/* Actions — stacked vertically so narrow cards never clip */}
+      <div className="relative px-3.5 pb-3.5 flex flex-col gap-1.5">
+        <button
+          onClick={() => onAdd(p, "individual")}
+          disabled={outOfStock}
+          className="press-spring flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-black text-white bg-gradient-to-br from-[#FB7185] to-[#E11D48] shadow-[0_3px_10px_-4px_rgba(225,29,72,0.45)] disabled:opacity-30 disabled:shadow-none"
+        >
+          <Plus size={14} strokeWidth={3} />
           {t.addPcs}
         </button>
-        <button onClick={() => onAdd(p, "box")} disabled={p.stock < p.qtyPerBox}
-          className={`py-2 rounded-xl text-xs font-bold disabled:opacity-30 ${th.accBg} ${th.acc}`}>
-          {t.addBox}({p.qtyPerBox})
-        </button>
+        {p.qtyPerBox > 1 && (
+          <button
+            onClick={() => onAdd(p, "box")}
+            disabled={p.stock < p.qtyPerBox}
+            className={`press-spring flex items-center justify-center gap-1 py-2 rounded-xl text-xs font-bold border-2 disabled:opacity-30 ${
+              th.dark
+                ? "border-[#E11D48]/40 text-[#FB7185]"
+                : "border-[#FFB5C0] text-[#E11D48]"
+            }`}
+          >
+            {t.box} · {p.qtyPerBox}
+          </button>
+        )}
       </div>
     </div>
   );

@@ -106,7 +106,7 @@ export default function App() {
     <div className={`min-h-screen flex items-center justify-center ${th.bg}`}>
       <div className="flex flex-col items-center gap-4">
         <BakeryLogo size={56} />
-        <div className="w-6 h-6 border-2 border-[#1E40AF] border-t-transparent rounded-full animate-spin" />
+        <div className="w-6 h-6 border-2 border-[#E11D48] border-t-transparent rounded-full animate-spin" />
       </div>
     </div>
   );
@@ -122,20 +122,27 @@ export default function App() {
 
   return (
     <div className={`min-h-screen ${th.bg}`}>
-      {/* Header */}
-      <header className={`fixed top-0 left-0 right-0 z-40 h-[72px] flex items-center justify-between px-4 border-b backdrop-blur-xl ${th.dark ? "bg-[#1E293B]/85" : "bg-white/85"} ${th.bdr}`}>
-        <div className="flex items-center gap-3">
-          <BakeryLogo size={44} />
-          <div>
-            <p className={`text-base font-extrabold leading-tight tracking-tight ${th.tx}`}>{t[currentPage as keyof typeof t] as string || t.appName}</p>
-            <p className={`text-xs ${th.txm}`}>{user.name} · {(t.roles as Record<string, string>)[user.role]}</p>
+      {/* Header — max-width matches main so the logo/title line up with page
+          content on wide screens, not floating at the extreme left edge. */}
+      <header className={`fixed top-0 left-0 right-0 z-40 h-[72px] border-b backdrop-blur-xl ${th.dark ? "bg-[#261620]/85" : "bg-white/90"} ${th.bdr}`}>
+        <div className="max-w-4xl mx-auto h-full flex items-center justify-between px-4">
+          <div className="flex items-center gap-3 min-w-0">
+            <BakeryLogo size={44} />
+            <div className="min-w-0">
+              <p className={`font-display text-lg font-black leading-tight tracking-tight truncate ${th.tx}`} style={{ fontVariationSettings: '"wght" 800' }}>
+                {t[currentPage as keyof typeof t] as string || t.appName}
+              </p>
+              <p className={`text-sm truncate ${th.txm}`}>{user.name} · {(t.roles as Record<string, string>)[user.role]}</p>
+            </div>
           </div>
+          <NotificationBell />
         </div>
-        <NotificationBell />
       </header>
 
-      {/* Content */}
-      <main className="pt-[84px] pb-28 px-4 max-w-5xl mx-auto">
+      {/* Content — max-w-4xl (≈1280px at 20px base) matches expected tablet/
+          desktop usage; the app is never used on 1600px+ monitors and
+          limiting width prevents awkward grid stretching. */}
+      <main className="pt-[84px] pb-28 px-4 max-w-4xl mx-auto">
         <ErrorBoundary onReset={() => setPage("dashboard")}>
           <Suspense fallback={<PageLoader />}>
             <div key={currentPage} className="animate-page-enter">
@@ -145,19 +152,29 @@ export default function App() {
         </ErrorBoundary>
       </main>
 
-      {/* Bottom Nav */}
-      <nav aria-label="Main navigation" className={`fixed bottom-0 left-0 right-0 z-40 border-t backdrop-blur-xl pb-safe ${th.dark ? "bg-[#1E293B]/92" : "bg-white/92"} ${th.bdr}`}>
+      {/* Bottom Nav — active tab now has a bottom-aligned pink indicator bar
+          plus a subtle scale bounce, so location is spatially obvious even
+          with glance-and-tap usage. */}
+      <nav aria-label="Main navigation" className={`fixed bottom-0 left-0 right-0 z-40 border-t backdrop-blur-xl pb-safe ${th.dark ? "bg-[#261620]/92" : "bg-white/95"} ${th.bdr}`}>
         <div role="tablist" className="flex items-center justify-around max-w-md mx-auto h-20">
           {navItems.map((id, idx) => {
             const active = currentPage === id;
             return (
               <button key={id} role="tab" aria-selected={active} tabIndex={active ? 0 : -1}
                 onClick={() => setPage(id)} onKeyDown={(e) => handleNavKeyDown(e, idx)}
-                className={`flex flex-col items-center gap-1 py-2 px-3 rounded-2xl transition-colors ${active ? th.acc : th.txf}`}>
-                <div className={`p-2 rounded-xl transition-colors ${active ? th.accBg : ""}`}>
+                className={`relative flex flex-col items-center gap-1 py-2 px-3 rounded-2xl transition-all ${active ? th.acc : th.txf}`}>
+                <div className={`p-2 rounded-2xl transition-all ${active ? `${th.accBg} scale-110` : ""}`}>
                   {NAV_ICONS[id]}
                 </div>
-                <span className="text-xs font-semibold">{t[id as keyof typeof t] as string}</span>
+                <span className={`text-xs font-semibold transition-all ${active ? "font-black" : ""}`}>
+                  {t[id as keyof typeof t] as string}
+                </span>
+                {active && (
+                  <span
+                    aria-hidden
+                    className="absolute -top-px left-1/2 -translate-x-1/2 h-[3px] w-10 rounded-full bg-gradient-to-r from-[#FFB5C0] to-[#E11D48]"
+                  />
+                )}
               </button>
             );
           })}

@@ -76,8 +76,8 @@ export function InventoryPage() {
     qtyPerBox: "12", stock: "0", unit: "kg" as UnitOfMeasure, image: "", minStock: "10",
   });
   const [addCatOpen, setAddCatOpen] = useState(false);
-  const [newCat, setNewCat] = useState({ name: "", nameId: "", color: "#3B82F6" });
-  const catColors = ["#3B82F6", "#D4627A", "#5B8DEF", "#7D5A44", "#8B6FC0", "#6F9A4D", "#E89B48", "#2BA5B5", "#9B59B6", "#E74C3C"];
+  const [newCat, setNewCat] = useState({ name: "", nameId: "", color: "#F472B6" });
+  const catColors = ["#F472B6", "#BE123C", "#E11D48", "#7D5A44", "#E11D48", "#E11D48", "#E11D48", "#E11D48", "#9B59B6", "#E74C3C"];
   const [overviewFilter, setOverviewFilter] = useState<"all" | "low" | "out" | "inactive" | "member">("all");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [productSearch, setProductSearch] = useState("");
@@ -185,7 +185,7 @@ export function InventoryPage() {
     if (!newCat.name || !newCat.nameId) return;
     addCategory({ id: genId(), name: newCat.name, nameId: newCat.nameId, icon: "", color: newCat.color });
     setAddCatOpen(false);
-    setNewCat({ name: "", nameId: "", color: "#3B82F6" });
+    setNewCat({ name: "", nameId: "", color: "#F472B6" });
     toast.success(t.categoryAdded as string);
   };
 
@@ -356,9 +356,9 @@ export function InventoryPage() {
                   className={`flex items-center justify-between px-5 py-3 border-b last:border-0 cursor-pointer active:opacity-70 ${th.bdrSoft}`}>
                   <div className="flex items-center gap-2.5">
                     <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${
-                      m.type === "in" ? (th.dark ? "bg-[#4A8B3F]/15" : "bg-green-50") : (th.dark ? "bg-[#C4504A]/15" : "bg-red-50")
+                      m.type === "in" ? (th.dark ? "bg-[#E11D48]/15" : "bg-[#FFE4E9]") : (th.dark ? "bg-[#C4504A]/15" : "bg-[#FCE4EC]")
                     }`}>
-                      {m.type === "in" ? <ArrowDownCircle size={14} className="text-[#4A8B3F]" /> : <ArrowUpCircle size={14} className="text-[#C4504A]" />}
+                      {m.type === "in" ? <ArrowDownCircle size={14} className="text-[#E11D48]" /> : <ArrowUpCircle size={14} className="text-[#C4504A]" />}
                     </div>
                     <div>
                       <p className={`text-sm font-semibold ${th.tx}`}>
@@ -369,7 +369,7 @@ export function InventoryPage() {
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className={`text-sm font-semibold ${m.type === "in" ? "text-[#4A8B3F]" : "text-[#C4504A]"}`}>{$(m.unitPrice * m.quantity)}</p>
+                    <p className={`text-sm font-semibold ${m.type === "in" ? "text-[#E11D48]" : "text-[#C4504A]"}`}>{$(m.unitPrice * m.quantity)}</p>
                     <p className={`text-xs ${th.txf}`}>{formatTime(m.createdAt)}</p>
                   </div>
                 </div>
@@ -443,14 +443,14 @@ export function InventoryPage() {
             <button key={tab.id} onClick={() => setActiveTab(tab.id)}
               className={`shrink-0 flex items-center gap-1.5 px-3.5 py-2.5 rounded-[14px] text-xs font-bold transition-all ${
                 activeTab === tab.id
-                  ? "text-white bg-gradient-to-r from-[#60A5FA] to-[#1E40AF]"
+                  ? "text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48]"
                   : `border ${th.card} ${th.bdr} ${th.txm}`
               }`}>
               {tab.icon} {tab.label}
             </button>
           ))}
         </div>
-        <div className={`absolute right-0 top-0 bottom-1 w-8 pointer-events-none bg-gradient-to-l ${th.dark ? "from-[#020617]" : "from-[#F1F5F9]"}`} />
+        <div className={`absolute right-0 top-0 bottom-1 w-8 pointer-events-none bg-gradient-to-l ${th.dark ? "from-[#140B0F]" : "from-[#FBE8EE]"}`} />
       </div>
 
       {/* Admin-only action buttons */}
@@ -470,14 +470,65 @@ export function InventoryPage() {
       {/* ======= OVERVIEW TAB ======= */}
       {activeTab === "overview" && (
         <>
+          {/* Nilai Stok — snapshot inventory valuation. Only owner/admin
+              sees this (staff sebar kasir kerjanya barang masuk, bukan
+              lihat modal toko). */}
+          {canWrite && (() => {
+            const active = products.filter(p => p.isActive);
+            let totalModal = 0;
+            let totalJual = 0;
+            let totalItems = 0;
+            for (const p of active) {
+              totalModal += p.purchasePrice * p.stock;
+              totalJual += p.sellingPrice * p.stock;
+              totalItems += p.stock;
+            }
+            const potensi = totalJual - totalModal;
+            const margin = totalJual > 0 ? (potensi / totalJual) * 100 : 0;
+            return (
+              <div className={`rounded-[18px] border p-4 ${th.card} ${th.bdr}`}>
+                <div className="flex items-center justify-between mb-3">
+                  <p className={`text-xs font-bold uppercase tracking-wider ${th.txm}`}>Nilai Stok Saat Ini</p>
+                  <p className={`text-xs ${th.txf}`}>{active.length} produk · {totalItems} item</p>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <div className={`rounded-xl border p-3 ${th.bdr} ${th.card2}`}>
+                    <p className={`text-xs font-semibold ${th.txm}`}>Modal</p>
+                    <p className={`font-display text-base font-black mt-1 ${th.tx}`} style={{ fontVariationSettings: '"wght" 800' }}>
+                      {$(totalModal)}
+                    </p>
+                  </div>
+                  <div className={`rounded-xl border p-3 ${th.bdr} ${th.card2}`}>
+                    <p className={`text-xs font-semibold ${th.txm}`}>Harga Jual</p>
+                    <p className={`font-display text-base font-black mt-1 ${th.tx}`} style={{ fontVariationSettings: '"wght" 800' }}>
+                      {$(totalJual)}
+                    </p>
+                  </div>
+                  <div className={`relative rounded-xl p-3 bg-gradient-to-br from-[#FFE4E9] to-[#FFD1DB] dark:from-[#E11D48]/15 dark:to-[#9F1239]/20 overflow-hidden`}>
+                    <div
+                      aria-hidden
+                      className="pointer-events-none absolute -top-4 -right-3 w-16 h-16 rounded-full blur-xl opacity-60"
+                      style={{ background: "radial-gradient(circle, #FFB5C0 0%, transparent 70%)" }}
+                    />
+                    <p className={`relative text-xs font-semibold ${th.acc}`}>Potensi Gain</p>
+                    <p className={`relative font-display text-base font-black mt-1 ${th.acc}`} style={{ fontVariationSettings: '"wght" 800' }}>
+                      {$(potensi)}
+                    </p>
+                    <p className={`relative text-xs mt-0.5 ${th.txm}`}>{margin.toFixed(1)}%</p>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
           {/* Stats */}
           <div className="grid grid-cols-5 gap-2">
             {[
-              { l: t.all, v: products.length, clr: "#5B8DEF", f: "all" as const },
-              { l: t.lowStock, v: lowStockCount, clr: "#E89B48", f: "low" as const },
+              { l: t.all, v: products.length, clr: "#E11D48", f: "all" as const },
+              { l: t.lowStock, v: lowStockCount, clr: "#E11D48", f: "low" as const },
               { l: t.outOfStock, v: outOfStockCount, clr: "#C4504A", f: "out" as const },
-              { l: t.inactive, v: inactiveCount, clr: "#94A3B8", f: "inactive" as const },
-              { l: "💎 Member", v: memberPriceCount, clr: "#1E40AF", f: "member" as const },
+              { l: t.inactive, v: inactiveCount, clr: "#A98C94", f: "inactive" as const },
+              { l: "💎 Member", v: memberPriceCount, clr: "#E11D48", f: "member" as const },
             ].map(s => (
               <button key={s.f} onClick={() => setOverviewFilter(s.f)}
                 className={`rounded-[14px] border p-2.5 text-left transition-all ${
@@ -494,7 +545,7 @@ export function InventoryPage() {
             <Search size={16} className={`absolute left-3.5 top-1/2 -translate-y-1/2 ${th.txf}`} />
             <input value={productSearch} onChange={e => setProductSearch(e.target.value)}
               placeholder={t.searchProducts as string}
-              className={`w-full pl-10 pr-4 py-3 text-sm rounded-2xl border focus:outline-none focus:ring-2 focus:ring-[#1E40AF]/20 font-medium ${th.inp}`} />
+              className={`w-full pl-10 pr-4 py-3 text-sm rounded-2xl border focus:outline-none focus:ring-2 focus:ring-[#E11D48]/20 font-medium ${th.inp}`} />
           </div>
 
           {/* Product list */}
@@ -508,7 +559,7 @@ export function InventoryPage() {
                       if (e.target.checked) setSelectedIds(new Set(filteredProducts.map(p => p.id)));
                       else setSelectedIds(new Set());
                     }}
-                    className="w-4 h-4 rounded accent-[#1E40AF]" />
+                    className="w-4 h-4 rounded accent-[#E11D48]" />
                 )}
                 <p className={`text-sm font-extrabold tracking-tight ${th.tx}`}>
                   {t.product} ({filteredProducts.length})
@@ -536,7 +587,7 @@ export function InventoryPage() {
                   {canWrite && (
                     <button
                       onClick={() => categories.length === 0 ? setAddCatOpen(true) : setAddProdOpen(true)}
-                      className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-[#60A5FA] to-[#1E40AF]"
+                      className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48]"
                     >
                       <Plus size={14} />
                       {categories.length === 0
@@ -564,26 +615,28 @@ export function InventoryPage() {
                         else next.delete(product.id);
                         setSelectedIds(next);
                       }}
-                      className="w-4 h-4 rounded accent-[#1E40AF] shrink-0" />
+                      className="w-4 h-4 rounded accent-[#E11D48] shrink-0" />
                   )}
-                  <ProductImage product={product} size={36} />
                   <div className="min-w-0">
-                    <p className={`text-sm font-bold truncate ${th.tx} ${!product.isActive ? "line-through opacity-50" : ""}`}>
+                    <p className={`text-[11px] font-mono uppercase tracking-[0.14em] ${th.txf}`}>{product.sku}</p>
+                    <p
+                      className={`font-display text-lg font-black truncate mt-0.5 ${th.tx} ${!product.isActive ? "line-through opacity-50" : ""}`}
+                      style={{ fontVariationSettings: '"wght" 900' }}
+                    >
                       {lang === "id" ? product.nameId : product.name}
                     </p>
-                    <p className={`text-xs font-mono ${th.txf}`}>{product.sku}</p>
                     {product.supplierId && (() => {
                       const sup = suppliers.find(s => s.id === product.supplierId);
                       if (!sup) return null;
                       return (
-                        <p className={`text-xs mt-0.5 font-semibold inline-flex items-center gap-1 ${th.txm}`}>
-                          <Truck size={10} /> {sup.name}
+                        <p className={`text-xs mt-1 font-semibold inline-flex items-center gap-1 ${th.txm}`}>
+                          <Truck size={11} /> {sup.name}
                         </p>
                       );
                     })()}
                     {typeof product.memberPrice === "number" && product.memberPrice > 0 && product.memberPrice < product.sellingPrice && (
-                      <p className={`text-xs mt-0.5 ${th.acc}`}>
-                        💎 {$(product.sellingPrice)} → <b>{$(product.memberPrice)}</b>
+                      <p className={`text-xs mt-1 ${th.acc}`}>
+                        Member {$(product.memberPrice)} · {$(product.sellingPrice)}
                         <span className={`ml-1 ${th.txm}`}>
                           (-{Math.round((1 - product.memberPrice / product.sellingPrice) * 100)}%)
                         </span>
@@ -593,18 +646,18 @@ export function InventoryPage() {
                 </div>
                 <div className="flex items-center gap-2.5 shrink-0">
                   <div className="text-right">
-                    <p className={`text-2xl font-black leading-none ${
+                    <p className={`font-display text-2xl font-black leading-none ${
                       product.stock === 0 || product.stock <= product.minStock
-                        ? "text-[#D4627A]"
-                        : "text-[#4A8B3F]"
-                    }`}>
+                        ? "text-[#BE123C] dark:text-[#FB7185]"
+                        : th.tx
+                    }`} style={{ fontVariationSettings: '"opsz" 72, "wght" 800' }}>
                       {product.stock}
                       <span className={`text-xs font-bold ml-1 ${th.txm}`}>{product.unit}</span>
                     </p>
                     <span className={`inline-block mt-1 text-xs font-bold px-2.5 py-1 rounded-lg ${
                       product.stock === 0 || product.stock <= product.minStock
-                        ? (th.dark ? "bg-[#D4627A]/20 text-[#D4627A]" : "bg-red-100 text-[#D4627A]")
-                        : (th.dark ? "bg-[#4A8B3F]/20 text-[#4A8B3F]" : "bg-green-100 text-[#4A8B3F]")
+                        ? (th.dark ? "bg-[#BE123C]/25 text-[#FB7185]" : "bg-[#FCE4EC] text-[#BE123C]")
+                        : `${th.elev} ${th.txm}`
                     }`}>
                       {product.stock === 0 ? t.outOfStock : product.stock <= product.minStock ? t.lowStock : t.normalStock}
                     </span>
@@ -614,7 +667,7 @@ export function InventoryPage() {
                       <button
                         onClick={(e) => { e.stopPropagation(); openEditProduct(product.id); }}
                         aria-label="Edit product"
-                        className={`w-7 h-7 rounded-lg flex items-center justify-center ${th.dark ? "bg-[#5B8DEF]/15 text-[#5B8DEF]" : "bg-blue-50 text-[#5B8DEF]"}`}
+                        className={`w-7 h-7 rounded-lg flex items-center justify-center ${th.dark ? "bg-[#E11D48]/15 text-[#E11D48]" : "bg-[#FFE4E9] text-[#E11D48]"}`}
                       >
                         <Pencil size={12} />
                       </button>
@@ -623,7 +676,7 @@ export function InventoryPage() {
                           onClick={(e) => { e.stopPropagation(); setConfirmDeleteProductId(product.id); }}
                           aria-label="Delete product"
                           title="Hapus produk"
-                          className={`w-7 h-7 rounded-lg flex items-center justify-center ${th.dark ? "bg-[#D4627A]/15 text-[#D4627A]" : "bg-red-50 text-[#D4627A]"}`}
+                          className={`w-7 h-7 rounded-lg flex items-center justify-center ${th.dark ? "bg-[#BE123C]/15 text-[#BE123C]" : "bg-[#FCE4EC] text-[#BE123C]"}`}
                         >
                           <Trash2 size={12} />
                         </button>
@@ -635,7 +688,7 @@ export function InventoryPage() {
                           toast.success(product.isActive ? t.productHidden as string : t.productShown as string);
                         }}
                         className={`w-10 h-6 rounded-full transition-colors relative ${
-                          product.isActive ? "bg-[#4A8B3F]" : (th.dark ? "bg-[#334155]" : "bg-[#E2E8F0]")
+                          product.isActive ? "bg-[#E11D48]" : (th.dark ? "bg-[#3D2230]" : "bg-[#F9C5D0]")
                         }`}
                         aria-label={product.isActive ? t.hideFromPOS as string : t.showInPOS as string}
                         title={product.isActive ? t.hideFromPOS as string : t.showInPOS as string}
@@ -685,13 +738,13 @@ export function InventoryPage() {
         <>
           {canWrite && (
             <button onClick={() => { setStockModal("in"); setForm({ prod: "", qty: "", unit: "individual", price: "", note: "", expiryDate: "", supplierId: "", paymentTerms: "COD", paymentStatus: "unpaid" }); }}
-              className="w-full py-3 rounded-2xl text-sm font-bold text-white bg-[#4A8B3F] flex items-center justify-center gap-2">
+              className="w-full py-3 rounded-2xl text-sm font-bold text-white bg-[#E11D48] flex items-center justify-center gap-2">
               <ArrowDownCircle size={16} /> {t.stockIn}
             </button>
           )}
           <div className={`rounded-[18px] border p-3.5 ${th.card} ${th.bdr}`}>
             <p className={`text-xs font-semibold uppercase tracking-wider ${th.txm}`}>{t.totalIn}</p>
-            <p className="text-xl font-black mt-1 text-[#4A8B3F]">+{totalInCount}</p>
+            <p className="text-xl font-black mt-1 text-[#E11D48]">+{totalInCount}</p>
           </div>
           <div className={`rounded-[22px] border overflow-hidden ${th.card} ${th.bdr}`}>
             {renderMovementList(stockInMovements, showAllIn, setShowAllIn, stockInMovements.length)}
@@ -742,16 +795,16 @@ export function InventoryPage() {
                 return (
                   <div key={batch.id} onClick={() => product && setDetailProductId(product.id)}
                     className={`flex items-center justify-between px-4 py-3 border-b last:border-0 cursor-pointer active:opacity-70 ${th.bdrSoft}`}>
-                    <div className="flex items-center gap-3 min-w-0 flex-1">
-                      {product && <ProductImage product={product} size={32} />}
-                      <div className="min-w-0">
-                        <p className={`text-sm font-bold truncate ${th.tx}`}>
-                          {product ? (lang === "id" ? product.nameId : product.name) : batch.productId}
-                        </p>
-                        <p className={`text-xs ${th.txf}`}>
-                          {batch.batchNumber} · {batch.quantity} {product?.unit || "pcs"}
-                        </p>
-                      </div>
+                    <div className="min-w-0 flex-1">
+                      <p
+                        className={`font-display text-base font-black truncate ${th.tx}`}
+                        style={{ fontVariationSettings: '"wght" 800' }}
+                      >
+                        {product ? (lang === "id" ? product.nameId : product.name) : batch.productId}
+                      </p>
+                      <p className={`text-xs ${th.txf} mt-0.5`}>
+                        {batch.batchNumber} · {batch.quantity} {product?.unit || "pcs"}
+                      </p>
                     </div>
                     <div className="text-right shrink-0">
                       <p className={`text-xs font-mono ${th.txm}`}>
@@ -759,8 +812,8 @@ export function InventoryPage() {
                       </p>
                       <span className={`text-base font-black px-2.5 py-1 rounded-lg ${
                         isExpired || isUrgent
-                          ? (th.dark ? "bg-[#D4627A]/20 text-[#D4627A]" : "bg-red-100 text-[#D4627A]")
-                          : "text-[#D4627A]"
+                          ? (th.dark ? "bg-[#BE123C]/20 text-[#BE123C]" : "bg-[#FCE4EC] text-[#BE123C]")
+                          : "text-[#BE123C]"
                       }`}>
                         {isExpired ? t.alreadyExpired : `${t.expiringIn} ${days} ${t.days}`}
                       </span>
@@ -778,9 +831,9 @@ export function InventoryPage() {
         <>
           <div className="grid grid-cols-3 gap-3">
             {[
-              { l: t.totalIn, v: `+${totalInCount}`, clr: "#4A8B3F" },
+              { l: t.totalIn, v: `+${totalInCount}`, clr: "#E11D48" },
               { l: t.totalOut, v: `-${totalOutCount}`, clr: "#C4504A" },
-              { l: t.netChange, v: `${totalInCount - totalOutCount >= 0 ? "+" : ""}${totalInCount - totalOutCount}`, clr: "#5B8DEF" },
+              { l: t.netChange, v: `${totalInCount - totalOutCount >= 0 ? "+" : ""}${totalInCount - totalOutCount}`, clr: "#E11D48" },
             ].map((s, i) => (
               <div key={i} className={`rounded-[18px] border p-3.5 ${th.card} ${th.bdr}`}>
                 <p className={`text-xs font-semibold uppercase tracking-wider ${th.txm}`}>{s.l}</p>
@@ -804,7 +857,7 @@ export function InventoryPage() {
           {unpaidInvoices.length > 0 && (
             <div className={`rounded-[22px] border overflow-hidden ${th.card} ${th.bdr}`}>
               <div className={`px-5 py-3.5 border-b ${th.bdr} flex items-center gap-2`}>
-                <Receipt size={14} className="text-[#E89B48]" />
+                <Receipt size={14} className="text-[#E11D48]" />
                 <p className={`text-sm font-extrabold tracking-tight ${th.tx}`}>{t.unpaidInvoices} ({unpaidInvoices.length})</p>
               </div>
               {unpaidInvoices.map(inv => {
@@ -818,7 +871,7 @@ export function InventoryPage() {
                       <p className={`text-xs ${th.txf}`}>
                         {lang === "id" ? prod?.nameId : prod?.name} · {inv.quantity} · {$(inv.unitPrice * inv.quantity)}
                       </p>
-                      <p className={`text-xs ${isOverdue ? "text-[#D4627A] font-bold" : th.txm}`}>
+                      <p className={`text-xs ${isOverdue ? "text-[#BE123C] font-bold" : th.txm}`}>
                         {t.dueDate}: {inv.dueDate ? formatDate(inv.dueDate) : "\u2014"}
                         {isOverdue && ` · ${t.overdue}`}
                       </p>
@@ -826,7 +879,7 @@ export function InventoryPage() {
                     {canWrite && (
                       <button onClick={() => { updatePaymentStatus(inv.id, "paid"); toast.success(t.paid as string); }}
                         className={`shrink-0 ml-3 px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1 ${
-                          th.dark ? "bg-[#4A8B3F]/15 text-[#4A8B3F]" : "bg-green-50 text-[#4A8B3F]"
+                          th.dark ? "bg-[#E11D48]/15 text-[#E11D48]" : "bg-[#FFE4E9] text-[#E11D48]"
                         }`}>
                         <Check size={12} /> {t.markAsPaid}
                       </button>
@@ -838,7 +891,7 @@ export function InventoryPage() {
           )}
           {unpaidInvoices.length === 0 && (
             <div className={`rounded-[18px] border p-3.5 flex items-center gap-2 ${th.card} ${th.bdr}`}>
-              <Check size={14} className="text-[#4A8B3F]" />
+              <Check size={14} className="text-[#E11D48]" />
               <p className={`text-sm font-semibold ${th.txm}`}>{t.noUnpaid}</p>
             </div>
           )}
@@ -848,7 +901,7 @@ export function InventoryPage() {
             <p className={`text-sm font-extrabold tracking-tight ${th.tx}`}>{t.suppliers}</p>
             {canWrite && (
               <button onClick={() => { setSupplierModal("add"); setSupForm({ name: "", phone: "", email: "", address: "" }); }}
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-[#60A5FA] to-[#1E40AF]">
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48]">
                 <Plus size={13} /> {t.addSupplier}
               </button>
             )}
@@ -880,7 +933,7 @@ export function InventoryPage() {
                           setSupForm({ name: sup.name, phone: sup.phone, email: sup.email, address: sup.address });
                           setSupplierModal("edit");
                         }}
-                          className={`px-2.5 py-1.5 rounded-lg text-xs font-bold ${th.dark ? "bg-[#5B8DEF]/15 text-[#5B8DEF]" : "bg-blue-50 text-[#5B8DEF]"}`}>
+                          className={`px-2.5 py-1.5 rounded-lg text-xs font-bold ${th.dark ? "bg-[#E11D48]/15 text-[#E11D48]" : "bg-[#FFE4E9] text-[#E11D48]"}`}>
                           {t.editSupplier}
                         </button>
                         {confirmDeleteSupplierId === sup.id ? (
@@ -896,7 +949,7 @@ export function InventoryPage() {
                           </div>
                         ) : (
                           <button onClick={(e) => { e.stopPropagation(); setConfirmDeleteSupplierId(sup.id); }}
-                            className={`px-2.5 py-1.5 rounded-lg text-xs font-bold ${th.dark ? "bg-[#C4504A]/15 text-[#C4504A]" : "bg-red-50 text-[#C4504A]"}`}>
+                            className={`px-2.5 py-1.5 rounded-lg text-xs font-bold ${th.dark ? "bg-[#C4504A]/15 text-[#C4504A]" : "bg-[#FCE4EC] text-[#C4504A]"}`}>
                             {t.deleteSupplier}
                           </button>
                         )}
@@ -955,7 +1008,7 @@ export function InventoryPage() {
                       {PAYMENT_TERMS_OPTIONS.map(pt => (
                         <button key={pt} onClick={() => setForm({ ...form, paymentTerms: pt })}
                           className={`py-2 rounded-xl text-xs font-bold ${
-                            form.paymentTerms === pt ? "text-white bg-gradient-to-r from-[#60A5FA] to-[#1E40AF]" : `border ${th.bdr} ${th.txm}`
+                            form.paymentTerms === pt ? "text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48]" : `border ${th.bdr} ${th.txm}`
                           }`}>{pt}</button>
                       ))}
                     </div>
@@ -967,7 +1020,7 @@ export function InventoryPage() {
                         <button key={ps} onClick={() => setForm({ ...form, paymentStatus: ps })}
                           className={`py-2 rounded-xl text-xs font-bold ${
                             form.paymentStatus === ps
-                              ? (ps === "paid" ? "text-white bg-[#4A8B3F]" : "text-white bg-[#E89B48]")
+                              ? (ps === "paid" ? "text-white bg-[#E11D48]" : "text-white bg-[#E11D48]")
                               : `border ${th.bdr} ${th.txm}`
                           }`}>{ps === "paid" ? t.paid : t.unpaid}</button>
                       ))}
@@ -992,7 +1045,7 @@ export function InventoryPage() {
                     }
                   }}
                     className={`py-2.5 rounded-xl text-xs font-bold ${
-                      form.unit === ut ? "text-white bg-gradient-to-r from-[#60A5FA] to-[#1E40AF]" : `border ${th.bdr} ${th.txm}`
+                      form.unit === ut ? "text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48]" : `border ${th.bdr} ${th.txm}`
                     }`}>{ut === "individual" ? t.individual : (form.prod ? `${t.box} (${products.find(p => p.id === form.prod)?.qtyPerBox || "?"})` : t.box)}</button>
                 ))}
               </div>
@@ -1041,7 +1094,7 @@ export function InventoryPage() {
           <div className="flex gap-2">
             <button onClick={() => setStockModal(null)} className={`flex-1 py-3 rounded-2xl text-sm font-bold border ${th.bdr} ${th.txm}`}>{t.cancel}</button>
             <button onClick={doStock} disabled={!form.prod || !form.qty}
-              className={`flex-1 py-3 rounded-2xl text-sm font-bold text-white disabled:opacity-40 ${stockModal === "in" ? "bg-[#4A8B3F]" : "bg-[#C4504A]"}`}>{t.confirm}</button>
+              className={`flex-1 py-3 rounded-2xl text-sm font-bold text-white disabled:opacity-40 ${stockModal === "in" ? "bg-[#E11D48]" : "bg-[#C4504A]"}`}>{t.confirm}</button>
           </div>
         </div>
       </Modal>
@@ -1052,21 +1105,21 @@ export function InventoryPage() {
           <div>
             <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>{t.productName}</p>
             <input value={newProd.name} onChange={e => { setNewProd({ ...newProd, name: e.target.value }); setProdFormErrors(p => ({ ...p, name: false })); }}
-              className={`${inp} ${prodFormErrors.name ? "!border-red-400" : ""}`} />
-            {prodFormErrors.name && <p className="text-red-400 text-xs mt-1 font-medium">{t.required}</p>}
+              className={`${inp} ${prodFormErrors.name ? "!border-[#BE123C]" : ""}`} />
+            {prodFormErrors.name && <p className="text-[#BE123C] text-xs mt-1 font-medium">{t.required}</p>}
           </div>
           <div>
             <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>{t.productNameId}</p>
             <input value={newProd.nameId} onChange={e => { setNewProd({ ...newProd, nameId: e.target.value }); setProdFormErrors(p => ({ ...p, nameId: false })); }}
-              className={`${inp} ${prodFormErrors.nameId ? "!border-red-400" : ""}`} />
-            {prodFormErrors.nameId && <p className="text-red-400 text-xs mt-1 font-medium">{t.required}</p>}
+              className={`${inp} ${prodFormErrors.nameId ? "!border-[#BE123C]" : ""}`} />
+            {prodFormErrors.nameId && <p className="text-[#BE123C] text-xs mt-1 font-medium">{t.required}</p>}
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>{t.sku}</p>
               <input value={newProd.sku} onChange={e => { setNewProd({ ...newProd, sku: e.target.value }); setProdFormErrors(p => ({ ...p, sku: false })); }}
-                className={`${inp} ${prodFormErrors.sku ? "!border-red-400" : ""}`} />
-              {prodFormErrors.sku && <p className="text-red-400 text-xs mt-1 font-medium">{t.required}</p>}
+                className={`${inp} ${prodFormErrors.sku ? "!border-[#BE123C]" : ""}`} />
+              {prodFormErrors.sku && <p className="text-[#BE123C] text-xs mt-1 font-medium">{t.required}</p>}
             </div>
             <div>
               <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>{lang === "id" ? "Kategori" : "Category"}</p>
@@ -1122,7 +1175,7 @@ export function InventoryPage() {
               const memberMargin = purchase > 0 ? ((member - purchase) / purchase * 100) : 0;
               const memberDiscount = sell > 0 ? ((sell - member) / sell * 100) : 0;
               return (
-                <p className={`text-xs mt-1 font-medium ${memberMargin < 0 ? "text-red-500" : memberMargin < 10 ? "text-[#E89B48]" : th.acc}`}>
+                <p className={`text-xs mt-1 font-medium ${memberMargin < 0 ? "text-[#BE123C]" : memberMargin < 10 ? "text-[#E11D48]" : th.acc}`}>
                   Diskon member: {memberDiscount.toFixed(1)}% · Margin member: {memberMargin.toFixed(1)}%
                 </p>
               );
@@ -1161,29 +1214,10 @@ export function InventoryPage() {
                 className={inp} min="0" />
             </div>
           </div>
-          {/* Image upload */}
-          <div>
-            <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>{t.uploadImage}</p>
-            <div className="flex items-center gap-3">
-              <label className={`flex-1 py-2.5 rounded-xl border text-center text-xs font-bold cursor-pointer ${th.bdr} ${th.txm}`}>
-                {t.chooseImage}
-                <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
-              </label>
-              {newProd.image && (
-                <div className="relative">
-                  <img src={newProd.image} alt="preview" className="w-12 h-12 rounded-xl object-cover" />
-                  <button onClick={() => setNewProd({ ...newProd, image: "" })} aria-label="Remove image"
-                    className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-[#C4504A] text-white flex items-center justify-center">
-                    <X size={10} />
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
           <div className="flex gap-2 mt-1">
             <button onClick={() => setAddProdOpen(false)} className={`flex-1 py-3 rounded-2xl text-sm font-bold border ${th.bdr} ${th.txm}`}>{t.cancel}</button>
             <button onClick={doAddProduct} disabled={!newProd.name || !newProd.nameId || !newProd.sku}
-              className="flex-1 py-3 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-[#60A5FA] to-[#1E40AF] disabled:opacity-40">{t.save}</button>
+              className="flex-1 py-3 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48] disabled:opacity-40">{t.save}</button>
           </div>
         </div>
       </Modal>
@@ -1214,7 +1248,7 @@ export function InventoryPage() {
           <div className="flex gap-2 mt-1">
             <button onClick={() => setAddCatOpen(false)} className={`flex-1 py-3 rounded-2xl text-sm font-bold border ${th.bdr} ${th.txm}`}>{t.cancel}</button>
             <button onClick={doAddCategory} disabled={!newCat.name || !newCat.nameId}
-              className="flex-1 py-3 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-[#60A5FA] to-[#1E40AF] disabled:opacity-40">{t.save}</button>
+              className="flex-1 py-3 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48] disabled:opacity-40">{t.save}</button>
           </div>
         </div>
       </Modal>
@@ -1248,7 +1282,7 @@ export function InventoryPage() {
               className={`flex-1 py-3 rounded-2xl text-sm font-bold border ${th.bdr} ${th.txm}`}>{t.cancel}</button>
             <button onClick={supplierModal === "edit" ? doEditSupplier : doAddSupplier}
               disabled={!supForm.name.trim()}
-              className="flex-1 py-3 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-[#60A5FA] to-[#1E40AF] disabled:opacity-40">{t.save}</button>
+              className="flex-1 py-3 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48] disabled:opacity-40">{t.save}</button>
           </div>
         </div>
       </Modal>
@@ -1330,7 +1364,7 @@ export function InventoryPage() {
               const memberMargin = purchase > 0 ? ((member - purchase) / purchase * 100) : 0;
               const memberDiscount = sell > 0 ? ((sell - member) / sell * 100) : 0;
               return (
-                <p className={`text-xs mt-1 font-medium ${memberMargin < 0 ? "text-red-500" : memberMargin < 10 ? "text-[#E89B48]" : th.acc}`}>
+                <p className={`text-xs mt-1 font-medium ${memberMargin < 0 ? "text-[#BE123C]" : memberMargin < 10 ? "text-[#E11D48]" : th.acc}`}>
                   Diskon member: {memberDiscount.toFixed(1)}% · Margin member: {memberMargin.toFixed(1)}%
                 </p>
               );
@@ -1368,28 +1402,10 @@ export function InventoryPage() {
                 className={inp} min="0" />
             </div>
           </div>
-          <div>
-            <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>{t.uploadImage}</p>
-            <div className="flex items-center gap-3">
-              <label className={`flex-1 py-2.5 rounded-xl border text-center text-xs font-bold cursor-pointer ${th.bdr} ${th.txm}`}>
-                {t.chooseImage}
-                <input type="file" accept="image/*" onChange={handleEditImageUpload} className="hidden" />
-              </label>
-              {editProd.image && (
-                <div className="relative">
-                  <img src={editProd.image} alt="preview" className="w-12 h-12 rounded-xl object-cover" />
-                  <button onClick={() => setEditProd({ ...editProd, image: "" })} aria-label="Remove image"
-                    className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-[#C4504A] text-white flex items-center justify-center">
-                    <X size={10} />
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
           <div className="flex gap-2 mt-1">
             <button onClick={() => setEditProdOpen(false)} className={`flex-1 py-3 rounded-2xl text-sm font-bold border ${th.bdr} ${th.txm}`}>{t.cancel}</button>
             <button onClick={doEditProduct} disabled={!editProd.name || !editProd.nameId || !editProd.sku}
-              className="flex-1 py-3 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-[#60A5FA] to-[#1E40AF] disabled:opacity-40">{t.save}</button>
+              className="flex-1 py-3 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48] disabled:opacity-40">{t.save}</button>
           </div>
         </div>
       </Modal>
@@ -1406,7 +1422,7 @@ export function InventoryPage() {
               <p className={`text-sm ${th.tx}`}>
                 {p ? <>Produk <b>{lang === "id" ? p.nameId : p.name}</b> (SKU {p.sku}) akan dihapus.</> : "Produk akan dihapus."}
               </p>
-              <div className={`rounded-xl border px-3 py-2.5 text-xs ${th.dark ? "border-[#E89B48]/30 bg-[#E89B48]/5 text-[#E89B48]" : "border-amber-200 bg-amber-50 text-amber-700"}`}>
+              <div className={`rounded-xl border px-3 py-2.5 text-xs ${th.dark ? "border-[#E11D48]/30 bg-[#E11D48]/5 text-[#E11D48]" : "border-[#FFB5C0] bg-[#FFE4E9] text-[#E11D48]"}`}>
                 ⚠️ Produk akan hilang dari daftar dan POS. Riwayat transaksi lama tetap aman (nama & harga sudah tersimpan di order).
                 <br />
                 <span className="opacity-70">Kalau ragu, pakai toggle "Sembunyikan dari POS" saja.</span>
@@ -1443,7 +1459,7 @@ export function InventoryPage() {
           <label className={`flex items-center gap-2 cursor-pointer px-3 py-2.5 rounded-xl border ${th.bdr}`}>
             <input type="checkbox" checked={labelIncludeExpiry}
               onChange={e => setLabelIncludeExpiry(e.target.checked)}
-              className="w-4 h-4 rounded accent-[#1E40AF]" />
+              className="w-4 h-4 rounded accent-[#E11D48]" />
             <span className={`text-sm font-bold ${th.tx}`}>Tampilkan tanggal kadaluarsa</span>
           </label>
 
@@ -1473,7 +1489,7 @@ export function InventoryPage() {
               );
               setLabelModalOpen(false);
             }}
-              className={`flex-1 py-2.5 rounded-xl text-sm font-bold text-white bg-[#1E40AF]`}>
+              className={`flex-1 py-2.5 rounded-xl text-sm font-bold text-white bg-[#E11D48]`}>
               Print
             </button>
           </div>

@@ -14,7 +14,7 @@ import Barcode from "react-barcode";
 import type { PaymentMethod, UnitType, DiscountType, Product, Order, Member } from "@/types";
 import toast from "react-hot-toast";
 import {
-  Search, ScanLine, ShoppingBag, Minus, Plus, Trash2, ImagePlus, X, UserPlus, Tag, Percent, Wallet, FileText, Printer, Barcode as BarcodeIcon,
+  Search, ScanLine, ShoppingBag, Minus, Plus, Trash2, ImagePlus, X, UserPlus, Tag, Percent, Wallet, FileText, Printer, Barcode as BarcodeIcon, Clock, Send, AlertCircle,
 } from "lucide-react";
 
 export function POSPage() {
@@ -73,6 +73,24 @@ export function POSPage() {
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [cashRcv, setCashRcv] = useState("");
   const [proofImage, setProofImage] = useState("");
+  // Split payment — muncul kalau user bayar cash tapi kurang dari total.
+  // Secondary method menanggung sisa (QRIS / Transfer / Kartu).
+  const [splitMethod, setSplitMethod] = useState<PaymentMethod | "">("");
+  // Pending order — kasir buat pending utk customer online yg belum bayar
+  const [pendingOpenModal, setPendingOpenModal] = useState(false);
+  const [pendingCustomerPhone, setPendingCustomerPhone] = useState("");
+  const [pendingBankId, setPendingBankId] = useState("");
+  const [pendingListOpen, setPendingListOpen] = useState(false);
+  // Mark-as-paid flow from pending list
+  const [markPaidOrderId, setMarkPaidOrderId] = useState<string | null>(null);
+  const [markPaidCashRcv, setMarkPaidCashRcv] = useState("");
+  const [markPaidMethod, setMarkPaidMethod] = useState<PaymentMethod>("cash");
+  const [markPaidSplit, setMarkPaidSplit] = useState<PaymentMethod | "">("");
+  const createPendingOrder = useOrderStore(s => s.createPendingOrder);
+  const markAsPaidAction = useOrderStore(s => s.markAsPaid);
+  const cancelPendingAction = useOrderStore(s => s.cancelPending);
+  const resendInvoiceAction = useOrderStore(s => s.resendInvoice);
+  const pendingCount = useOrderStore(s => s.orders.filter(o => o.status === "pending").length);
   const [selectedBankId, setSelectedBankId] = useState("");
   const [lastOrder, setLastOrder] = useState<Order | null>(null);
   const [detailProductId, setDetailProductId] = useState<string | null>(null);
@@ -90,6 +108,10 @@ export function POSPage() {
   const [labelModalOpen, setLabelModalOpen] = useState(false);
   const [labelSearch, setLabelSearch] = useState("");
   const [selectedLabels, setSelectedLabels] = useState<Set<string>>(new Set());
+  // Step-2 confirm dialog: optional ED shared across all selected labels
+  const [labelConfirmOpen, setLabelConfirmOpen] = useState(false);
+  const [labelIncludeExpiry, setLabelIncludeExpiry] = useState(false);
+  const [labelExpiryDate, setLabelExpiryDate] = useState("");
   const labelWidth = useSettingsStore(s => s.labelWidth);
   const labelHeight = useSettingsStore(s => s.labelHeight);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -300,9 +322,23 @@ export function POSPage() {
         ...(ci.discountType ? { discountType: ci.discountType, discountValue: ci.discountValue, discountAmount: disc } : {}),
       };
     });
+    // Compute payments split — if cash primary + rcv < total, split into
+    // [cash portion, secondary method portion].
+    const payments: { method: PaymentMethod; amount: number }[] = [];
+    const rcv = parseFloat(cashRcv) || 0;
+    if (payment === "cash" && splitMethod && rcv < cartTotal && rcv > 0) {
+      payments.push({ method: "cash", amount: rcv });
+      payments.push({ method: splitMethod as PaymentMethod, amount: cartTotal - rcv });
+    } else {
+      // Single-method: for cash, amount = cartTotal (any excess is change,
+      // tracked in UI only). For non-cash, full amount.
+      payments.push({ method: payment, amount: cartTotal });
+    }
+
     const order: Order = {
       id: `ORD-${Date.now().toString(36).toUpperCase()}`,
       items: orderItems,
+      payments,
       subtotal: discountedSubtotal, ppnRate, ppn: ppnAmount, total: cartTotal,
       payment, status: "completed" as const,
       customer: activeMember ? activeMember.name : (customer || (t.walkIn as string)),
@@ -329,6 +365,7 @@ export function POSPage() {
     setCashRcv("");
     setProofImage("");
     setSelectedBankId("");
+    setSplitMethod("");
     setCheckoutOpen(false);
     setCartOpen(false);
     toast.success(t.orderSuccess as string);
@@ -339,7 +376,7 @@ export function POSPage() {
     <div className="flex flex-col gap-3">
       {/* Active member badge — shown when member is selected */}
       {activeMember && (
-        <div className={`flex items-center justify-between px-3 py-2 rounded-xl ${th.dark ? "bg-[#1E40AF]/15" : "bg-[#EFF6FF]"}`}>
+        <div className={`flex items-center justify-between px-3 py-2 rounded-xl ${th.dark ? "bg-[#E11D48]/15" : "bg-[#FFE4E9]"}`}>
           <div className="flex items-center gap-2 min-w-0">
             <span className="text-base">💎</span>
             <div className="min-w-0">
@@ -424,18 +461,16 @@ export function POSPage() {
             <p className={`text-sm font-extrabold ${th.tx}`}>{t.addMember}</p>
             <button onClick={() => setShowAddMember(false)} aria-label="Close" className={th.txm}><X size={14} /></button>
           </div>
+          {/* Add Member (kasir flow) — keep it minimal: nama + no HP saja.
+              Alamat & nomor anggota hanya muncul di modal Edit Member
+              (halaman Orders → Members) sehingga UI kasir tidak crowded. */}
           <div className="flex flex-col gap-2">
             <input value={newMemberName} onChange={e => setNewMemberName(e.target.value)}
               placeholder={t.memberName as string} className={`w-full px-3 py-2.5 text-sm rounded-xl border ${th.inp}`} />
             <input value={newMemberPhone} onChange={e => setNewMemberPhone(e.target.value)}
               placeholder={t.memberPhone as string} type="tel" inputMode="tel" className={`w-full px-3 py-2.5 text-sm rounded-xl border ${th.inp}`} />
-            <input value={newMemberNumber} onChange={e => setNewMemberNumber(e.target.value)}
-              placeholder={t.memberNumber as string} className={`w-full px-3 py-2.5 text-sm rounded-xl border ${th.inp}`} />
-            <textarea value={newMemberAddress} onChange={e => setNewMemberAddress(e.target.value)}
-              placeholder={t.memberAddress as string} rows={2}
-              className={`w-full px-3 py-2.5 text-sm rounded-xl border resize-none ${th.inp}`} />
             <button onClick={handleAddNewMember} disabled={!newMemberName.trim()}
-              className="w-full py-2.5 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-[#60A5FA] to-[#1E40AF] disabled:opacity-40">{t.save}</button>
+              className="w-full py-2.5 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48] disabled:opacity-40">{t.save}</button>
           </div>
         </div>
       )}
@@ -447,15 +482,15 @@ export function POSPage() {
           <p className={`text-xs mt-1 ${th.txf}`}>{t.emptyCartHint}</p>
         </div>
       ) : cartItems.map(ci => {
-        const prod = products.find(p => p.id === ci.productId);
         const itemGross = ci.unitPrice * ci.quantity;
         const itemDisc = calcItemDiscount(ci);
         return (
-          <div key={ci.id} className={`flex gap-3 p-3 rounded-[18px] border ${th.card2} ${th.bdr}`}>
-            {prod && <ProductImage product={prod} size={40} />}
+          <div key={ci.id} className={`p-3.5 rounded-[18px] border ${th.card2} ${th.bdr}`}>
             <div className="flex-1 min-w-0">
-              <p className={`text-sm font-bold truncate ${th.tx}`}>{ci.name}</p>
-              <div className="flex items-center gap-1.5 mt-0.5">
+              <p className={`font-display text-lg font-black truncate ${th.tx}`} style={{ fontVariationSettings: '"wght" 800' }}>
+                {ci.name}
+              </p>
+              <div className="flex items-center gap-1.5 mt-1">
                 <span className={`text-xs font-semibold px-1.5 py-0.5 rounded-md ${th.accBg} ${th.acc}`}>
                   {ci.unitType === "box" ? `${t.box}(${ci.qtyPerBox})` : t.individual}
                 </span>
@@ -463,43 +498,75 @@ export function POSPage() {
                   <>
                     <span className={`text-xs line-through ${th.txf}`}>{$(ci.regularPrice)}</span>
                     <span className={`text-xs font-bold ${th.acc}`}>{$(ci.unitPrice)}</span>
-                    <span className="text-xs font-bold px-1 py-0.5 rounded bg-[#1E40AF]/15 text-[#1E40AF]">💎 Member</span>
+                    <span className="text-xs font-bold px-1.5 py-0.5 rounded bg-[#FFE4E9] text-[#9F1239]">Member</span>
                   </>
                 ) : (
                   <span className={`text-xs ${th.txm}`}>{$(ci.unitPrice)}</span>
                 )}
-                {ci.discountType && <span className="text-xs font-bold px-1.5 py-0.5 rounded-md bg-[#E89B48]/15 text-[#E89B48]">-{ci.discountType === "percent" ? `${ci.discountValue}%` : $(ci.discountValue || 0)}</span>}
+                {ci.discountType && <span className="text-xs font-bold px-1.5 py-0.5 rounded-md bg-[#E11D48]/15 text-[#E11D48]">-{ci.discountType === "percent" ? `${ci.discountValue}%` : $(ci.discountValue || 0)}</span>}
               </div>
-              <div className="flex items-center justify-between mt-2">
-                <div className="flex items-center gap-1.5">
-                  <button onClick={() => handleQtyUpdate(ci.id, -1)} aria-label="Decrease quantity" className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold ${th.elev} ${th.tx}`}><Minus size={12} /></button>
-                  <span className={`w-6 text-center text-sm font-extrabold ${th.tx}`}>{ci.quantity}</span>
-                  <button onClick={() => handleQtyUpdate(ci.id, 1)} aria-label="Increase quantity" className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold ${th.elev} ${th.tx}`}><Plus size={12} /></button>
+              {/* Quantity stepper + line total — enlarged for 50+ users */}
+              <div className="flex items-center justify-between mt-3 gap-3">
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleQtyUpdate(ci.id, -1)}
+                    aria-label="Kurangi"
+                    className="w-11 h-11 rounded-2xl flex items-center justify-center bg-white border-2 border-[#FFB5C0] text-[#E11D48] active:scale-90 active:bg-[#FFE4E9] transition-transform dark:bg-[#3D2230] dark:border-[#E11D48]/40 dark:text-[#FB7185]"
+                  >
+                    <Minus size={22} strokeWidth={3} />
+                  </button>
+                  <span className={`font-display w-10 text-center text-2xl font-black ${th.tx}`} style={{ fontVariationSettings: '"opsz" 72, "wght" 800' }}>
+                    {ci.quantity}
+                  </span>
+                  <button
+                    onClick={() => handleQtyUpdate(ci.id, 1)}
+                    aria-label="Tambah"
+                    className="w-11 h-11 rounded-2xl flex items-center justify-center text-white bg-gradient-to-br from-[#FB7185] to-[#E11D48] shadow-[0_4px_12px_-4px_rgba(225,29,72,0.45)] active:scale-90 transition-transform"
+                  >
+                    <Plus size={22} strokeWidth={3} />
+                  </button>
                 </div>
                 <div className="flex items-center gap-2">
                   {itemDisc > 0 ? (
-                    <div className="text-right">
-                      <span className={`text-xs line-through ${th.txf}`}>{$(itemGross)}</span>
-                      <span className={`text-sm font-extrabold ml-1 ${th.tx}`}>{$(itemGross - itemDisc)}</span>
+                    <div className="text-right leading-tight">
+                      <div className={`text-xs line-through ${th.txf}`}>{$(itemGross)}</div>
+                      <div className={`font-display text-lg font-black ${th.tx}`} style={{ fontVariationSettings: '"opsz" 72, "wght" 800' }}>{$(itemGross - itemDisc)}</div>
                     </div>
                   ) : (
-                    <span className={`text-sm font-extrabold ${th.tx}`}>{$(itemGross)}</span>
+                    <span className={`font-display text-lg font-black ${th.tx}`} style={{ fontVariationSettings: '"opsz" 72, "wght" 800' }}>
+                      {$(itemGross)}
+                    </span>
                   )}
-                  <button onClick={() => { setDiscountItemId(discountItemId === ci.id ? null : ci.id); setDiscountMode(ci.discountType || "percent"); setDiscountInput(ci.discountValue ? String(ci.discountValue) : ""); }}
-                    aria-label="Toggle discount" className={`w-6 h-6 rounded-md flex items-center justify-center ${ci.discountType ? "text-[#E89B48]" : th.txf}`}><Tag size={11} /></button>
-                  <button onClick={() => removeItem(ci.id)} aria-label="Remove item" className="text-[#D4627A]/60 hover:text-[#D4627A]"><Trash2 size={14} /></button>
+                  <button
+                    onClick={() => { setDiscountItemId(discountItemId === ci.id ? null : ci.id); setDiscountMode(ci.discountType || "percent"); setDiscountInput(ci.discountValue ? String(ci.discountValue) : ""); }}
+                    aria-label="Diskon item"
+                    className={`w-10 h-10 rounded-xl flex items-center justify-center active:scale-90 transition-transform ${
+                      ci.discountType
+                        ? "bg-[#FFEDD5] text-[#BE123C] dark:bg-[#E11D48]/20 dark:text-[#FB7185]"
+                        : `${th.elev} ${th.txm}`
+                    }`}
+                  >
+                    <Tag size={16} strokeWidth={2.4} />
+                  </button>
+                  <button
+                    onClick={() => removeItem(ci.id)}
+                    aria-label="Hapus item"
+                    className="w-10 h-10 rounded-xl flex items-center justify-center bg-[#FCE4EC] text-[#BE123C] active:scale-90 active:bg-[#FBCFE8] transition-transform dark:bg-[#E11D48]/15 dark:text-[#FB7185]"
+                  >
+                    <Trash2 size={16} strokeWidth={2.4} />
+                  </button>
                 </div>
               </div>
               {discountItemId === ci.id && (
                 <div className="mt-2 flex items-center gap-1.5">
                   <div className="flex rounded-lg overflow-hidden border">
-                    <button onClick={() => setDiscountMode("percent")} aria-label="Percent discount" className={`px-2 py-1 text-xs font-bold ${discountMode === "percent" ? "bg-[#E89B48] text-white" : `${th.elev} ${th.txm}`}`}><Percent size={10} /></button>
-                    <button onClick={() => setDiscountMode("fixed")} aria-label="Fixed discount" className={`px-2 py-1 text-xs font-bold ${discountMode === "fixed" ? "bg-[#E89B48] text-white" : `${th.elev} ${th.txm}`}`}>Rp</button>
+                    <button onClick={() => setDiscountMode("percent")} aria-label="Percent discount" className={`px-2 py-1 text-xs font-bold ${discountMode === "percent" ? "bg-[#E11D48] text-white" : `${th.elev} ${th.txm}`}`}><Percent size={10} /></button>
+                    <button onClick={() => setDiscountMode("fixed")} aria-label="Fixed discount" className={`px-2 py-1 text-xs font-bold ${discountMode === "fixed" ? "bg-[#E11D48] text-white" : `${th.elev} ${th.txm}`}`}>Rp</button>
                   </div>
                   <input value={discountInput} onChange={e => setDiscountInput(e.target.value)} type="number" placeholder="0"
                     className={`flex-1 px-2 py-1 text-xs rounded-lg border w-16 ${th.inp}`} />
                   <button onClick={() => { setItemDiscount(ci.id, discountMode, parseFloat(discountInput) || 0); setDiscountItemId(null); }}
-                    className="px-2 py-1 rounded-lg text-xs font-bold text-white bg-[#E89B48]">{t.save}</button>
+                    className="px-2 py-1 rounded-lg text-xs font-bold text-white bg-[#E11D48]">{t.save}</button>
                   {ci.discountType && <button onClick={() => { setItemDiscount(ci.id, null, 0); setDiscountItemId(null); }}
                     aria-label="Remove discount" className="text-xs font-bold text-[#C4504A]"><X size={10} /></button>}
                 </div>
@@ -516,10 +583,10 @@ export function POSPage() {
             <div className="flex justify-between text-sm mt-1"><span className={th.acc}>💎 Hemat sebagai member</span><span className={`font-semibold ${th.acc}`}>-{$(memberSavings)}</span></div>
           )}
           {itemDiscountsTotal > 0 && (
-            <div className="flex justify-between text-sm mt-1"><span className="text-[#E89B48]">{t.itemDiscount}</span><span className="font-semibold text-[#E89B48]">-{$(itemDiscountsTotal)}</span></div>
+            <div className="flex justify-between text-sm mt-1"><span className="text-[#E11D48]">{t.itemDiscount}</span><span className="font-semibold text-[#E11D48]">-{$(itemDiscountsTotal)}</span></div>
           )}
           {orderDiscAmount > 0 && (
-            <div className="flex justify-between text-sm mt-1"><span className="text-[#E89B48]">{t.orderDiscount}</span><span className="font-semibold text-[#E89B48]">-{$(orderDiscAmount)}</span></div>
+            <div className="flex justify-between text-sm mt-1"><span className="text-[#E11D48]">{t.orderDiscount}</span><span className="font-semibold text-[#E11D48]">-{$(orderDiscAmount)}</span></div>
           )}
           {ppnRate > 0 && (
             <div className="flex justify-between text-sm mt-1"><span className={th.txm}>{t.ppn} ({ppnRate}%)</span><span className={`font-semibold ${th.tx}`}>{$(ppnAmount)}</span></div>
@@ -536,20 +603,20 @@ export function POSPage() {
             </button>
           ) : !showOrderDiscount && orderDiscountType ? (
             <div className="mt-2 flex items-center justify-between">
-              <span className="text-xs font-bold text-[#E89B48]">{t.orderDiscount}: -{orderDiscountType === "percent" ? `${orderDiscountValue}%` : $(orderDiscountValue)}</span>
+              <span className="text-xs font-bold text-[#E11D48]">{t.orderDiscount}: -{orderDiscountType === "percent" ? `${orderDiscountValue}%` : $(orderDiscountValue)}</span>
               <button onClick={() => { setOrderDiscount(null, 0); }} className="text-xs font-bold text-[#C4504A]">{t.removeDiscount}</button>
             </div>
           ) : null}
           {showOrderDiscount && (
             <div className="mt-2 flex items-center gap-1.5">
               <div className="flex rounded-lg overflow-hidden border">
-                <button onClick={() => setOrderDiscMode("percent")} aria-label="Percent discount" className={`px-2 py-1 text-xs font-bold ${orderDiscMode === "percent" ? "bg-[#E89B48] text-white" : `${th.elev} ${th.txm}`}`}><Percent size={10} /></button>
-                <button onClick={() => setOrderDiscMode("fixed")} aria-label="Fixed discount" className={`px-2 py-1 text-xs font-bold ${orderDiscMode === "fixed" ? "bg-[#E89B48] text-white" : `${th.elev} ${th.txm}`}`}>Rp</button>
+                <button onClick={() => setOrderDiscMode("percent")} aria-label="Percent discount" className={`px-2 py-1 text-xs font-bold ${orderDiscMode === "percent" ? "bg-[#E11D48] text-white" : `${th.elev} ${th.txm}`}`}><Percent size={10} /></button>
+                <button onClick={() => setOrderDiscMode("fixed")} aria-label="Fixed discount" className={`px-2 py-1 text-xs font-bold ${orderDiscMode === "fixed" ? "bg-[#E11D48] text-white" : `${th.elev} ${th.txm}`}`}>Rp</button>
               </div>
               <input value={orderDiscInput} onChange={e => setOrderDiscInput(e.target.value)} type="number" placeholder="0"
                 className={`flex-1 px-2 py-1 text-xs rounded-lg border w-16 ${th.inp}`} />
               <button onClick={() => { setOrderDiscount(orderDiscMode, parseFloat(orderDiscInput) || 0); setShowOrderDiscount(false); }}
-                className="px-2 py-1 rounded-lg text-xs font-bold text-white bg-[#E89B48]">{t.save}</button>
+                className="px-2 py-1 rounded-lg text-xs font-bold text-white bg-[#E11D48]">{t.save}</button>
               <button onClick={() => setShowOrderDiscount(false)} aria-label="Close" className={th.txf}><X size={12} /></button>
             </div>
           )}
@@ -559,15 +626,19 @@ export function POSPage() {
           {(["cash", "card", "transfer", "qris"] as PaymentMethod[]).map(pm => (
             <button key={pm} onClick={() => { setPayment(pm); if (pm !== "qris" && pm !== "transfer") setProofImage(""); if (pm !== "transfer") setSelectedBankId(""); }}
               className={`py-3 rounded-[14px] text-xs font-bold transition-all ${
-                payment === pm ? "text-white bg-gradient-to-r from-[#60A5FA] to-[#1E40AF]" : `border ${th.bdr} ${th.txm}`
+                payment === pm ? "text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48]" : `border ${th.bdr} ${th.txm}`
               }`}>{t[pm]}</button>
           ))}
         </div>
         <div className="flex gap-2">
           <button onClick={() => { clearCart(); if (!isPanel) setCartOpen(false); toast(t.cartCleared as string, { icon: "🗑️" }); }}
             className={`flex-1 py-3 rounded-2xl text-sm font-bold border ${th.bdr} ${th.txm}`}>{t.clear}</button>
+          <button onClick={() => setPendingOpenModal(true)}
+            className={`flex-1 py-3 rounded-2xl text-sm font-bold border-2 border-[#FFB5C0] ${th.acc}`}>
+            Simpan Pending
+          </button>
           <button onClick={() => setCheckoutOpen(true)}
-            className="flex-[2] py-3 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-[#60A5FA] to-[#1E40AF]">{t.payNow} {$(cartTotal)}</button>
+            className="flex-[2] py-3 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48]">{t.payNow} {$(cartTotal)}</button>
         </div>
       </>}
     </div>
@@ -583,7 +654,7 @@ export function POSPage() {
         <p className={`text-lg font-black mb-2 ${th.tx}`}>{t.registerNotOpen}</p>
         <p className={`text-sm text-center max-w-sm mb-6 ${th.txm}`}>{t.registerNotOpenHint}</p>
         <button onClick={() => setOpenRegisterOpen(true)}
-          className="px-8 py-3.5 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-[#60A5FA] to-[#1E40AF]">
+          className="px-8 py-3.5 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48]">
           {t.openRegister}
         </button>
 
@@ -604,7 +675,7 @@ export function POSPage() {
               <button onClick={() => { setOpenRegisterOpen(false); setOpeningCashInput(""); }}
                 className={`flex-1 py-3 rounded-2xl text-sm font-bold border ${th.bdr} ${th.txm}`}>{t.cancel}</button>
               <button onClick={doOpenRegister}
-                className="flex-1 py-3 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-[#60A5FA] to-[#1E40AF]">{t.confirm}</button>
+                className="flex-1 py-3 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48]">{t.confirm}</button>
             </div>
           </div>
         </Modal>
@@ -615,19 +686,20 @@ export function POSPage() {
             <div className={`px-4 py-3 border-b ${th.bdr}`}>
               <p className={`text-xs font-extrabold tracking-tight ${th.tx}`}>{t.registerHistory}</p>
             </div>
-            {todaySessions.map(s => {
-              const diffColor = s.difference === 0 ? "text-[#4A8B3F]" : s.difference > 0 ? "text-[#5B8DEF]" : "text-[#C4504A]";
-              return (
-                <div key={s.id} className={`px-4 py-2.5 border-b last:border-0 ${th.bdrSoft}`}>
-                  <div className="flex justify-between">
-                    <span className={`text-sm font-bold ${th.tx}`}>{formatTime(s.closedAt)}</span>
-                    <span className={`text-sm font-black ${diffColor}`}>{s.difference >= 0 ? "+" : ""}{$(s.difference)}</span>
-                  </div>
-                  <p className={`text-xs ${th.txm}`}>{t.openingCash}: {$(s.openingCash)} · {t.expectedCash}: {$(s.expectedCash)} · {t.actualCash}: {$(s.actualCash)}</p>
-                  {s.notes && <p className={`text-xs mt-0.5 ${th.txf}`}>{s.notes}</p>}
+            {todaySessions.map(s => (
+              <div key={s.id} className={`px-4 py-2.5 border-b last:border-0 ${th.bdrSoft}`}>
+                <div className="flex justify-between">
+                  <span className={`text-sm font-bold ${th.tx}`}>{formatTime(s.closedAt)}</span>
+                  <span className={`font-display text-sm font-black ${th.acc}`} style={{ fontVariationSettings: '"wght" 800' }}>
+                    Total Modal {$(s.expectedCash)}
+                  </span>
                 </div>
-              );
-            })}
+                <p className={`text-xs ${th.txm}`}>
+                  Modal: {$(s.openingCash)} · Kurang Modal: {$(s.actualCash)}
+                </p>
+                {s.notes && <p className={`text-xs mt-0.5 ${th.txf}`}>{s.notes}</p>}
+              </div>
+            ))}
           </div>
         )}
       </div>
@@ -653,7 +725,7 @@ export function POSPage() {
                 }
               }
             }}
-            className={`w-full pl-10 pr-12 py-3 text-sm rounded-2xl border focus:outline-none focus:ring-2 focus:ring-[#1E40AF]/20 font-medium ${th.inp}`} />
+            className={`w-full pl-10 pr-12 py-3 text-sm rounded-2xl border focus:outline-none focus:ring-2 focus:ring-[#E11D48]/20 font-medium ${th.inp}`} />
           <ScanLine size={16} className={`absolute right-3.5 top-1/2 -translate-y-1/2 ${th.txf}`} />
         </div>
         <button onClick={() => setOrderHistoryOpen(true)} aria-label={t.orderHistory as string}
@@ -663,6 +735,16 @@ export function POSPage() {
         <button onClick={() => setLabelModalOpen(true)} aria-label="Cetak Label"
           className={`shrink-0 flex items-center justify-center w-11 py-3 rounded-2xl text-xs font-bold border ${th.bdr} ${th.txm}`}>
           <BarcodeIcon size={14} />
+        </button>
+        {/* Pending orders badge — clock icon with count */}
+        <button onClick={() => setPendingListOpen(true)} aria-label="Pesanan Pending"
+          className={`relative shrink-0 flex items-center justify-center w-11 py-3 rounded-2xl text-xs font-bold border ${th.bdr} ${pendingCount > 0 ? th.acc : th.txm}`}>
+          <Clock size={14} />
+          {pendingCount > 0 && (
+            <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-gradient-to-br from-[#FB7185] to-[#E11D48] text-white text-[10px] font-black flex items-center justify-center leading-none">
+              {pendingCount}
+            </span>
+          )}
         </button>
         {canManageRegister && (
           <button onClick={() => setCloseRegisterOpen(true)} aria-label={t.closeRegister as string}
@@ -704,17 +786,17 @@ export function POSPage() {
                 <p className={`text-base font-black ${th.acc}`}>{$(total)}</p>
               </div>
               <div className="grid grid-cols-3 gap-2">
-                <div className={`rounded-xl px-2 py-1.5 text-center ${th.dark ? "bg-[#4A8B3F]/10" : "bg-green-50"}`}>
-                  <p className={`text-xs font-semibold text-[#4A8B3F]`}>Tunai</p>
-                  <p className={`text-sm font-black text-[#4A8B3F]`}>{$(byMethod.cash || 0)}</p>
+                <div className={`rounded-xl px-2 py-1.5 text-center ${th.dark ? "bg-[#E11D48]/10" : "bg-[#FFE4E9]"}`}>
+                  <p className={`text-xs font-semibold text-[#E11D48]`}>Tunai</p>
+                  <p className={`text-sm font-black text-[#E11D48]`}>{$(byMethod.cash || 0)}</p>
                 </div>
-                <div className={`rounded-xl px-2 py-1.5 text-center ${th.dark ? "bg-[#60A5FA]/10" : "bg-blue-50"}`}>
+                <div className={`rounded-xl px-2 py-1.5 text-center ${th.dark ? "bg-[#FB7185]/10" : "bg-[#FFE4E9]"}`}>
                   <p className={`text-xs font-semibold ${th.acc}`}>QRIS</p>
                   <p className={`text-sm font-black ${th.acc}`}>{$(byMethod.qris || 0)}</p>
                 </div>
-                <div className={`rounded-xl px-2 py-1.5 text-center ${th.dark ? "bg-[#E89B48]/10" : "bg-orange-50"}`}>
-                  <p className={`text-xs font-semibold text-[#E89B48]`}>Transfer</p>
-                  <p className={`text-sm font-black text-[#E89B48]`}>{$((byMethod.transfer || 0) + (byMethod.card || 0))}</p>
+                <div className={`rounded-xl px-2 py-1.5 text-center ${th.dark ? "bg-[#E11D48]/10" : "bg-[#FFE4E9]"}`}>
+                  <p className={`text-xs font-semibold text-[#E11D48]`}>Transfer</p>
+                  <p className={`text-sm font-black text-[#E11D48]`}>{$((byMethod.transfer || 0) + (byMethod.card || 0))}</p>
                 </div>
               </div>
               {itemsSold.length > 0 && (
@@ -750,7 +832,7 @@ export function POSPage() {
           <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
             <button onClick={() => setCatFilter("all")}
               className={`shrink-0 px-4 py-2.5 rounded-[14px] text-xs font-bold transition-all ${
-                catFilter === "all" ? "text-white bg-gradient-to-r from-[#60A5FA] to-[#1E40AF]" : `border ${th.card} ${th.bdr} ${th.txm}`
+                catFilter === "all" ? "text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48]" : `border ${th.card} ${th.bdr} ${th.txm}`
               }`}>{t.all}</button>
             {categories.map(cat => {
               const Icon = CategoryIconMap[cat.icon];
@@ -758,7 +840,7 @@ export function POSPage() {
               return (
                 <button key={cat.id} onClick={() => setCatFilter(cat.id)}
                   className={`shrink-0 flex items-center gap-1.5 px-3.5 py-2.5 rounded-[14px] text-xs font-bold transition-all ${
-                    active ? "text-white bg-gradient-to-r from-[#60A5FA] to-[#1E40AF]" : `border ${th.card} ${th.bdr} ${th.txm}`
+                    active ? "text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48]" : `border ${th.card} ${th.bdr} ${th.txm}`
                   }`}>
                   {Icon && <Icon color={active ? "#fff" : cat.color} size={18} />}
                   {lang === "id" ? cat.nameId : cat.name}
@@ -766,7 +848,7 @@ export function POSPage() {
               );
             })}
           </div>
-          <div className={`absolute right-0 top-0 bottom-1 w-8 pointer-events-none bg-gradient-to-l ${th.dark ? "from-[#020617]" : "from-[#F1F5F9]"}`} />
+          <div className={`absolute right-0 top-0 bottom-1 w-8 pointer-events-none bg-gradient-to-l ${th.dark ? "from-[#140B0F]" : "from-[#FBE8EE]"}`} />
         </div>
 
         {/* Products grid */}
@@ -777,7 +859,10 @@ export function POSPage() {
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-3 pb-4">
+            {/* Auto-fit grid: cards wrap based on container width. Each card
+                targets ~240px min, so narrow phones show 1 col (full name
+                visible), tablets show 2, desktop 3-4. No more text-clipping. */}
+            <div className="grid gap-3 pb-4" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))" }}>
               {visibleProducts.map(p => (
                 <ProductCard
                   key={p.id}
@@ -819,7 +904,7 @@ export function POSPage() {
       {cartCount > 0 && (
         <div className="lg:hidden fixed bottom-20 left-4 right-4 z-30">
           <button onClick={() => setCartOpen(true)}
-            className="w-full flex items-center justify-between text-white px-5 py-3.5 rounded-[20px] bg-gradient-to-r from-[#60A5FA] to-[#1E40AF] shadow-[0_8px_30px_rgba(160,103,60,0.3)] active:scale-[0.98] transition-transform">
+            className="w-full flex items-center justify-between text-white px-5 py-3.5 rounded-[20px] bg-gradient-to-r from-[#FB7185] to-[#E11D48] shadow-[0_8px_30px_rgba(160,103,60,0.3)] active:scale-[0.98] transition-transform">
             <span className="flex items-center gap-2.5">
               <ShoppingBag size={18} />
               <span className="font-bold text-sm">{t.cart} · {cartCount}</span>
@@ -852,11 +937,41 @@ export function POSPage() {
             <div>
               <p className={`text-sm font-bold mb-1.5 ${th.tx}`}>{t.cashReceived}</p>
               <input type="number" value={cashRcv} onChange={e => setCashRcv(e.target.value)} placeholder="0"
-                className={`w-full px-4 py-3 text-sm rounded-2xl border ${th.inp}`}
+                className={`w-full px-4 py-3 text-base rounded-2xl border ${th.inp}`}
                 onKeyDown={e => { if (e.key === "Enter" && parseFloat(cashRcv) >= cartTotal) doCheckout(); }} />
               {parseFloat(cashRcv) >= cartTotal && (
-                <p className="text-sm font-bold text-[#4A8B3F] mt-2">{t.change}: {$(parseFloat(cashRcv) - cartTotal)}</p>
+                <p className="text-sm font-bold text-[#E11D48] mt-2">{t.change}: {$(parseFloat(cashRcv) - cartTotal)}</p>
               )}
+              {/* Split payment — muncul kalau tunai kurang dari total. */}
+              {parseFloat(cashRcv) > 0 && parseFloat(cashRcv) < cartTotal && (() => {
+                const kurang = cartTotal - parseFloat(cashRcv);
+                return (
+                  <div className={`mt-3 rounded-2xl border p-4 ${th.bdr} bg-[#FFE4E9] dark:bg-[#E11D48]/10`}>
+                    <div className="flex items-center gap-2 mb-2">
+                      <AlertCircle size={16} className={th.acc} />
+                      <p className={`text-sm font-bold ${th.acc}`}>Kurang {$(kurang)}</p>
+                    </div>
+                    <p className={`text-xs mb-2 ${th.txm}`}>Sisa dibayar dengan:</p>
+                    <div className="grid grid-cols-3 gap-2">
+                      {(["qris", "transfer", "card"] as PaymentMethod[]).map(m => (
+                        <button key={m} onClick={() => setSplitMethod(m)}
+                          className={`py-2 rounded-xl text-xs font-bold transition-all ${
+                            splitMethod === m
+                              ? "text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48]"
+                              : `border ${th.bdr} ${th.tx} ${th.card}`
+                          }`}>
+                          {t[m]}
+                        </button>
+                      ))}
+                    </div>
+                    {splitMethod && (
+                      <p className={`text-xs mt-2 ${th.txm}`}>
+                        Tunai {$(parseFloat(cashRcv))} + {t[splitMethod]} {$(kurang)} = <b className={th.tx}>{$(cartTotal)}</b>
+                      </p>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           )}
           {payment === "transfer" && bankAccounts.length > 0 && (
@@ -869,12 +984,12 @@ export function POSPage() {
                     <button key={acc.id} onClick={() => setSelectedBankId(acc.id)}
                       className={`w-full text-left rounded-2xl border p-3.5 transition-all ${
                         selected
-                          ? "border-[#1E40AF] bg-gradient-to-r from-[#60A5FA]/10 to-[#1E40AF]/10"
+                          ? "border-[#E11D48] bg-gradient-to-r from-[#FB7185]/10 to-[#E11D48]/10"
                           : `${th.card2} ${th.bdr}`
                       }`}>
                       <div className="flex items-center gap-3">
                         <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-xs font-extrabold shrink-0 ${
-                          selected ? "bg-gradient-to-r from-[#60A5FA] to-[#1E40AF] text-white" : `${th.accBg} ${th.acc}`
+                          selected ? "bg-gradient-to-r from-[#FB7185] to-[#E11D48] text-white" : `${th.accBg} ${th.acc}`
                         }`}>
                           {acc.bankName.split("(")[1]?.replace(")", "").trim().slice(0, 3) || acc.bankName.slice(0, 3).toUpperCase()}
                         </div>
@@ -939,10 +1054,16 @@ export function POSPage() {
           <div className="flex gap-2">
             <button onClick={() => setCheckoutOpen(false)} className={`flex-1 py-3 rounded-2xl text-sm font-bold border ${th.bdr} ${th.txm}`}>{t.cancel}</button>
             <button onClick={doCheckout} disabled={
-              (payment === "cash" && (!cashRcv || parseFloat(cashRcv) < cartTotal)) ||
+              (payment === "cash" && (() => {
+                const rcv = parseFloat(cashRcv) || 0;
+                if (!rcv) return true;
+                if (rcv >= cartTotal) return false; // cukup tunai
+                // Kurang: butuh split method dipilih supaya sisa terbayar
+                return !splitMethod;
+              })()) ||
               (payment === "transfer" && bankAccounts.length > 0 && !selectedBankId)
             }
-              className="flex-1 py-3 rounded-2xl text-sm font-bold text-white bg-[#4A8B3F] disabled:opacity-40">{t.confirm}</button>
+              className="flex-1 py-3 rounded-2xl text-sm font-bold text-white bg-[#E11D48] disabled:opacity-40">{t.confirm}</button>
           </div>
         </div>
       </Modal>
@@ -952,7 +1073,7 @@ export function POSPage() {
         {lastOrder && (
           <div className="flex flex-col gap-4">
             <div className="text-center">
-              <div className="w-12 h-12 rounded-full bg-[#4A8B3F]/10 flex items-center justify-center mx-auto mb-3">
+              <div className="w-12 h-12 rounded-full bg-[#E11D48]/10 flex items-center justify-center mx-auto mb-3">
                 <span className="text-2xl">✓</span>
               </div>
               <p className={`text-lg font-black ${th.tx}`}>{t.orderSuccess}</p>
@@ -967,8 +1088,8 @@ export function POSPage() {
                   </div>
                   {(item.discountAmount || 0) > 0 && (
                     <div className="flex justify-between">
-                      <span className="text-xs text-[#E89B48]">&nbsp;&nbsp;{t.discount} {item.discountType === "percent" ? `${item.discountValue}%` : ""}</span>
-                      <span className="text-xs font-bold text-[#E89B48]">-{$(item.discountAmount || 0)}</span>
+                      <span className="text-xs text-[#E11D48]">&nbsp;&nbsp;{t.discount} {item.discountType === "percent" ? `${item.discountValue}%` : ""}</span>
+                      <span className="text-xs font-bold text-[#E11D48]">-{$(item.discountAmount || 0)}</span>
                     </div>
                   )}
                 </div>
@@ -985,14 +1106,14 @@ export function POSPage() {
                   </div>
                   {itemDiscSum > 0 && (
                     <div className="flex justify-between py-0.5">
-                      <span className="text-sm text-[#E89B48]">{t.itemDiscount}</span>
-                      <span className="text-sm font-semibold text-[#E89B48]">-{$(itemDiscSum)}</span>
+                      <span className="text-sm text-[#E11D48]">{t.itemDiscount}</span>
+                      <span className="text-sm font-semibold text-[#E11D48]">-{$(itemDiscSum)}</span>
                     </div>
                   )}
                   {orderDisc > 0 && (
                     <div className="flex justify-between py-0.5">
-                      <span className="text-sm text-[#E89B48]">{t.orderDiscount}{lastOrder.orderDiscountType === "percent" ? ` ${lastOrder.orderDiscountValue}%` : ""}</span>
-                      <span className="text-sm font-semibold text-[#E89B48]">-{$(orderDisc)}</span>
+                      <span className="text-sm text-[#E11D48]">{t.orderDiscount}{lastOrder.orderDiscountType === "percent" ? ` ${lastOrder.orderDiscountValue}%` : ""}</span>
+                      <span className="text-sm font-semibold text-[#E11D48]">-{$(orderDisc)}</span>
                     </div>
                   )}
                   {lastOrder.ppnRate > 0 && (
@@ -1017,21 +1138,278 @@ export function POSPage() {
               🖨 {t.printReceipt}
             </button>
             <button onClick={() => setLastOrder(null)}
-              className="w-full py-3 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-[#60A5FA] to-[#1E40AF]">{t.close}</button>
+              className="w-full py-3 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48]">{t.close}</button>
           </div>
         )}
       </Modal>
+      {/* Simpan Pending modal — customer pesan online, belum bayar */}
+      <Modal open={pendingOpenModal} onClose={() => setPendingOpenModal(false)} title="Simpan sebagai Pending">
+        <div className="flex flex-col gap-3">
+          <div className={`rounded-2xl p-4 ${th.accBg}`}>
+            <p className={`text-xs font-semibold ${th.acc}`}>Total Pesanan</p>
+            <p className={`font-display text-2xl font-black ${th.acc}`} style={{ fontVariationSettings: '"wght" 900' }}>
+              {$(cartTotal)}
+            </p>
+          </div>
+          <p className={`text-sm ${th.txm}`}>
+            Pesanan akan disimpan sebagai PENDING. Stok belum dipotong sampai customer bayar.
+          </p>
+          <div>
+            <p className={`text-sm font-bold mb-1.5 ${th.tx}`}>Nomor HP Customer</p>
+            <input
+              type="tel"
+              inputMode="tel"
+              value={pendingCustomerPhone}
+              onChange={e => setPendingCustomerPhone(e.target.value)}
+              placeholder="08xxxxxxxxxx"
+              className={`w-full px-4 py-3 text-base rounded-2xl border ${th.inp}`}
+            />
+            <p className={`text-xs mt-1 ${th.txf}`}>
+              Rincian pembayaran akan otomatis dikirim ke WhatsApp nomor ini.
+            </p>
+          </div>
+          {bankAccounts.length > 0 && (
+            <div>
+              <p className={`text-sm font-bold mb-1.5 ${th.tx}`}>Rekening Tujuan Transfer</p>
+              <div className="flex flex-col gap-1.5">
+                {bankAccounts.map(acc => {
+                  const selected = pendingBankId === acc.id || (!pendingBankId && acc.id === bankAccounts[0].id);
+                  return (
+                    <button key={acc.id} onClick={() => setPendingBankId(acc.id)}
+                      className={`w-full text-left rounded-xl border p-3 text-sm ${
+                        selected ? "border-[#E11D48] bg-gradient-to-r from-[#FB7185]/10 to-[#E11D48]/10" : `${th.card2} ${th.bdr}`
+                      }`}>
+                      <p className={`font-bold ${th.tx}`}>{acc.bankName}</p>
+                      <p className={`text-xs ${th.txm}`}>{acc.accountNumber} · {acc.accountHolder}</p>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+          {bankAccounts.length === 0 && (
+            <p className={`text-xs ${th.txm} p-2 rounded-lg bg-[#FFE4E9]`}>
+              Belum ada rekening di Settings. Pesan akan dikirim tanpa info transfer.
+            </p>
+          )}
+          <div className="flex gap-2 mt-2">
+            <button onClick={() => setPendingOpenModal(false)}
+              className={`flex-1 py-3 rounded-2xl text-sm font-bold border ${th.bdr} ${th.txm}`}>
+              Batal
+            </button>
+            <button
+              onClick={async () => {
+                if (!pendingCustomerPhone.trim()) {
+                  toast.error("Nomor HP customer wajib diisi");
+                  return;
+                }
+                let totalSavings = 0;
+                const orderItems = cartItems.map(ci => {
+                  const disc = calcItemDiscount(ci);
+                  if (activeMember && ci.regularPrice && ci.regularPrice > ci.unitPrice) {
+                    totalSavings += (ci.regularPrice - ci.unitPrice) * ci.quantity;
+                  }
+                  return {
+                    productId: ci.productId, name: ci.name, quantity: ci.quantity,
+                    unitType: ci.unitType, unitPrice: ci.unitPrice,
+                    ...(ci.regularPrice !== undefined ? { regularPrice: ci.regularPrice } : {}),
+                    ...(ci.discountType ? { discountType: ci.discountType, discountValue: ci.discountValue, discountAmount: disc } : {}),
+                  };
+                });
+                const pendingOrder: Order = {
+                  id: `ORD-${Date.now().toString(36).toUpperCase()}`,
+                  items: orderItems,
+                  subtotal: discountedSubtotal, ppnRate, ppn: ppnAmount, total: cartTotal,
+                  payment: "cash" as const, // placeholder; real method set at MarkAsPaid
+                  status: "pending" as const,
+                  customer: activeMember ? activeMember.name : (customer || (t.walkIn as string)),
+                  customerPhone: pendingCustomerPhone.trim(),
+                  ...(activeMember ? { memberId: activeMember.id, member: activeMember, memberSavings: totalSavings } : {}),
+                  createdAt: new Date().toISOString(),
+                  createdBy: user.id,
+                  ...(orderDiscountType ? { orderDiscountType, orderDiscountValue, orderDiscount: orderDiscAmount } : {}),
+                };
+                try {
+                  const bankId = pendingBankId || (bankAccounts.length > 0 ? bankAccounts[0].id : undefined);
+                  await createPendingOrder(pendingOrder, bankId);
+                  toast.success("Pesanan pending tersimpan & WA terkirim");
+                  clearCart();
+                  setPendingCustomerPhone("");
+                  setPendingBankId("");
+                  setPendingOpenModal(false);
+                  setCartOpen(false);
+                } catch { /* toast already shown */ }
+              }}
+              disabled={!pendingCustomerPhone.trim()}
+              className="flex-1 py-3 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48] disabled:opacity-40"
+            >
+              Simpan & Kirim WA
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Pending Orders list modal */}
+      <Modal open={pendingListOpen} onClose={() => setPendingListOpen(false)} title={`Pesanan Menunggu Pembayaran (${pendingCount})`}>
+        <div className="flex flex-col gap-2">
+          {allOrders.filter(o => o.status === "pending").length === 0 ? (
+            <div className={`text-center py-10 ${th.txm}`}>
+              <Clock size={36} className="mx-auto opacity-30 mb-3" />
+              <p className="font-semibold text-sm">Tidak ada pesanan pending</p>
+            </div>
+          ) : allOrders.filter(o => o.status === "pending").map(o => {
+            const ageHours = (Date.now() - new Date(o.createdAt).getTime()) / 3600000;
+            const ageLabel = ageHours < 1 ? "< 1 jam lalu"
+              : ageHours < 24 ? `${Math.floor(ageHours)} jam lalu`
+              : `${Math.floor(ageHours / 24)} hari lalu`;
+            const ageColor = ageHours > 24 ? "text-[#BE123C]"
+              : ageHours > 3 ? "text-[#E11D48]"
+              : th.txm;
+            return (
+              <div key={o.id} className={`rounded-2xl border p-4 ${th.card2} ${th.bdr}`}>
+                <div className="flex items-start justify-between gap-3 mb-2">
+                  <div className="min-w-0">
+                    <p className={`font-display text-sm font-black truncate ${th.tx}`} style={{ fontVariationSettings: '"wght" 900' }}>
+                      {o.customer || "Umum"}
+                    </p>
+                    <p className={`text-xs font-mono ${th.txf} truncate`}>#{o.id.slice(-8).toUpperCase()}</p>
+                    <p className={`text-xs ${ageColor}`}>{ageLabel}</p>
+                  </div>
+                  <p className={`font-display text-xl font-black shrink-0 ${th.acc}`} style={{ fontVariationSettings: '"wght" 900' }}>
+                    {$(o.total)}
+                  </p>
+                </div>
+                <div className="flex gap-1.5">
+                  <button
+                    onClick={() => { setMarkPaidOrderId(o.id); setMarkPaidMethod("cash"); setMarkPaidCashRcv(""); setMarkPaidSplit(""); }}
+                    className="flex-1 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48]"
+                  >
+                    Tandai Lunas
+                  </button>
+                  <button
+                    onClick={async () => {
+                      try {
+                        await resendInvoiceAction(o.id);
+                        toast.success("WA terkirim ulang");
+                      } catch { /* toast already shown */ }
+                    }}
+                    className={`py-2 px-3 rounded-xl text-xs font-bold border-2 border-[#FFB5C0] ${th.acc}`}
+                    title="Kirim ulang rincian ke customer"
+                  >
+                    <Send size={12} />
+                  </button>
+                  <button
+                    onClick={async () => {
+                      if (!confirm("Batalkan pesanan ini? Stok tidak terpengaruh.")) return;
+                      try {
+                        await cancelPendingAction(o.id);
+                        toast.success("Pesanan dibatalkan");
+                      } catch { /* toast already shown */ }
+                    }}
+                    className={`py-2 px-3 rounded-xl text-xs font-bold text-[#BE123C] bg-[#FCE4EC]`}
+                    title="Batalkan pesanan"
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </Modal>
+
+      {/* Tandai Lunas modal — select payment method for pending order */}
+      <Modal open={!!markPaidOrderId} onClose={() => setMarkPaidOrderId(null)} title="Tandai Lunas">
+        {markPaidOrderId && (() => {
+          const o = allOrders.find(x => x.id === markPaidOrderId);
+          if (!o) return null;
+          const rcv = parseFloat(markPaidCashRcv) || 0;
+          const needSplit = markPaidMethod === "cash" && rcv > 0 && rcv < o.total;
+          const enoughCash = markPaidMethod === "cash" && rcv >= o.total;
+          const canConfirm = markPaidMethod !== "cash" || enoughCash || (needSplit && markPaidSplit);
+          return (
+            <div className="flex flex-col gap-3">
+              <div className={`rounded-2xl p-4 ${th.accBg}`}>
+                <p className={`text-xs ${th.acc}`}>Total Pesanan</p>
+                <p className={`font-display text-2xl font-black ${th.acc}`} style={{ fontVariationSettings: '"wght" 900' }}>
+                  {$(o.total)}
+                </p>
+                <p className={`text-xs mt-1 ${th.txm}`}>{o.customer || "Umum"}</p>
+              </div>
+              <div className="grid grid-cols-4 gap-2">
+                {(["cash", "card", "transfer", "qris"] as PaymentMethod[]).map(pm => (
+                  <button key={pm} onClick={() => { setMarkPaidMethod(pm); setMarkPaidSplit(""); setMarkPaidCashRcv(""); }}
+                    className={`py-2.5 rounded-xl text-xs font-bold ${
+                      markPaidMethod === pm ? "text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48]" : `border ${th.bdr} ${th.txm}`
+                    }`}>{t[pm]}</button>
+                ))}
+              </div>
+              {markPaidMethod === "cash" && (
+                <div>
+                  <p className={`text-sm font-bold mb-1.5 ${th.tx}`}>Tunai Diterima</p>
+                  <input type="number" value={markPaidCashRcv} onChange={e => setMarkPaidCashRcv(e.target.value)}
+                    placeholder="0" className={`w-full px-4 py-3 text-base rounded-2xl border ${th.inp}`} />
+                  {enoughCash && (
+                    <p className="text-sm font-bold text-[#E11D48] mt-2">Kembalian: {$(rcv - o.total)}</p>
+                  )}
+                  {needSplit && (
+                    <div className={`mt-3 rounded-2xl border p-4 ${th.bdr} bg-[#FFE4E9]`}>
+                      <p className={`text-sm font-bold mb-2 ${th.acc}`}>Kurang {$(o.total - rcv)}</p>
+                      <div className="grid grid-cols-3 gap-2">
+                        {(["qris", "transfer", "card"] as PaymentMethod[]).map(m => (
+                          <button key={m} onClick={() => setMarkPaidSplit(m)}
+                            className={`py-2 rounded-xl text-xs font-bold ${
+                              markPaidSplit === m ? "text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48]" : `border ${th.bdr} ${th.tx} ${th.card}`
+                            }`}>{t[m]}</button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+              <div className="flex gap-2 mt-2">
+                <button onClick={() => setMarkPaidOrderId(null)}
+                  className={`flex-1 py-3 rounded-2xl text-sm font-bold border ${th.bdr} ${th.txm}`}>
+                  Batal
+                </button>
+                <button
+                  onClick={async () => {
+                    const payments: { method: string; amount: number }[] = [];
+                    if (markPaidMethod === "cash" && needSplit) {
+                      payments.push({ method: "cash", amount: rcv });
+                      payments.push({ method: markPaidSplit as string, amount: o.total - rcv });
+                    } else {
+                      payments.push({ method: markPaidMethod, amount: o.total });
+                    }
+                    try {
+                      await markAsPaidAction(markPaidOrderId!, payments);
+                      toast.success("Pesanan lunas · stok terpotong");
+                      setMarkPaidOrderId(null);
+                    } catch { /* toast already shown */ }
+                  }}
+                  disabled={!canConfirm}
+                  className="flex-1 py-3 rounded-2xl text-sm font-bold text-white bg-[#E11D48] disabled:opacity-40"
+                >
+                  Konfirmasi Lunas
+                </button>
+              </div>
+            </div>
+          );
+        })()}
+      </Modal>
+
       {/* Order History modal */}
+      {/* Step 1: pick products to label */}
       <Modal open={labelModalOpen} onClose={() => { setLabelModalOpen(false); setLabelSearch(""); setSelectedLabels(new Set()); }} title="Cetak Label Barcode">
         <div className="flex flex-col gap-3">
           <div className="relative">
             <Search size={16} className={`absolute left-3 top-1/2 -translate-y-1/2 ${th.txf}`} />
             <input autoFocus value={labelSearch} onChange={e => setLabelSearch(e.target.value)}
-              placeholder="Cari nama produk / SKU / barcode…"
+              placeholder="Cari nama / SKU / barcode…"
               className={`w-full pl-10 pr-3 py-3 text-sm rounded-2xl border ${th.inp}`} />
           </div>
-          <p className={`text-xs ${th.txm}`}>
-            Ukuran label: {labelWidth}mm × {labelHeight}mm · Centang produk lalu tekan Cetak.
+          <p className={`text-sm ${th.txm}`}>
+            Ukuran label: {labelWidth}mm × {labelHeight}mm · centang produk lalu tekan Lanjut.
           </p>
           <div className={`border rounded-2xl overflow-hidden max-h-[50vh] overflow-y-auto ${th.bdr}`}>
             {(() => {
@@ -1057,22 +1435,11 @@ export function POSPage() {
                         if (e.target.checked) next.add(p.id); else next.delete(p.id);
                         setSelectedLabels(next);
                       }}
-                      className="w-4 h-4 rounded accent-[#1E40AF] shrink-0" />
+                      className="w-4 h-4 rounded accent-[#E11D48] shrink-0" />
                     <div className="min-w-0 flex-1">
-                      <p className={`text-sm font-bold truncate ${th.tx}`}>{lang === "id" ? p.nameId : p.name}</p>
+                      <p className={`text-base font-bold truncate ${th.tx}`}>{lang === "id" ? p.nameId : p.name}</p>
                       <p className={`text-xs font-mono ${th.txf}`}>{p.sku}</p>
                     </div>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        printBarcodeLabel(p, lang, { width: labelWidth, height: labelHeight });
-                        toast.success("Label dicetak");
-                      }}
-                      className={`shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border ${th.bdr} ${th.acc}`}
-                    >
-                      <Printer size={12} /> 1
-                    </button>
                   </label>
                 );
               });
@@ -1083,25 +1450,77 @@ export function POSPage() {
               <button
                 type="button"
                 onClick={() => setSelectedLabels(new Set())}
-                className={`text-xs font-bold ${th.txm} underline`}
+                className={`text-sm font-bold ${th.txm} underline`}
               >
                 Batal ({selectedLabels.size})
               </button>
               <button
                 type="button"
                 onClick={() => {
-                  const size = { width: labelWidth, height: labelHeight };
-                  const picks = products.filter(p => selectedLabels.has(p.id));
-                  printBarcodeLabels(picks, lang, size);
-                  toast.success(`${picks.length} label dicetak`);
-                  setSelectedLabels(new Set());
+                  setLabelIncludeExpiry(false);
+                  setLabelExpiryDate("");
+                  setLabelConfirmOpen(true);
                 }}
-                className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-[#60A5FA] to-[#1E40AF]`}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48]`}
               >
-                <Printer size={12} /> Cetak {selectedLabels.size} Label
+                <Printer size={14} /> Lanjut · {selectedLabels.size} label
               </button>
             </div>
           )}
+        </div>
+      </Modal>
+
+      {/* Step 2: confirm dialog with optional ED — mirrors the Inventory flow
+          so kasir can opt in/out of printing a tanggal kadaluarsa per batch. */}
+      <Modal open={labelConfirmOpen} onClose={() => setLabelConfirmOpen(false)} title="Print Barcode Label">
+        <div className="flex flex-col gap-3">
+          <p className={`text-sm ${th.txm}`}>
+            {selectedLabels.size} produk akan dicetak.
+          </p>
+
+          <label className={`flex items-center gap-2 cursor-pointer px-3 py-2.5 rounded-xl border ${th.bdr}`}>
+            <input type="checkbox" checked={labelIncludeExpiry}
+              onChange={e => setLabelIncludeExpiry(e.target.checked)}
+              className="w-4 h-4 rounded accent-[#E11D48]" />
+            <span className={`text-sm font-bold ${th.tx}`}>Tampilkan tanggal kadaluarsa</span>
+          </label>
+
+          {labelIncludeExpiry && (
+            <div>
+              <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>Tanggal kadaluarsa</p>
+              <input type="date" value={labelExpiryDate}
+                onChange={e => setLabelExpiryDate(e.target.value)}
+                className={`w-full px-3 py-2.5 text-sm rounded-xl border ${th.inp}`} />
+              <p className={`text-xs mt-1 ${th.txm}`}>
+                Kosongkan jika belum tahu · berlaku untuk semua {selectedLabels.size} label.
+              </p>
+            </div>
+          )}
+
+          <div className="flex gap-2 mt-2">
+            <button onClick={() => setLabelConfirmOpen(false)}
+              className={`flex-1 py-3 rounded-xl text-sm font-bold border ${th.bdr} ${th.txm}`}>
+              Batal
+            </button>
+            <button
+              onClick={() => {
+                const picks = products.filter(p => selectedLabels.has(p.id));
+                printBarcodeLabels(
+                  picks, lang,
+                  { width: labelWidth, height: labelHeight },
+                  labelIncludeExpiry && labelExpiryDate ? { expiryDate: labelExpiryDate } : undefined
+                );
+                toast.success(`${picks.length} label dicetak`);
+                setSelectedLabels(new Set());
+                setLabelConfirmOpen(false);
+                setLabelModalOpen(false);
+                setLabelSearch("");
+              }}
+              className="flex-1 py-3 rounded-xl text-sm font-bold text-white bg-[#E11D48]"
+            >
+              Print
+            </button>
+          </div>
         </div>
       </Modal>
 
@@ -1113,7 +1532,7 @@ export function POSPage() {
               <p className="font-semibold text-sm">{t.noOrderHistory}</p>
             </div>
           ) : sessionOrders.map(o => {
-            const statusColor = o.status === "completed" ? "text-[#4A8B3F]" : o.status === "cancelled" ? "text-[#C4504A]" : o.status === "refunded" ? "text-[#E89B48]" : th.txm;
+            const statusColor = o.status === "completed" ? "text-[#E11D48]" : o.status === "cancelled" ? "text-[#C4504A]" : o.status === "refunded" ? "text-[#E11D48]" : th.txm;
             const statusLabel = t[o.status as keyof typeof t] as string || o.status;
             return (
               <div key={o.id} className={`rounded-[16px] border p-3.5 ${th.card2} ${th.bdr}`}>
@@ -1138,38 +1557,40 @@ export function POSPage() {
 
       <ProductDetailModal productId={detailProductId} onClose={() => setDetailProductId(null)} />
 
-      {/* Close Register modal */}
+      {/* Close Register modal — label Santi's preference:
+            - "Modal"        (was "Kas Awal"): opening cash
+            - "Kurang Modal" (was "Kas Aktual"): input, cash aktual di laci
+            - "Total Modal"  (was "Selisih" section): computed = Modal +
+              semua tunai orders shift ini (yang seharusnya ada di laci).
+            "Kas Diharapkan" row dihapus karena digantikan "Total Modal". */}
       <Modal open={closeRegisterOpen} onClose={() => { setCloseRegisterOpen(false); setActualCash(""); setRegisterNotes(""); }} title={t.closeRegister as string}>
         <div className="flex flex-col gap-4">
           <div className={`rounded-[18px] border p-4 ${th.card2} ${th.bdr}`}>
             {activeSession && (
-              <div className={`flex justify-between mb-1.5 pb-1.5 border-b ${th.bdrSoft}`}>
-                <span className={`text-sm ${th.txm}`}>{t.openingCash}</span>
-                <span className={`text-sm font-bold ${th.tx}`}>{$(activeSession.openingCash)}</span>
+              <div className="flex justify-between mb-2">
+                <span className={`text-sm ${th.txm}`}>Modal</span>
+                <span className={`font-display text-lg font-black ${th.tx}`} style={{ fontVariationSettings: '"wght" 800' }}>
+                  {$(activeSession.openingCash)}
+                </span>
               </div>
             )}
-            <div className="flex justify-between mb-1">
-              <span className={`text-sm ${th.txm}`}>{t.expectedCash}</span>
-              <span className={`text-sm font-black ${th.tx}`}>{$(expectedCash)}</span>
-            </div>
-            <p className={`text-xs ${th.txf}`}>{activeSession ? `${t.openingCash} + ${t.cash} orders` : `${t.cash} orders ${t.today?.toString().toLowerCase()}`}</p>
           </div>
           <div>
-            <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>{t.actualCash}</p>
+            <p className={`text-sm font-bold mb-1.5 ${th.tx}`}>Kurang Modal</p>
             <input type="number" value={actualCash} onChange={e => setActualCash(e.target.value)}
-              placeholder="0" className={`w-full px-4 py-3 text-sm rounded-2xl border ${th.inp}`} />
+              placeholder="0" className={`w-full px-4 py-3 text-base rounded-2xl border ${th.inp}`} />
           </div>
-          {actualCash && (() => {
-            const diff = (parseFloat(actualCash) || 0) - expectedCash;
-            const color = diff === 0 ? "text-[#4A8B3F]" : diff > 0 ? "text-[#5B8DEF]" : "text-[#C4504A]";
-            const label = diff === 0 ? t.cashBalanced : diff > 0 ? t.cashOver : t.cashShort;
-            return (
-              <div className="flex justify-between px-1">
-                <span className={`text-sm font-bold ${color}`}>{t.cashDifference}: {label}</span>
-                <span className={`text-sm font-black ${color}`}>{diff >= 0 ? "+" : ""}{$(diff)}</span>
-              </div>
-            );
-          })()}
+          {/* Total Modal — hero row, computed. Shows what SHOULD be in the
+              drawer (opening + all cash orders this shift). Helps kasir
+              compare with physical count. */}
+          <div className={`rounded-[18px] border p-4 ${th.bdr} bg-gradient-to-br from-[#FFE4E9] to-[#FFD1DB] dark:from-[#E11D48]/15 dark:to-[#9F1239]/20`}>
+            <div className="flex justify-between items-baseline">
+              <span className={`text-sm font-semibold uppercase tracking-wider ${th.acc}`}>Total Modal</span>
+              <span className={`font-display text-2xl font-black ${th.acc}`} style={{ fontVariationSettings: '"wght" 900' }}>
+                {$(expectedCash)}
+              </span>
+            </div>
+          </div>
           <div>
             <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>{t.registerNotes}</p>
             <input value={registerNotes} onChange={e => setRegisterNotes(e.target.value)}
@@ -1179,7 +1600,7 @@ export function POSPage() {
             <button onClick={() => { setCloseRegisterOpen(false); setActualCash(""); setRegisterNotes(""); }}
               className={`flex-1 py-3 rounded-2xl text-sm font-bold border ${th.bdr} ${th.txm}`}>{t.cancel}</button>
             <button onClick={doCloseRegister} disabled={!actualCash}
-              className="flex-1 py-3 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-[#60A5FA] to-[#1E40AF] disabled:opacity-40">{t.confirm}</button>
+              className="flex-1 py-3 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48] disabled:opacity-40">{t.confirm}</button>
           </div>
 
           {/* Today's register history */}
@@ -1188,19 +1609,20 @@ export function POSPage() {
               <div className={`px-4 py-3 border-b ${th.bdr}`}>
                 <p className={`text-xs font-extrabold tracking-tight ${th.tx}`}>{t.registerHistory}</p>
               </div>
-              {todaySessions.map(s => {
-                const diffColor = s.difference === 0 ? "text-[#4A8B3F]" : s.difference > 0 ? "text-[#5B8DEF]" : "text-[#C4504A]";
-                return (
-                  <div key={s.id} className={`px-4 py-2.5 border-b last:border-0 ${th.bdrSoft}`}>
-                    <div className="flex justify-between">
-                      <span className={`text-sm font-bold ${th.tx}`}>{formatTime(s.closedAt)}</span>
-                      <span className={`text-sm font-black ${diffColor}`}>{s.difference >= 0 ? "+" : ""}{$(s.difference)}</span>
-                    </div>
-                    <p className={`text-xs ${th.txm}`}>{t.openingCash}: {$(s.openingCash)} · {t.expectedCash}: {$(s.expectedCash)} · {t.actualCash}: {$(s.actualCash)}</p>
-                    {s.notes && <p className={`text-xs mt-0.5 ${th.txf}`}>{s.notes}</p>}
+              {todaySessions.map(s => (
+                <div key={s.id} className={`px-4 py-2.5 border-b last:border-0 ${th.bdrSoft}`}>
+                  <div className="flex justify-between">
+                    <span className={`text-sm font-bold ${th.tx}`}>{formatTime(s.closedAt)}</span>
+                    <span className={`font-display text-sm font-black ${th.acc}`} style={{ fontVariationSettings: '"wght" 800' }}>
+                      Total Modal {$(s.expectedCash)}
+                    </span>
                   </div>
-                );
-              })}
+                  <p className={`text-xs ${th.txm}`}>
+                    Modal: {$(s.openingCash)} · Kurang Modal: {$(s.actualCash)}
+                  </p>
+                  {s.notes && <p className={`text-xs mt-0.5 ${th.txf}`}>{s.notes}</p>}
+                </div>
+              ))}
             </div>
           )}
         </div>

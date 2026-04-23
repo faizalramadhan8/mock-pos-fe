@@ -68,14 +68,14 @@ export const INDONESIAN_BANKS = [
 ];
 
 export const CATEGORIES: Category[] = [
-  { id: "c1", name: "Flour & Starch", nameId: "Tepung & Pati", icon: "flour", color: "#3B82F6" },
-  { id: "c2", name: "Sugar", nameId: "Gula", icon: "sugar", color: "#D4627A" },
-  { id: "c3", name: "Dairy & Eggs", nameId: "Susu & Telur", icon: "dairy", color: "#5B8DEF" },
+  { id: "c1", name: "Flour & Starch", nameId: "Tepung & Pati", icon: "flour", color: "#F472B6" },
+  { id: "c2", name: "Sugar", nameId: "Gula", icon: "sugar", color: "#BE123C" },
+  { id: "c3", name: "Dairy & Eggs", nameId: "Susu & Telur", icon: "dairy", color: "#E11D48" },
   { id: "c4", name: "Chocolate", nameId: "Cokelat", icon: "choco", color: "#7D5A44" },
-  { id: "c5", name: "Leavening", nameId: "Pengembang", icon: "leaven", color: "#8B6FC0" },
-  { id: "c6", name: "Nuts & Fruits", nameId: "Kacang & Buah", icon: "nuts", color: "#6F9A4D" },
-  { id: "c7", name: "Fats & Oils", nameId: "Lemak & Minyak", icon: "fats", color: "#E89B48" },
-  { id: "c8", name: "Flavors", nameId: "Perasa & Ekstrak", icon: "flavor", color: "#2BA5B5" },
+  { id: "c5", name: "Leavening", nameId: "Pengembang", icon: "leaven", color: "#E11D48" },
+  { id: "c6", name: "Nuts & Fruits", nameId: "Kacang & Buah", icon: "nuts", color: "#E11D48" },
+  { id: "c7", name: "Fats & Oils", nameId: "Lemak & Minyak", icon: "fats", color: "#E11D48" },
+  { id: "c8", name: "Flavors", nameId: "Perasa & Ekstrak", icon: "flavor", color: "#E11D48" },
 ];
 
 export const MOCK_USERS: User[] = [
