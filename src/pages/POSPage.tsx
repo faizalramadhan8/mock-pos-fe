@@ -389,7 +389,7 @@ export function POSPage() {
           </div>
           <button onClick={() => setMember(null)}
             className={`shrink-0 text-xs font-bold px-2.5 py-1 rounded-lg border ${th.bdr} ${th.txm}`}>
-            Lepas
+            Hapus
           </button>
         </div>
       )}
