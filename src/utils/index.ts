@@ -79,6 +79,7 @@ export function printReceipt(order: Order, opts?: { cashierName?: string }) {
   const addr = s.storeAddress || "";
   const phone = s.storePhone || "";
   const cashier = opts?.cashierName || "-";
+  const customerName = order.member ? order.member.name : (order.customer || "");
 
   // Format Bu Santi: thermal 58mm, font tipis (regular weight, no bold global).
   // Header centered, body left/right kolom, footer centered. NO Diskon /
@@ -97,7 +98,16 @@ export function printReceipt(order: Order, opts?: { cashierName?: string }) {
   const orderNo = `${yyyy}.${mm}.${dd}.${idTail}`;
   const dateStr = `${dd}-${mm}-${yyyy}  ${hh}:${mi}`;
 
-  const subtotal = order.items.reduce((acc, i) => acc + i.quantity * i.unitPrice, 0);
+  // Subtotal pakai harga normal (regular_price kalau ada, fallback unit_price).
+  // memberSavings = total selisih (regular - member) × qty. Subtotal − Hemat
+  // Member = total. Konsisten dengan format struk WA.
+  let subtotal = 0;
+  let memberSavings = 0;
+  for (const i of order.items) {
+    const regular = i.regularPrice && i.regularPrice > i.unitPrice ? i.regularPrice : i.unitPrice;
+    subtotal += regular * i.quantity;
+    memberSavings += (regular - i.unitPrice) * i.quantity;
+  }
   const fmt = (n: number) => "Rp " + Math.round(n).toLocaleString("id-ID");
   const barcodeSvg = generateBarcodeSvg(order.id, { width: 1.0, height: 30, fontSize: 8 });
 
@@ -133,6 +143,7 @@ export function printReceipt(order: Order, opts?: { cashierName?: string }) {
   <div class="kv"><span class="k">No #</span><span>:</span><span>${orderNo}</span></div>
   <div class="kv"><span class="k">Kasir</span><span>:</span><span>${escapeHtml(cashier)}</span></div>
   <div class="kv"><span class="k">Tanggal</span><span>:</span><span>${dateStr}</span></div>
+  ${customerName ? `<div class="kv"><span class="k">${order.member ? "Member" : "Pelanggan"}</span><span>:</span><span>${escapeHtml(customerName)}</span></div>` : ""}
   <div class="ln"></div>
   ${order.items.map(i => {
     const isMember = !!(i.regularPrice && i.regularPrice > i.unitPrice);
@@ -142,6 +153,7 @@ export function printReceipt(order: Order, opts?: { cashierName?: string }) {
   }).join("")}
   <div class="ln"></div>
   <div class="r"><span class="l">Subtotal</span><span class="v">${fmt(subtotal)}</span></div>
+  ${memberSavings > 0 ? `<div class="r"><span class="l">Hemat Member</span><span class="v">-${fmt(memberSavings)}</span></div>` : ""}
   <div class="r total"><span class="l">Total</span><span class="v">${fmt(order.total)}</span></div>
   ${barcodeSvg ? `<div class="bc">${barcodeSvg}</div>` : ""}
   <div class="ln"></div>
