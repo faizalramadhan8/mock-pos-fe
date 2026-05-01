@@ -299,11 +299,11 @@ function addLabelPageToPdf(pdf: jsPDF, product: Product, lang: "en" | "id", size
   const innerW = pageW - sidePad * 2;
   const contentH = pageH - footH - topPad - 1;  // -1mm bottom safety
 
-  // Font sizes (pt) — diperbesar setelah barcode dikecilkan supaya nama produk
-  // & harga lebih dominan dan mudah dibaca.
-  const nameFontPt = pageW <= 30 ? 9 : pageW <= 40 ? 11 : 13;
-  const priceFontPt = pageW <= 30 ? 12 : pageW <= 40 ? 14 : 17;
-  const footFontPt = pageW <= 30 ? 7 : 8;
+  // Font sizes (pt) — disamakan proporsional dengan versi HTML+CSS commit
+  // 2116949 (10px / 11px / 9px → 7.5pt / 8.25pt / 6.75pt at 96 DPI).
+  const nameFontPt = pageW <= 30 ? 7.5 : pageW <= 40 ? 9 : 10.5;
+  const priceFontPt = pageW <= 30 ? 8.25 : pageW <= 40 ? 9.75 : 11.25;
+  const footFontPt = pageW <= 30 ? 6.75 : 7.5;
 
   // Layout: name (top, max 2 line), barcode (middle), price (bottom of content area)
   pdf.setFont("helvetica", "bold");
@@ -321,17 +321,16 @@ function addLabelPageToPdf(pdf: jsPDF, product: Product, lang: "en" | "id", size
     y += nameLineH * 1.05;
   }
 
-  // Barcode area — antara nama dan price baseline. Tinggi barcode dibatasi
-  // 40% dari tinggi label supaya tidak dominan; lebar 80% dari inner width.
+  // Barcode area — fill space antara nama dan price (mirip CSS flex:1 di
+  // versi HTML), lebar 95% dari inner width, no height cap.
   const priceH = priceFontPt * 0.353;
   const priceBaselineY = topPad + contentH - 0.5;
   const availableTop = topPad + nameBlockH + 0.5;
-  const availableBottom = priceBaselineY - priceH - 1.2;
+  const availableBottom = priceBaselineY - priceH - 0.8;
   const availableH = Math.max(4, availableBottom - availableTop);
-  const barcodeH = Math.min(availableH, pageH * 0.4);
-  const barcodeW = innerW * 0.8;
-  // Center vertically dalam available space
-  const barcodeTop = availableTop + (availableH - barcodeH) / 2;
+  const barcodeH = availableH;
+  const barcodeW = innerW * 0.95;
+  const barcodeTop = availableTop;
 
   const barcodeImg = generateBarcodeDataUrl(product.sku, barcodeW, barcodeH);
   if (barcodeImg) {
