@@ -293,13 +293,16 @@ function labelCss(size: LabelSize) {
   // (label exits the printer with content reading top-to-bottom).
   const pageW = Math.min(size.width, size.height);
   const pageH = Math.max(size.width, size.height);
+  // Tinggi label dikurangi 0.5mm dari page-size untuk absorb sub-pixel
+  // rounding — kalau persis sama browser sering anggap overflow → blank page.
+  // Body TIDAK di-fix tingginya, biarkan grow sesuai jumlah label.
   return `
   *{margin:0;padding:0;box-sizing:border-box}
   @page{size:${pageW}mm ${pageH}mm;margin:0}
-  html,body{width:${pageW}mm;height:${pageH}mm}
+  html,body{width:${pageW}mm}
   body{font-family:Arial,sans-serif;color:#000;text-align:center;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-  .label{width:${pageW}mm;height:${pageH}mm;display:flex;flex-direction:column;justify-content:space-between;page-break-after:always;overflow:hidden}
-  .label:last-child{page-break-after:auto}
+  .label{width:${pageW}mm;height:${pageH - 0.5}mm;display:flex;flex-direction:column;justify-content:space-between;break-after:page;page-break-after:always;break-inside:avoid;page-break-inside:avoid;overflow:hidden}
+  .label:last-child{break-after:auto;page-break-after:auto}
   .top{flex:1;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:0.8mm 1mm 0.5mm;gap:0.8mm}
   .name{font-size:${nameFont}px;font-weight:800;line-height:1.1;letter-spacing:-0.2px;max-height:${nameFont * 2.3}px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;word-break:break-word;text-align:center}
   .bc{width:100%;display:flex;justify-content:center}
