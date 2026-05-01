@@ -1,6 +1,11 @@
-export type DateRange = "today" | "yesterday" | "week" | "month" | "all";
+export type DateRange = "today" | "yesterday" | "week" | "month" | "all" | "custom";
 
-export function getDateRange(range: DateRange): { start: Date; end: Date } | null {
+export interface CustomRange {
+  from: string; // YYYY-MM-DD
+  to: string;   // YYYY-MM-DD
+}
+
+export function getDateRange(range: DateRange, custom?: CustomRange): { start: Date; end: Date } | null {
   if (range === "all") return null;
   const now = new Date();
   const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
@@ -21,5 +26,14 @@ export function getDateRange(range: DateRange): { start: Date; end: Date } | nul
     }
     case "month":
       return { start: new Date(now.getFullYear(), now.getMonth(), 1), end: endOfDay(now) };
+    case "custom": {
+      if (!custom?.from || !custom?.to) return null;
+      const start = startOfDay(new Date(custom.from));
+      const end = endOfDay(new Date(custom.to));
+      // Guard: kalau from > to, return null supaya filter tampil empty (caller
+      // bisa cek dan tampilkan error inline).
+      if (start > end) return null;
+      return { start, end };
+    }
   }
 }

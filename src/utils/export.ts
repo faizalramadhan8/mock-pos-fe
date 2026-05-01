@@ -45,6 +45,101 @@ export async function exportOrders(orders: Order[], format: ExportFormat) {
   await sheetToFile(data, "Orders", `orders-${new Date().toISOString().slice(0, 10)}`, format);
 }
 
+// Multi-sheet Excel report: Transaksi + Top Produk + Member.
+// Hanya order completed yang masuk (cancelled/refunded di-skip dari agregat
+// supaya angka revenue/qty bersih). dateLabel masuk ke filename.
+export async function exportOrderReport(orders: Order[], dateLabel: string) {
+  const completed = orders.filter(o => o.status === "completed");
+
+  // Sheet 1 — Transaksi (sama dengan exportOrders tapi semua status)
+  const transaksi = orders.map(o => ({
+    "Order ID": o.id,
+    "Tanggal": new Date(o.createdAt).toLocaleString("id-ID"),
+    "Customer": o.customer || (o.member ? o.member.name : "-"),
+    "Member": o.member ? o.member.name : "",
+    "Status": o.status,
+    "Pembayaran": o.payment,
+    "Item": o.items.map(i => `${i.name} ×${i.quantity}`).join(", "),
+    "Subtotal": o.subtotal,
+    "Diskon": o.orderDiscount || 0,
+    "PPN": o.ppn,
+    "Total": o.total,
+  }));
+
+  // Sheet 2 — Top Produk (agregat dari completed, sort by qty desc)
+  const productMap = new Map<string, { name: string; qty: number; revenue: number }>();
+  for (const o of completed) {
+    for (const i of o.items) {
+      const key = i.productId || i.name;
+      const existing = productMap.get(key);
+      const lineRevenue = i.unitPrice * i.quantity;
+      if (existing) {
+        existing.qty += i.quantity;
+        existing.revenue += lineRevenue;
+      } else {
+        productMap.set(key, { name: i.name, qty: i.quantity, revenue: lineRevenue });
+      }
+    }
+  }
+  const topProduk = Array.from(productMap.values())
+    .sort((a, b) => b.qty - a.qty)
+    .map((p, idx) => ({
+      "Peringkat": idx + 1,
+      "Produk": p.name,
+      "Qty Terjual": p.qty,
+      "Total Pendapatan": p.revenue,
+    }));
+
+  // Sheet 3 — Member (agregat per member terdaftar yang transaksi di period)
+  type MemberRow = { id: string; name: string; phone: string; orders: number; spend: number; savings: number; lastVisit: string };
+  const memberMap = new Map<string, MemberRow>();
+  for (const o of completed) {
+    if (!o.member?.id) continue;
+    const id = o.member.id;
+    const savings = o.memberSavings || 0;
+    const existing = memberMap.get(id);
+    if (existing) {
+      existing.orders += 1;
+      existing.spend += o.total;
+      existing.savings += savings;
+      if (o.createdAt > existing.lastVisit) existing.lastVisit = o.createdAt;
+    } else {
+      memberMap.set(id, {
+        id,
+        name: o.member.name,
+        phone: o.member.phone || "-",
+        orders: 1,
+        spend: o.total,
+        savings,
+        lastVisit: o.createdAt,
+      });
+    }
+  }
+  const member = Array.from(memberMap.values())
+    .sort((a, b) => b.spend - a.spend)
+    .map((m, idx) => ({
+      "Peringkat": idx + 1,
+      "Nama": m.name,
+      "No. HP": m.phone,
+      "Jumlah Order": m.orders,
+      "Total Belanja": m.spend,
+      "Hemat Member": m.savings,
+      "Kunjungan Terakhir": new Date(m.lastVisit).toLocaleString("id-ID"),
+    }));
+
+  const XLSX = await import("xlsx");
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(transaksi), "Transaksi");
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(topProduk), "Top Produk");
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(member), "Member");
+  const buf = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+  const safeLabel = dateLabel.replace(/[^a-zA-Z0-9_-]+/g, "-").toLowerCase();
+  downloadBlob(
+    new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }),
+    `laporan-${safeLabel}-${new Date().toISOString().slice(0, 10)}.xlsx`
+  );
+}
+
 export async function exportProducts(products: Product[], format: ExportFormat) {
   const data = products.map(p => ({
     "SKU": p.sku,

@@ -7,8 +7,8 @@ import { Modal } from "@/components/Modal";
 import { useThemeClasses } from "@/hooks/useThemeClasses";
 import { useDebounce } from "@/hooks/useDebounce";
 import { formatCurrency as $, formatTime, formatDate, printReport, genId } from "@/utils";
-import { exportOrders } from "@/utils/export";
-import { getDateRange, type DateRange } from "@/utils/dateRange";
+import { exportOrders, exportOrderReport } from "@/utils/export";
+import { getDateRange, type DateRange, type CustomRange } from "@/utils/dateRange";
 import { Printer, FileText, Download, Search, Users, Trash2, Plus, Receipt, Pencil } from "lucide-react";
 import type { Member } from "@/types";
 import toast from "react-hot-toast";
@@ -55,6 +55,7 @@ export function OrdersPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [paymentFilter, setPaymentFilter] = useState("all");
   const [dateRange, setDateRange] = useState<DateRange>("all");
+  const [customRange, setCustomRange] = useState<CustomRange>({ from: "", to: "" });
   const [detailProductId, setDetailProductId] = useState<string | null>(null);
   const [detailOrderId, setDetailOrderId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -79,13 +80,21 @@ export function OrdersPage() {
 
   // Filter by date range
   const dateFiltered = useMemo(() => {
-    const range = getDateRange(dateRange);
+    const range = getDateRange(dateRange, customRange);
     if (!range) return orders;
     return orders.filter(o => {
       const d = new Date(o.createdAt);
       return d >= range.start && d <= range.end;
     });
-  }, [orders, dateRange]);
+  }, [orders, dateRange, customRange]);
+
+  // Custom range validation — true kalau user pilih "custom" tapi belum
+  // lengkap atau from > to.
+  const customError = dateRange === "custom" && (
+    !customRange.from || !customRange.to ? "Pilih tanggal awal dan akhir."
+      : new Date(customRange.from) > new Date(customRange.to) ? "Tanggal awal tidak boleh setelah tanggal akhir."
+      : ""
+  );
 
   // Filter by search query
   const searchFiltered = useMemo(() => {
@@ -133,7 +142,16 @@ export function OrdersPage() {
       case "week": return t.thisWeek;
       case "month": return t.thisMonth;
       case "all": return t.allOrders;
+      case "custom": return lang === "id" ? "Pilih Tanggal" : "Custom Range";
     }
+  };
+
+  // Label dipakai untuk filename export
+  const exportRangeLabel = () => {
+    if (dateRange === "custom" && customRange.from && customRange.to) {
+      return `${customRange.from}_sd_${customRange.to}`;
+    }
+    return String(dateRangeLabel(dateRange));
   };
 
   const statusLabel = (f: string) => {
@@ -157,8 +175,15 @@ export function OrdersPage() {
               className={`flex items-center gap-1 px-2 py-1.5 rounded-xl text-xs font-bold ${th.elev} ${th.txm}`}>
               <Download size={11} /> CSV
             </button>
-            <button onClick={async () => { await exportOrders(dateFiltered, "xlsx"); toast.success(t.exportSuccess as string); }}
-              className={`flex items-center gap-1 px-2 py-1.5 rounded-xl text-xs font-bold ${th.elev} ${th.txm}`}>
+            <button
+              disabled={!!customError}
+              onClick={async () => {
+                if (customError) { toast.error(customError); return; }
+                await exportOrderReport(dateFiltered, exportRangeLabel());
+                toast.success(lang === "id" ? "Laporan berhasil diunduh" : "Report downloaded");
+              }}
+              title={lang === "id" ? "Excel berisi: Transaksi, Top Produk, Member" : "Excel contains: Transactions, Top Products, Members"}
+              className={`flex items-center gap-1 px-2 py-1.5 rounded-xl text-xs font-bold ${th.elev} ${th.txm} disabled:opacity-40`}>
               <Download size={11} /> Excel
             </button>
             <button onClick={() => printReport(dateFiltered, dateRangeLabel(dateRange) as string)}
@@ -197,7 +222,7 @@ export function OrdersPage() {
         </div>
         <select value={dateRange} onChange={e => setDateRange(e.target.value as DateRange)}
           className={`px-4 py-3 text-sm font-bold rounded-2xl border appearance-none cursor-pointer ${th.inp}`}>
-          {(["today", "yesterday", "week", "month", "all"] as DateRange[]).map(r => (
+          {(["today", "yesterday", "week", "month", "all", "custom"] as DateRange[]).map(r => (
             <option key={r} value={r}>{dateRangeLabel(r)}</option>
           ))}
         </select>
@@ -215,6 +240,34 @@ export function OrdersPage() {
           <option value="qris">QRIS</option>
         </select>
       </div>
+
+      {/* Custom date range — muncul cuma kalau pilih "Pilih Tanggal".
+          Validation inline: error label di bawah kalau from > to atau kosong. */}
+      {dateRange === "custom" && (
+        <div className={`flex flex-wrap items-end gap-2 px-1`}>
+          <div className="flex-1 min-w-[140px]">
+            <label className={`text-xs font-bold ${th.txm} block mb-1`}>{lang === "id" ? "Dari tanggal" : "From"}</label>
+            <input type="date" value={customRange.from} max={customRange.to || undefined}
+              onChange={e => setCustomRange(r => ({ ...r, from: e.target.value }))}
+              className={`w-full px-3 py-2.5 text-sm font-bold rounded-2xl border ${th.inp}`} />
+          </div>
+          <div className="flex-1 min-w-[140px]">
+            <label className={`text-xs font-bold ${th.txm} block mb-1`}>{lang === "id" ? "Sampai tanggal" : "To"}</label>
+            <input type="date" value={customRange.to} min={customRange.from || undefined}
+              onChange={e => setCustomRange(r => ({ ...r, to: e.target.value }))}
+              className={`w-full px-3 py-2.5 text-sm font-bold rounded-2xl border ${th.inp}`} />
+          </div>
+          <button type="button" onClick={() => setCustomRange({ from: "", to: "" })}
+            className={`text-xs font-bold px-3 py-2.5 rounded-2xl border ${th.bdr} ${th.txm}`}>
+            Reset
+          </button>
+          {customError && (
+            <p role="alert" className={`w-full text-xs font-bold mt-0.5 ${th.dark ? "text-[#FB7185]" : "text-[#BE123C]"}`}>
+              {customError}
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Summary — 1 compact line.  Since Dashboard already surfaces the
           same revenue/gain numbers, we don't need 4 prominent cards here.
