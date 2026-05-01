@@ -98,8 +98,6 @@ export function printReceipt(order: Order, opts?: { cashierName?: string }) {
   const dateStr = `${dd}-${mm}-${yyyy}  ${hh}:${mi}`;
 
   const subtotal = order.items.reduce((acc, i) => acc + i.quantity * i.unitPrice, 0);
-  const ppnAmount = order.ppn || 0;
-  const ppnRate = order.ppnRate || 0;
   const fmt = (n: number) => "Rp " + Math.round(n).toLocaleString("id-ID");
   const barcodeSvg = generateBarcodeSvg(order.id, { width: 1.0, height: 30, fontSize: 8 });
 
@@ -144,7 +142,6 @@ export function printReceipt(order: Order, opts?: { cashierName?: string }) {
   }).join("")}
   <div class="ln"></div>
   <div class="r"><span class="l">Subtotal</span><span class="v">${fmt(subtotal)}</span></div>
-  ${ppnRate > 0 ? `<div class="r"><span class="l">PPN (${ppnRate}%)</span><span class="v">${fmt(ppnAmount)}</span></div>` : ""}
   <div class="r total"><span class="l">Total</span><span class="v">${fmt(order.total)}</span></div>
   ${barcodeSvg ? `<div class="bc">${barcodeSvg}</div>` : ""}
   <div class="ln"></div>
