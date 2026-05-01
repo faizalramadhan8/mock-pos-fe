@@ -349,19 +349,24 @@ function addLabelPageToPdf(pdf: jsPDF, product: Product, lang: "en" | "id", size
   }
 }
 
-function buildLabelsPdf(products: Product[], lang: "en" | "id", size: LabelSize, extras?: LabelExtras): jsPDF {
+function buildLabelsPdf(products: Product[], lang: "en" | "id", size: LabelSize, extras?: LabelExtras, copies = 1): jsPDF {
   const pageW = Math.min(size.width, size.height);
   const pageH = Math.max(size.width, size.height);
+  const c = Math.max(1, Math.min(99, Math.floor(copies)));
   const pdf = new jsPDF({
     unit: "mm",
     format: [pageW, pageH],
     orientation: "portrait",
     compress: true,
   });
-  products.forEach((p, idx) => {
-    if (idx > 0) pdf.addPage([pageW, pageH], "portrait");
-    addLabelPageToPdf(pdf, p, lang, size, extras);
-  });
+  let firstPage = true;
+  for (const p of products) {
+    for (let i = 0; i < c; i++) {
+      if (!firstPage) pdf.addPage([pageW, pageH], "portrait");
+      firstPage = false;
+      addLabelPageToPdf(pdf, p, lang, size, extras);
+    }
+  }
   return pdf;
 }
 
@@ -390,15 +395,15 @@ function printPdfViaIframe(pdf: jsPDF) {
   };
 }
 
-export function printBarcodeLabel(product: Product, lang: "en" | "id", size?: LabelSize, extras?: LabelExtras) {
+export function printBarcodeLabel(product: Product, lang: "en" | "id", size?: LabelSize, extras?: LabelExtras, copies = 1) {
   const s = size || { width: 40, height: 30 };
-  const pdf = buildLabelsPdf([product], lang, s, extras);
+  const pdf = buildLabelsPdf([product], lang, s, extras, copies);
   printPdfViaIframe(pdf);
 }
 
-export function printBarcodeLabels(products: Product[], lang: "en" | "id", size?: LabelSize, extras?: LabelExtras) {
+export function printBarcodeLabels(products: Product[], lang: "en" | "id", size?: LabelSize, extras?: LabelExtras, copies = 1) {
   if (products.length === 0) return;
   const s = size || { width: 40, height: 30 };
-  const pdf = buildLabelsPdf(products, lang, s, extras);
+  const pdf = buildLabelsPdf(products, lang, s, extras, copies);
   printPdfViaIframe(pdf);
 }
