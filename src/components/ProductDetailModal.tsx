@@ -128,7 +128,7 @@ export function ProductDetailModal({ productId, onClose }: ProductDetailModalPro
           Hidden if no history rows exist. Purchase rows are admin-only.
           Filter chips meet 44px touch target (kasir uses tablet). Prices use
           font-display so columns align across rows (tnum). */}
-      {(historyLoading || filteredHistory.length > 0) && (
+      {(historyLoading || priceHistory.length > 0) && (
         <div className={`rounded-2xl border p-4 mb-3 ${th.bdr} ${th.card2}`}>
           <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
             <p className={`text-xs font-bold uppercase tracking-wider ${th.txf}`}>
@@ -166,7 +166,15 @@ export function ProductDetailModal({ productId, onClose }: ProductDetailModalPro
               ))}
             </div>
           ) : filteredHistory.length === 0 ? (
-            <p className={`text-xs ${th.txf}`}>{lang === "id" ? "Belum ada perubahan." : "No changes yet."}</p>
+            <p className={`text-xs ${th.txf}`}>
+              {priceFilter === "member"
+                ? (lang === "id" ? "Produk ini belum punya harga member." : "No member price set for this product.")
+                : priceFilter === "purchase"
+                  ? (lang === "id" ? "Belum ada riwayat harga modal." : "No purchase price history.")
+                  : priceFilter === "regular"
+                    ? (lang === "id" ? "Belum ada riwayat harga jual." : "No selling price history.")
+                    : (lang === "id" ? "Belum ada perubahan." : "No changes yet.")}
+            </p>
           ) : (
             <div className="space-y-1.5 max-h-64 overflow-y-auto" role="list">
               {filteredHistory.map(h => {
