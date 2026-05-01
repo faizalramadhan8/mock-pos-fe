@@ -146,10 +146,8 @@ export function printReceipt(order: Order, opts?: { cashierName?: string }) {
   ${customerName ? `<div class="kv"><span class="k">${order.member ? "Member" : "Pelanggan"}</span><span>:</span><span>${escapeHtml(customerName)}</span></div>` : ""}
   <div class="ln"></div>
   ${order.items.map(i => {
-    const isMember = !!(i.regularPrice && i.regularPrice > i.unitPrice);
-    const lineName = `${escapeHtml(i.name)}${isMember ? " Member" : ""} ×${i.quantity}`;
     const lineTotal = i.quantity * i.unitPrice;
-    return `<div class="r item"><span class="l">${lineName}</span><span class="v">${fmt(lineTotal)}</span></div>`;
+    return `<div class="r item"><span class="l">${escapeHtml(i.name)} ×${i.quantity}</span><span class="v">${fmt(lineTotal)}</span></div>`;
   }).join("")}
   <div class="ln"></div>
   <div class="r"><span class="l">Subtotal</span><span class="v">${fmt(subtotal)}</span></div>
