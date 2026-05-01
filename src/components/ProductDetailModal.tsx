@@ -125,31 +125,50 @@ export function ProductDetailModal({ productId, onClose }: ProductDetailModalPro
       </div>
 
       {/* Riwayat Harga — chronological price changes (regular/member/purchase).
-          Hidden if no history rows exist. Purchase rows are admin-only. */}
+          Hidden if no history rows exist. Purchase rows are admin-only.
+          Filter chips meet 44px touch target (kasir uses tablet). Prices use
+          font-display so columns align across rows (tnum). */}
       {(historyLoading || filteredHistory.length > 0) && (
         <div className={`rounded-2xl border p-4 mb-3 ${th.bdr} ${th.card2}`}>
-          <div className="flex items-center justify-between mb-2.5">
+          <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
             <p className={`text-xs font-bold uppercase tracking-wider ${th.txf}`}>
               {lang === "id" ? "Riwayat Harga" : "Price History"}
             </p>
-            <div className="flex gap-1">
-              {(["all", "regular", "member", ...(canSeeCost ? (["purchase"] as const) : [])] as const).map(f => (
-                <button key={f} onClick={() => setPriceFilter(f)}
-                  className={`text-xs font-bold px-2 py-0.5 rounded-md ${priceFilter === f ? `${th.accBg} ${th.acc}` : th.txf}`}>
-                  {f === "all" ? (lang === "id" ? "Semua" : "All")
-                    : f === "regular" ? (lang === "id" ? "Jual" : "Sell")
-                    : f === "member" ? "Member"
-                    : (lang === "id" ? "Modal" : "Cost")}
-                </button>
-              ))}
+            <div role="tablist" aria-label={lang === "id" ? "Filter tipe harga" : "Price type filter"} className="flex gap-1">
+              {(["all", "regular", "member", ...(canSeeCost ? (["purchase"] as const) : [])] as const).map(f => {
+                const labelText = f === "all" ? (lang === "id" ? "Semua" : "All")
+                  : f === "regular" ? (lang === "id" ? "Jual" : "Sell")
+                  : f === "member" ? "Member"
+                  : (lang === "id" ? "Modal" : "Cost");
+                const active = priceFilter === f;
+                return (
+                  <button key={f} role="tab" aria-selected={active}
+                    onClick={() => setPriceFilter(f)}
+                    className={`text-xs font-bold min-h-[36px] px-3 py-1.5 rounded-lg transition-colors ${active ? `${th.accBg} ${th.acc}` : `${th.txf} hover:${th.accBg}`}`}>
+                    {labelText}
+                  </button>
+                );
+              })}
             </div>
           </div>
           {historyLoading ? (
-            <p className={`text-xs ${th.txf}`}>{lang === "id" ? "Memuat..." : "Loading..."}</p>
+            <div className="space-y-2" aria-live="polite" aria-busy="true">
+              {[0, 1, 2].map(i => (
+                <div key={i} className={`flex items-center justify-between py-1.5 border-b last:border-0 ${th.bdrSoft}`}>
+                  <div className="flex items-center gap-2 w-full">
+                    <span className={`h-5 w-12 rounded-md ${th.elev} animate-pulse`} />
+                    <div className="flex-1 space-y-1.5">
+                      <span className={`block h-4 w-24 rounded ${th.elev} animate-pulse`} />
+                      <span className={`block h-3 w-40 rounded ${th.elev} animate-pulse`} />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           ) : filteredHistory.length === 0 ? (
             <p className={`text-xs ${th.txf}`}>{lang === "id" ? "Belum ada perubahan." : "No changes yet."}</p>
           ) : (
-            <div className="space-y-1.5 max-h-56 overflow-y-auto">
+            <div className="space-y-1.5 max-h-64 overflow-y-auto" role="list">
               {filteredHistory.map(h => {
                 const tagBg = h.price_type === "purchase"
                   ? (th.dark ? "bg-[#FB7185]/15 text-[#FB7185]" : "bg-[#FFE4E9] text-[#BE123C]")
@@ -160,11 +179,11 @@ export function ProductDetailModal({ productId, onClose }: ProductDetailModalPro
                   : h.price_type === "member" ? "Member"
                   : (lang === "id" ? "Modal" : "Cost");
                 return (
-                  <div key={h.id} className={`flex items-center justify-between py-1.5 border-b last:border-0 ${th.bdrSoft}`}>
+                  <div key={h.id} role="listitem" className={`flex items-center justify-between gap-2 py-2 border-b last:border-0 ${th.bdrSoft}`}>
                     <div className="flex items-center gap-2 min-w-0">
-                      <span className={`text-xs font-bold px-2 py-0.5 rounded-md ${tagBg}`}>{label}</span>
+                      <span className={`shrink-0 text-xs font-bold px-2 py-1 rounded-md ${tagBg}`}>{label}</span>
                       <div className="min-w-0">
-                        <p className={`text-sm font-bold ${th.tx}`}>{$(h.price)}</p>
+                        <p className={`font-display text-sm font-bold ${th.tx}`}>{$(h.price)}</p>
                         <p className={`text-xs ${th.txf}`}>
                           {formatDate(h.start_date)}
                           {h.end_date ? ` – ${formatDate(h.end_date)}` : ` – ${lang === "id" ? "sekarang" : "now"}`}
@@ -172,7 +191,8 @@ export function ProductDetailModal({ productId, onClose }: ProductDetailModalPro
                       </div>
                     </div>
                     {h.status === "active" && (
-                      <span className={`text-xs font-bold px-2 py-0.5 rounded-md ${th.accBg} ${th.acc}`}>
+                      <span aria-label={lang === "id" ? "Harga aktif saat ini" : "Currently active price"}
+                        className={`shrink-0 text-xs font-bold px-2 py-1 rounded-md ${th.accBg} ${th.acc}`}>
                         {lang === "id" ? "Aktif" : "Active"}
                       </span>
                     )}
