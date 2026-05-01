@@ -91,7 +91,6 @@ export function InventoryPage() {
     const d = new Date(); d.setMonth(d.getMonth() + 3);
     return d.toISOString().slice(0, 10);
   });
-  const [labelCopies, setLabelCopies] = useState(1);
   const [confirmDeleteSupplierId, setConfirmDeleteSupplierId] = useState<string | null>(null);
   const [prodFormErrors, setProdFormErrors] = useState<Record<string, boolean>>({});
   const [editProdOpen, setEditProdOpen] = useState(false);
@@ -1533,34 +1532,8 @@ export function InventoryPage() {
       <Modal open={labelModalOpen} onClose={() => setLabelModalOpen(false)} title="Print Barcode Label">
         <div className="flex flex-col gap-3">
           <p className={`text-xs ${th.txm}`}>
-            {selectedIds.size} produk × {labelCopies} copy = <b>{selectedIds.size * labelCopies}</b> label akan dicetak.
+            {selectedIds.size} produk akan dicetak.
           </p>
-
-          <div>
-            <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>Jumlah copy per produk</p>
-            <div className="flex items-center gap-2">
-              <button type="button"
-                onClick={() => setLabelCopies(c => Math.max(1, c - 1))}
-                className={`w-10 h-10 rounded-xl border ${th.bdr} ${th.txm} text-lg font-bold`}>−</button>
-              <input type="number" min={1} max={99} value={labelCopies}
-                onChange={e => {
-                  const v = parseInt(e.target.value || "1");
-                  setLabelCopies(Number.isFinite(v) ? Math.max(1, Math.min(99, v)) : 1);
-                }}
-                className={`flex-1 px-3 py-2.5 text-center text-sm font-bold rounded-xl border ${th.inp}`} />
-              <button type="button"
-                onClick={() => setLabelCopies(c => Math.min(99, c + 1))}
-                className={`w-10 h-10 rounded-xl border ${th.bdr} ${th.txm} text-lg font-bold`}>+</button>
-            </div>
-            <div className="flex gap-1 mt-1.5">
-              {[1, 2, 5, 10, 20].map(n => (
-                <button key={n} type="button" onClick={() => setLabelCopies(n)}
-                  className={`text-xs font-bold px-2.5 py-1 rounded-lg ${labelCopies === n ? `${th.accBg} ${th.acc}` : th.txf}`}>
-                  ×{n}
-                </button>
-              ))}
-            </div>
-          </div>
 
           <label className={`flex items-center gap-2 cursor-pointer px-3 py-2.5 rounded-xl border ${th.bdr}`}>
             <input type="checkbox" checked={labelIncludeExpiry}
@@ -1576,7 +1549,7 @@ export function InventoryPage() {
                 onChange={e => setLabelExpiryDate(e.target.value)}
                 className={`w-full px-3 py-2.5 text-sm rounded-xl border ${th.inp}`} />
               <p className={`text-xs mt-1 ${th.txm}`}>
-                Berlaku untuk semua label yang dicetak.
+                Berlaku untuk semua {selectedIds.size} label yang dicetak.
               </p>
             </div>
           )}
@@ -1591,8 +1564,7 @@ export function InventoryPage() {
               printBarcodeLabels(
                 selected, lang,
                 { width: labelWidth, height: labelHeight },
-                labelIncludeExpiry && labelExpiryDate ? { expiryDate: labelExpiryDate } : undefined,
-                labelCopies
+                labelIncludeExpiry && labelExpiryDate ? { expiryDate: labelExpiryDate } : undefined
               );
               setLabelModalOpen(false);
             }}
