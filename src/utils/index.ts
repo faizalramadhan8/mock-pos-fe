@@ -2,6 +2,7 @@ import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 import type { Order, Product, PaymentTerms } from "@/types";
 import JsBarcode from "jsbarcode";
+import { jsPDF } from "jspdf";
 import { useSettingsStore } from "@/stores";
 
 export function cn(...inputs: ClassValue[]) { return twMerge(clsx(inputs)); }
@@ -261,73 +262,143 @@ function getStoreNameForLabel(): string {
   }
 }
 
-function buildLabelHtml(product: Product, lang: "en" | "id", size: LabelSize, extras?: LabelExtras) {
-  const name = lang === "id" ? product.nameId : product.name;
-  // Barcode sizing — bigger bars so it scans reliably and looks prominent
-  const barcodeW = size.width <= 40 ? 2.0 : size.width <= 50 ? 2.4 : 2.8;
-  const barcodeH = Math.round(Math.min(size.width, size.height) * 0.95);
-  const barcodeSvg = generateBarcodeSvg(product.sku, { width: barcodeW, height: barcodeH, fontSize: 0, displayValue: false });
-  if (!barcodeSvg) return "";
-  const expDate = extras?.expiryDate ? formatExpiry(extras.expiryDate) : "";
-  const storeName = getStoreNameForLabel();
-  const hasFooter = expDate || storeName;
-  const footer = hasFooter
-    ? `<div class="foot"><span>${expDate ? "ED. " + escapeHtml(expDate) : ""}</span><span>${escapeHtml(storeName)}</span></div>`
-    : "";
-  return `<div class="label">
-    <div class="top">
-      <div class="name">${escapeHtml(name.toUpperCase())}</div>
-      <div class="bc">${barcodeSvg}</div>
-      <div class="price">Rp ${product.sellingPrice.toLocaleString("id-ID")}</div>
-    </div>
-    ${footer}
-  </div>`;
+// Render barcode ke canvas dataURL — jsPDF butuh image, bukan SVG.
+function generateBarcodeDataUrl(value: string, widthMm: number, heightMm: number): string {
+  const canvas = document.createElement("canvas");
+  // Render at ~6× DPI mm→px (≈152 DPI) supaya barcode tajam saat dicetak thermal.
+  const dpi = 6;
+  canvas.width = Math.round(widthMm * dpi);
+  canvas.height = Math.round(heightMm * dpi);
+  try {
+    JsBarcode(canvas, value, {
+      format: "CODE128",
+      width: 1.6,
+      height: canvas.height,
+      displayValue: false,
+      margin: 0,
+    });
+    return canvas.toDataURL("image/png");
+  } catch {
+    return "";
+  }
 }
 
-function labelCss(size: LabelSize) {
-  // Scale font based on label size. Sized to match target design (big & readable)
-  const nameFont = size.width <= 40 ? 10 : size.width <= 50 ? 12 : 14;
-  const priceFont = size.width <= 40 ? 11 : size.width <= 50 ? 13 : 15;
-  const footFont = size.width <= 40 ? 9 : 10;
-  // Use the SHORTER side as page width so the output stays portrait-oriented
-  // (label exits the printer with content reading top-to-bottom).
+// Bangun 1 page PDF untuk satu label. Page-size persis sama dengan label
+// fisik → tidak mungkin overflow → tidak ada blank page.
+function addLabelPageToPdf(pdf: jsPDF, product: Product, lang: "en" | "id", size: LabelSize, extras?: LabelExtras) {
   const pageW = Math.min(size.width, size.height);
   const pageH = Math.max(size.width, size.height);
-  // Tinggi label dikurangi 0.5mm dari page-size untuk absorb sub-pixel
-  // rounding — kalau persis sama browser sering anggap overflow → blank page.
-  // Body TIDAK di-fix tingginya, biarkan grow sesuai jumlah label.
-  return `
-  *{margin:0;padding:0;box-sizing:border-box}
-  @page{size:${pageW}mm ${pageH}mm;margin:0}
-  html,body{width:${pageW}mm}
-  body{font-family:Arial,sans-serif;color:#000;text-align:center;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-  .label{width:${pageW}mm;height:${pageH - 0.5}mm;display:flex;flex-direction:column;justify-content:space-between;break-after:page;page-break-after:always;break-inside:avoid;page-break-inside:avoid;overflow:hidden}
-  .label:last-child{break-after:auto;page-break-after:auto}
-  .top{flex:1;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:0.8mm 1mm 0.5mm;gap:0.8mm}
-  .name{font-size:${nameFont}px;font-weight:800;line-height:1.1;letter-spacing:-0.2px;max-height:${nameFont * 2.3}px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;word-break:break-word;text-align:center}
-  .bc{width:100%;display:flex;justify-content:center}
-  .bc svg{max-width:95%;height:auto;display:block}
-  .price{font-size:${priceFont}px;font-weight:900;letter-spacing:-0.2px}
-  .foot{background:#000;color:#fff;font-size:${footFont}px;font-weight:700;display:flex;justify-content:space-between;padding:0.8mm 1.8mm;letter-spacing:0.3px}`;
+  const name = (lang === "id" ? product.nameId : product.name).toUpperCase();
+  const expDate = extras?.expiryDate ? formatExpiry(extras.expiryDate) : "";
+  const storeName = getStoreNameForLabel();
+  const hasFooter = !!(expDate || storeName);
+
+  const footH = hasFooter ? 4 : 0;             // mm
+  const sidePad = 1;                            // mm
+  const topPad = 1;                             // mm
+  const innerW = pageW - sidePad * 2;
+  const contentH = pageH - footH - topPad - 1;  // -1mm bottom safety
+
+  // Font sizes (pt)
+  const nameFontPt = pageW <= 30 ? 7 : pageW <= 40 ? 8 : 10;
+  const priceFontPt = pageW <= 30 ? 8 : pageW <= 40 ? 10 : 12;
+  const footFontPt = pageW <= 30 ? 6 : 7;
+
+  // Layout: name (top, max 2 line), barcode (middle), price (bottom of content area)
+  pdf.setFont("helvetica", "bold");
+  pdf.setFontSize(nameFontPt);
+  pdf.setTextColor(0, 0, 0);
+
+  // Word-wrap name max 2 line
+  const nameLines = pdf.splitTextToSize(name, innerW).slice(0, 2);
+  const nameLineH = nameFontPt * 0.353;        // pt → mm approx
+  const nameBlockH = nameLines.length * nameLineH * 1.05;
+
+  let y = topPad + nameLineH;
+  for (const line of nameLines) {
+    pdf.text(line, pageW / 2, y, { align: "center" });
+    y += nameLineH * 1.05;
+  }
+
+  // Barcode area — antara nama dan price baseline
+  const priceH = priceFontPt * 0.353;
+  const priceBaselineY = topPad + contentH - 0.5;
+  const barcodeTop = topPad + nameBlockH + 0.5;
+  const barcodeBottom = priceBaselineY - priceH - 0.8;
+  const barcodeH = Math.max(4, barcodeBottom - barcodeTop);
+  const barcodeW = innerW * 0.95;
+
+  const barcodeImg = generateBarcodeDataUrl(product.sku, barcodeW, barcodeH);
+  if (barcodeImg) {
+    pdf.addImage(barcodeImg, "PNG", (pageW - barcodeW) / 2, barcodeTop, barcodeW, barcodeH);
+  }
+
+  // Price
+  pdf.setFontSize(priceFontPt);
+  pdf.text(`Rp ${product.sellingPrice.toLocaleString("id-ID")}`, pageW / 2, priceBaselineY, { align: "center" });
+
+  // Footer (hitam dengan teks putih) — ED + nama toko
+  if (hasFooter) {
+    pdf.setFillColor(0, 0, 0);
+    pdf.rect(0, pageH - footH, pageW, footH, "F");
+    pdf.setTextColor(255, 255, 255);
+    pdf.setFontSize(footFontPt);
+    const footY = pageH - footH / 2 + footFontPt * 0.353 / 2 - 0.3;
+    if (expDate) pdf.text(`ED. ${expDate}`, sidePad, footY, { align: "left" });
+    if (storeName) pdf.text(storeName, pageW - sidePad, footY, { align: "right" });
+  }
+}
+
+function buildLabelsPdf(products: Product[], lang: "en" | "id", size: LabelSize, extras?: LabelExtras): jsPDF {
+  const pageW = Math.min(size.width, size.height);
+  const pageH = Math.max(size.width, size.height);
+  const pdf = new jsPDF({
+    unit: "mm",
+    format: [pageW, pageH],
+    orientation: "portrait",
+    compress: true,
+  });
+  products.forEach((p, idx) => {
+    if (idx > 0) pdf.addPage([pageW, pageH], "portrait");
+    addLabelPageToPdf(pdf, p, lang, size, extras);
+  });
+  return pdf;
+}
+
+// Trigger print dari blob PDF lewat hidden iframe — sama pattern dengan
+// printViaIframe tapi PDF blob URL. Browser akan tampilkan dialog print
+// PDF viewer; kalau pakai Chrome `--kiosk-printing` flag, dialog skip.
+function printPdfViaIframe(pdf: jsPDF) {
+  const blob = pdf.output("blob");
+  const url = URL.createObjectURL(blob);
+  const id = "bakeshop-pdf-print-frame";
+  let iframe = document.getElementById(id) as HTMLIFrameElement | null;
+  if (!iframe) {
+    iframe = document.createElement("iframe");
+    iframe.id = id;
+    iframe.style.cssText = "position:fixed;width:0;height:0;border:none;left:-9999px;top:-9999px";
+    document.body.appendChild(iframe);
+  }
+  iframe.src = url;
+  iframe.onload = () => {
+    setTimeout(() => {
+      iframe!.contentWindow?.focus();
+      iframe!.contentWindow?.print();
+      // Revoke setelah print dialog ditutup; aman setelah delay.
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    }, 250);
+  };
 }
 
 export function printBarcodeLabel(product: Product, lang: "en" | "id", size?: LabelSize, extras?: LabelExtras) {
   const s = size || { width: 40, height: 30 };
-  const content = buildLabelHtml(product, lang, s, extras);
-  if (!content) return;
-  const html = `<!DOCTYPE html>
-<html><head><title>Label ${product.sku}</title>
-<style>${labelCss(s)}</style></head><body>${content}</body></html>`;
-  printViaIframe(html);
+  const pdf = buildLabelsPdf([product], lang, s, extras);
+  printPdfViaIframe(pdf);
 }
 
 export function printBarcodeLabels(products: Product[], lang: "en" | "id", size?: LabelSize, extras?: LabelExtras) {
   if (products.length === 0) return;
   const s = size || { width: 40, height: 30 };
-  const labels = products.map(p => buildLabelHtml(p, lang, s, extras)).filter(Boolean).join("\n");
-  if (!labels) return;
-  const html = `<!DOCTYPE html>
-<html><head><title>Batch Labels (${products.length})</title>
-<style>${labelCss(s)}</style></head><body>${labels}</body></html>`;
-  printViaIframe(html);
+  const pdf = buildLabelsPdf(products, lang, s, extras);
+  printPdfViaIframe(pdf);
 }
