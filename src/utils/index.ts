@@ -156,7 +156,7 @@ export function printReceipt(order: Order, opts?: { cashierName?: string }) {
   ${barcodeSvg ? `<div class="bc">${barcodeSvg}</div>` : ""}
   <div class="ln"></div>
   <p class="c" style="font-style:italic">Barang yang sudah dibeli tidak dapat ditukar atau dikembalikan.</p>
-  <p class="c" style="margin-top:1.5mm">Terimakasih sudah berbelanja 🙏</p>
+  <p class="c" style="margin-top:1.5mm">Terimakasih sudah berbelanja!</p>
 </body></html>`;
 
   // Use hidden iframe to bypass pop-up blockers
