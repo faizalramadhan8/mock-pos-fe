@@ -2,6 +2,7 @@ import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 import type { Order, Product, PaymentTerms } from "@/types";
 import JsBarcode from "jsbarcode";
+import { useSettingsStore } from "@/stores";
 
 export function cn(...inputs: ClassValue[]) { return twMerge(clsx(inputs)); }
 export function formatCurrency(n: number) { return "Rp " + n.toLocaleString("id-ID"); }
@@ -71,93 +72,84 @@ function generateBarcodeSvg(value: string, opts?: { width?: number; height?: num
 }
 
 export function printReceipt(order: Order, opts?: { cashierName?: string }) {
-  const settings = JSON.parse(localStorage.getItem("bakeshop-settings") || "{}");
-  const name = settings?.state?.storeName || "Toko Bahan Kue Santi";
-  const addr = settings?.state?.storeAddress || "Jl. Sudirman No. 123, Jakarta";
-  const phone = settings?.state?.storePhone || "+62 812-3456-7890";
-  const barcodeSvg = generateBarcodeSvg(order.id, { width: 1.2, height: 35, fontSize: 10 });
-  const customerName = order.member ? order.member.name : (order.customer || "Walk-in");
-  const cashier = opts?.cashierName;
-  const memberSavings = order.memberSavings || 0;
-  const grossSubtotal = order.items.reduce((s, i) => s + i.quantity * i.unitPrice, 0);
-  const itemDiscTotal = order.items.reduce((s, i) => s + (i.discountAmount || 0), 0);
-  const orderDiscTotal = order.orderDiscount || 0;
-  const hasDiscounts = itemDiscTotal > 0 || orderDiscTotal > 0 || memberSavings > 0;
+  // Read from the live Zustand store, not localStorage — avoids stale reads
+  // right after Save in Settings (persist write is async).
+  const s = useSettingsStore.getState();
+  const name = s.storeName || "Toko Bahan Kue Santi";
+  const addr = s.storeAddress || "";
+  const phone = s.storePhone || "";
+  const cashier = opts?.cashierName || "-";
 
-  // Ubah PAPER_W / PAPER_H di bawah kalau ukuran kertas berubah.
-  // Sekarang: 40mm lebar × 90mm panjang per struk (thermal narrow).
-  // Semua tulisan font-weight:900 supaya hasil cetak thermal lebih tebal.
-  const PAPER_W = "40mm";
-  const PAPER_H = "90mm";
-  const BODY_W = "38mm"; // 2mm margin total
+  // Format Bu Santi: thermal 58mm, font tipis (regular weight, no bold global).
+  // Header centered, body left/right kolom, footer centered. NO Diskon /
+  // Biaya Tambahan / Biaya CC / Pembulatan baris (Bu Santi: tidak perlu).
+  const PAPER_W = "58mm";
+  const BODY_W = "54mm"; // 2mm margin sisi
 
-  // Truncate order ID to last 8 chars (uppercase) supaya muat di 1 baris.
-  const shortId = order.id.slice(-8).toUpperCase();
-  const dt = new Date(order.createdAt).toLocaleString("id-ID", {
-    day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit",
-  });
+  // No # format YYYY.MM.DD.NNNNN — tahun-bulan-tanggal + 5 char terakhir id.
+  const created = new Date(order.createdAt);
+  const yyyy = created.getFullYear();
+  const mm = String(created.getMonth() + 1).padStart(2, "0");
+  const dd = String(created.getDate()).padStart(2, "0");
+  const hh = String(created.getHours()).padStart(2, "0");
+  const mi = String(created.getMinutes()).padStart(2, "0");
+  const idTail = (order.id.replace(/[^0-9]/g, "") || order.id).slice(-5).padStart(5, "0").toUpperCase();
+  const orderNo = `${yyyy}.${mm}.${dd}.${idTail}`;
+  const dateStr = `${dd}-${mm}-${yyyy}  ${hh}:${mi}`;
 
+  const subtotal = order.items.reduce((acc, i) => acc + i.quantity * i.unitPrice, 0);
+  const ppnAmount = order.ppn || 0;
+  const ppnRate = order.ppnRate || 0;
+  const fmt = (n: number) => "Rp " + Math.round(n).toLocaleString("id-ID");
+  const barcodeSvg = generateBarcodeSvg(order.id, { width: 1.0, height: 30, fontSize: 8 });
+
+  // Format mengikuti modal "Pesanan Selesai" di layar — single-line per item
+  // (Nama xQty di kiri, harga di kanan), summary Subtotal/PPN/Total, barcode
+  // di bawah, lalu disclaimer + terima kasih.
   const html = `<!DOCTYPE html>
-<html><head><title>Receipt ${shortId}</title>
+<html><head><title>Struk ${orderNo}</title>
 <style>
-  @page{size:${PAPER_W} ${PAPER_H};margin:0}
-  * { font-weight:900 !important; }
-  body{font-family:'Arial Narrow','Helvetica Condensed',Arial,sans-serif;
-       font-size:9px;line-height:1.25;width:${BODY_W};margin:0 auto;padding:1mm 0;color:#000;
+  @page{size:${PAPER_W} auto;margin:0}
+  body{font-family:Arial,Helvetica,sans-serif;font-size:10px;line-height:1.4;
+       width:${BODY_W};margin:0 auto;padding:2mm 0;color:#000;font-weight:400;
        -webkit-print-color-adjust:exact;print-color-adjust:exact}
   .c{text-align:center}
-  .ln{border-top:1px dashed #000;margin:2px 0}
-  .r{display:flex;justify-content:space-between;gap:2px}
-  .r span:last-child{text-align:right;white-space:nowrap}
-  h2{margin:0;font-size:11px}
+  .ln{border-top:1px dashed #000;margin:3px 0}
+  .r{display:flex;justify-content:space-between;gap:4px;align-items:flex-start}
+  .r .l{flex:1}
+  .r .v{text-align:right;white-space:nowrap}
+  .kv{display:flex;gap:4px}
+  .kv .k{min-width:14mm}
+  h2{margin:0;font-size:11px;font-weight:600;letter-spacing:.2px}
   p{margin:1px 0}
   .item{margin:2px 0}
-  .item .nm{word-break:break-word}
-  .total{font-size:11px}
-  .bc{text-align:center;margin:3px 0} .bc svg{max-width:100%}
-  @media print { body { width:${BODY_W}; } }
+  .total .l, .total .v{font-weight:700;font-size:12px}
+  .bc{text-align:center;margin:3mm 0 1mm} .bc svg{max-width:100%;height:auto}
 </style></head><body>
   <div class="c">
-    <div style="display:inline-block;background:#C4302B;color:#fff;padding:2mm 3mm;border-radius:1.5mm;margin-bottom:1mm;line-height:1.1">
-      <div style="font-size:6px;letter-spacing:0.3px">Toko Bahan Kue</div>
-      <div style="font-size:14px;letter-spacing:1.2px;font-weight:900">SANTI</div>
-    </div>
-    <h2 style="color:#C4302B">${escapeHtml(name)}</h2>
-    <p>${escapeHtml(addr)}</p>
-    <p>${escapeHtml(phone)}</p>
+    <h2>${escapeHtml(name)}</h2>
+    ${addr ? `<p>${escapeHtml(addr)}</p>` : ""}
+    ${phone ? `<p>Telp. ${escapeHtml(phone)}</p>` : ""}
   </div>
   <div class="ln"></div>
-  <div class="r"><span>#${shortId}</span><span>${dt}</span></div>
-  <div>Plgn: ${escapeHtml(customerName)}</div>
-  ${cashier ? `<div>Ksr: ${escapeHtml(cashier)}</div>` : ""}
+  <div class="kv"><span class="k">No #</span><span>:</span><span>${orderNo}</span></div>
+  <div class="kv"><span class="k">Kasir</span><span>:</span><span>${escapeHtml(cashier)}</span></div>
+  <div class="kv"><span class="k">Tanggal</span><span>:</span><span>${dateStr}</span></div>
   <div class="ln"></div>
   ${order.items.map(i => {
-    const g = i.quantity * i.unitPrice;
-    const d = i.discountAmount || 0;
-    const memberLine = i.regularPrice && i.regularPrice > i.unitPrice
-      ? `<div>&nbsp;&nbsp;(Member, normal Rp ${i.regularPrice.toLocaleString("id-ID")})</div>`
-      : "";
-    const discLine = d > 0
-      ? `<div class="r"><span>&nbsp;&nbsp;Disc${i.discountType === "percent" ? " " + i.discountValue + "%" : ""}</span><span>-Rp ${d.toLocaleString("id-ID")}</span></div>`
-      : "";
-    return `<div class="item">
-      <div class="nm">${escapeHtml(i.name)}</div>
-      <div class="r"><span>${i.quantity} x Rp ${i.unitPrice.toLocaleString("id-ID")}</span><span>Rp ${g.toLocaleString("id-ID")}</span></div>
-      ${memberLine}
-      ${discLine}
-    </div>`;
+    const isMember = !!(i.regularPrice && i.regularPrice > i.unitPrice);
+    const lineName = `${escapeHtml(i.name)}${isMember ? " Member" : ""} ×${i.quantity}`;
+    const lineTotal = i.quantity * i.unitPrice;
+    return `<div class="r item"><span class="l">${lineName}</span><span class="v">${fmt(lineTotal)}</span></div>`;
   }).join("")}
   <div class="ln"></div>
-  ${hasDiscounts || order.ppnRate > 0 ? `<div class="r"><span>Subtotal</span><span>Rp ${(grossSubtotal + memberSavings).toLocaleString("id-ID")}</span></div>` : ""}
-  ${memberSavings > 0 ? `<div class="r"><span>Hemat Member</span><span>-Rp ${memberSavings.toLocaleString("id-ID")}</span></div>` : ""}
-  ${itemDiscTotal > 0 ? `<div class="r"><span>Item Disc</span><span>-Rp ${itemDiscTotal.toLocaleString("id-ID")}</span></div>` : ""}
-  ${orderDiscTotal > 0 ? `<div class="r"><span>Order Disc${order.orderDiscountType === "percent" ? " " + order.orderDiscountValue + "%" : ""}</span><span>-Rp ${orderDiscTotal.toLocaleString("id-ID")}</span></div>` : ""}
-  ${order.ppnRate > 0 ? `<div class="r"><span>PPN (${order.ppnRate}%)</span><span>Rp ${order.ppn.toLocaleString("id-ID")}</span></div>` : ""}
-  <div class="r total"><span>TOTAL</span><span>Rp ${order.total.toLocaleString("id-ID")}</span></div>
-  <div class="r"><span>Bayar</span><span>${order.payment.toUpperCase()}</span></div>
-  <div class="ln"></div>
+  <div class="r"><span class="l">Subtotal</span><span class="v">${fmt(subtotal)}</span></div>
+  ${ppnRate > 0 ? `<div class="r"><span class="l">PPN (${ppnRate}%)</span><span class="v">${fmt(ppnAmount)}</span></div>` : ""}
+  <div class="r total"><span class="l">Total</span><span class="v">${fmt(order.total)}</span></div>
   ${barcodeSvg ? `<div class="bc">${barcodeSvg}</div>` : ""}
-  <p class="c">Terima kasih!</p>
+  <div class="ln"></div>
+  <p class="c" style="font-style:italic">Barang yang sudah dibeli tidak dapat ditukar atau dikembalikan.</p>
+  <p class="c" style="margin-top:1.5mm">Terimakasih sudah berbelanja 🙏</p>
 </body></html>`;
 
   // Use hidden iframe to bypass pop-up blockers
