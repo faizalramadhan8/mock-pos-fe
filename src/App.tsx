@@ -125,7 +125,7 @@ export default function App() {
       {/* Header — max-width matches main so the logo/title line up with page
           content on wide screens, not floating at the extreme left edge. */}
       <header className={`fixed top-0 left-0 right-0 z-40 h-[72px] border-b backdrop-blur-xl ${th.dark ? "bg-[#261620]/85" : "bg-white/90"} ${th.bdr}`}>
-        <div className="max-w-4xl mx-auto h-full flex items-center justify-between px-4">
+        <div className="h-full flex items-center justify-between px-4 sm:px-6">
           <div className="flex items-center gap-3 min-w-0">
             <BakeryLogo size={44} />
             <div className="min-w-0">
@@ -139,10 +139,11 @@ export default function App() {
         </div>
       </header>
 
-      {/* Content — max-w-4xl (≈1280px at 20px base) matches expected tablet/
-          desktop usage; the app is never used on 1600px+ monitors and
-          limiting width prevents awkward grid stretching. */}
-      <main className="pt-[84px] pb-28 px-4 max-w-4xl mx-auto">
+      {/* Content — full-width per owner request: maksimalkan ruang horizontal
+          di tablet/desktop, padding sisi 16-24px supaya tidak menempel ke
+          edge layar. Sebelumnya max-w-4xl (1280px) → ada empty space
+          mencolok di kiri/kanan saat tablet ≥1280px. */}
+      <main className="pt-[84px] pb-28 px-4 sm:px-6">
         <ErrorBoundary onReset={() => setPage("dashboard")}>
           <Suspense fallback={<PageLoader />}>
             <div key={currentPage} className="animate-page-enter">

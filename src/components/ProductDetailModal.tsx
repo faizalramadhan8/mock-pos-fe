@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Modal } from "./Modal";
 import { ProductImage } from "./ProductImage";
 import {
@@ -8,6 +8,7 @@ import {
 import { useThemeClasses } from "@/hooks/useThemeClasses";
 import { formatCurrency as $, formatDate, formatTime, printBarcodeLabel } from "@/utils";
 import { ArrowDownCircle, ArrowUpCircle, Printer } from "lucide-react";
+import { productApi, type ProductPriceHistoryRes } from "@/api/products";
 
 interface ProductDetailModalProps {
   productId: string | null;
@@ -44,6 +45,28 @@ export function ProductDetailModal({ productId, onClose }: ProductDetailModalPro
       : [],
     [product, movements]
   );
+
+  // Price history — load when modal opens for a product. Fail silent: empty
+  // history just hides the section, the rest of the modal still renders.
+  const [priceFilter, setPriceFilter] = useState<"all" | "regular" | "member" | "purchase">("all");
+  const [priceHistory, setPriceHistory] = useState<ProductPriceHistoryRes[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  useEffect(() => {
+    if (!productId) { setPriceHistory([]); return; }
+    let alive = true;
+    setHistoryLoading(true);
+    productApi.getPriceHistory(productId)
+      .then(res => { if (alive) setPriceHistory(res.body || []); })
+      .catch(() => { if (alive) setPriceHistory([]); })
+      .finally(() => { if (alive) setHistoryLoading(false); });
+    return () => { alive = false; };
+  }, [productId]);
+
+  const filteredHistory = useMemo(() => {
+    const rows = priceFilter === "all" ? priceHistory : priceHistory.filter(r => r.price_type === priceFilter);
+    if (!canSeeCost) return rows.filter(r => r.price_type !== "purchase");
+    return rows;
+  }, [priceHistory, priceFilter, canSeeCost]);
 
   if (!product) return null;
 
@@ -100,6 +123,66 @@ export function ProductDetailModal({ productId, onClose }: ProductDetailModalPro
           )}
         </div>
       </div>
+
+      {/* Riwayat Harga — chronological price changes (regular/member/purchase).
+          Hidden if no history rows exist. Purchase rows are admin-only. */}
+      {(historyLoading || filteredHistory.length > 0) && (
+        <div className={`rounded-2xl border p-4 mb-3 ${th.bdr} ${th.card2}`}>
+          <div className="flex items-center justify-between mb-2.5">
+            <p className={`text-xs font-bold uppercase tracking-wider ${th.txf}`}>
+              {lang === "id" ? "Riwayat Harga" : "Price History"}
+            </p>
+            <div className="flex gap-1">
+              {(["all", "regular", "member", ...(canSeeCost ? (["purchase"] as const) : [])] as const).map(f => (
+                <button key={f} onClick={() => setPriceFilter(f)}
+                  className={`text-xs font-bold px-2 py-0.5 rounded-md ${priceFilter === f ? `${th.accBg} ${th.acc}` : th.txf}`}>
+                  {f === "all" ? (lang === "id" ? "Semua" : "All")
+                    : f === "regular" ? (lang === "id" ? "Jual" : "Sell")
+                    : f === "member" ? "Member"
+                    : (lang === "id" ? "Modal" : "Cost")}
+                </button>
+              ))}
+            </div>
+          </div>
+          {historyLoading ? (
+            <p className={`text-xs ${th.txf}`}>{lang === "id" ? "Memuat..." : "Loading..."}</p>
+          ) : filteredHistory.length === 0 ? (
+            <p className={`text-xs ${th.txf}`}>{lang === "id" ? "Belum ada perubahan." : "No changes yet."}</p>
+          ) : (
+            <div className="space-y-1.5 max-h-56 overflow-y-auto">
+              {filteredHistory.map(h => {
+                const tagBg = h.price_type === "purchase"
+                  ? (th.dark ? "bg-[#FB7185]/15 text-[#FB7185]" : "bg-[#FFE4E9] text-[#BE123C]")
+                  : h.price_type === "member"
+                    ? (th.dark ? "bg-[#FFB5C0]/15 text-[#FFB5C0]" : "bg-[#FFD1DB] text-[#E11D48]")
+                    : (th.accBg + " " + th.acc);
+                const label = h.price_type === "regular" ? (lang === "id" ? "Jual" : "Sell")
+                  : h.price_type === "member" ? "Member"
+                  : (lang === "id" ? "Modal" : "Cost");
+                return (
+                  <div key={h.id} className={`flex items-center justify-between py-1.5 border-b last:border-0 ${th.bdrSoft}`}>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className={`text-xs font-bold px-2 py-0.5 rounded-md ${tagBg}`}>{label}</span>
+                      <div className="min-w-0">
+                        <p className={`text-sm font-bold ${th.tx}`}>{$(h.price)}</p>
+                        <p className={`text-xs ${th.txf}`}>
+                          {formatDate(h.start_date)}
+                          {h.end_date ? ` – ${formatDate(h.end_date)}` : ` – ${lang === "id" ? "sekarang" : "now"}`}
+                        </p>
+                      </div>
+                    </div>
+                    {h.status === "active" && (
+                      <span className={`text-xs font-bold px-2 py-0.5 rounded-md ${th.accBg} ${th.acc}`}>
+                        {lang === "id" ? "Aktif" : "Active"}
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Stock */}
       <div className={`rounded-2xl border p-4 mb-3 ${th.bdr} ${th.card2}`}>

@@ -2,14 +2,13 @@ import { useState, useMemo, useEffect } from "react";
 import { useCategoryStore, useProductStore, useInventoryStore, useBatchStore, useAuthStore, useLangStore, useSupplierStore, useSettingsStore } from "@/stores";
 import { INVENTORY_WRITE_ROLES, UNIT_OPTIONS, PAYMENT_TERMS_OPTIONS, PAYMENT_TERMS_LABELS } from "@/constants";
 import { Modal } from "@/components/Modal";
-import { ProductImage } from "@/components/ProductImage";
 import { ProductDetailModal } from "@/components/ProductDetailModal";
 import { SupplierDetailModal } from "@/components/SupplierDetailModal";
 import { SearchableSelect } from "@/components/SearchableSelect";
 import { useThemeClasses } from "@/hooks/useThemeClasses";
 import { useDebounce } from "@/hooks/useDebounce";
-import { formatCurrency as $, formatTime, formatDate, genId, genBatchNumber, calcDueDate, compressImage, printBarcodeLabel, printBarcodeLabels } from "@/utils";
-import { exportProducts, exportInventory } from "@/utils/export";
+import { formatCurrency as $, formatTime, formatDate, genId, genBatchNumber, calcDueDate, printBarcodeLabel, printBarcodeLabels } from "@/utils";
+import { exportProducts } from "@/utils/export";
 import type { UnitType, StockType, StockMovement, PaymentTerms, PaymentStatus, UnitOfMeasure } from "@/types";
 import toast from "react-hot-toast";
 import {
@@ -17,7 +16,7 @@ import {
   LayoutGrid, AlertTriangle, Truck, Check, Receipt, Pencil, Download, Search, Printer, Trash2,
 } from "lucide-react";
 
-type InventoryTab = "overview" | "stockIn" | "stockOut" | "expiry" | "history" | "suppliers";
+type InventoryTab = "overview" | "stockIn" | "stockOut" | "expiry" | "suppliers";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function getDateLabel(dateStr: string, t: Record<string, any>): string {
@@ -286,14 +285,6 @@ export function InventoryPage() {
     toast.success(t.productUpdated as string);
   };
 
-  const handleEditImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const base64 = await compressImage(file);
-    setEditProd({ ...editProd, image: base64 });
-    toast.success(t.imageUploaded as string);
-  };
-
   const doStock = () => {
     const prod = products.find(p => p.id === form.prod);
     if (!prod || !form.qty || !stockModal) return;
@@ -359,15 +350,7 @@ export function InventoryPage() {
     toast.success(t.supplierUpdated as string);
   };
 
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const base64 = await compressImage(file);
-    setNewProd({ ...newProd, image: base64 });
-    toast.success(t.imageUploaded as string);
-  };
-
-  // Render movement list (reused by stockIn, stockOut, history tabs)
+  // Render movement list (reused by stockIn & stockOut tabs)
   const renderMovementList = (list: StockMovement[], showAll: boolean, setShowAll: (v: boolean) => void, totalCount: number) => {
     const visible = showAll ? list : list.slice(0, 10);
     const grouped = groupMovements(visible);
@@ -425,7 +408,6 @@ export function InventoryPage() {
   };
 
   // Tab-specific show-all state
-  const [showAllHistory, setShowAllHistory] = useState(false);
   const [showAllIn, setShowAllIn] = useState(false);
   const [showAllOut, setShowAllOut] = useState(false);
 
@@ -1454,29 +1436,50 @@ export function InventoryPage() {
 
           {/* Tambah Stok + ED baru — untuk barang yang baru datang dengan
               ED berbeda. Sistem bikin batch baru, stok total ditambah
-              otomatis. "Stok Saat Ini" di atas tidak perlu diubah manual. */}
-          <div className={`rounded-xl border p-3.5 ${th.bdr} bg-[#FFE4E9]/30`}>
-            <p className={`text-xs font-bold mb-2 ${th.acc}`}>
-              + Tambah Stok Baru dengan ED
-            </p>
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <p className={`text-xs font-semibold mb-1 ${th.txm}`}>Jumlah tambahan</p>
-                <input type="number" value={editProd.addStock}
-                  onChange={e => setEditProd({ ...editProd, addStock: e.target.value })}
-                  placeholder="0" className={inp} min="0" />
+              otomatis. "Current Stock" di atas tidak perlu diubah manual. */}
+          {(() => {
+            const addQty = parseInt(editProd.addStock) || 0;
+            const hasED = !!editProd.expiryDate;
+            // Status preview untuk kasih feedback jelas
+            let preview = "";
+            let previewTone: "info" | "warn" | "ok" = "info";
+            if (addQty > 0 && hasED) {
+              preview = `Stok akan jadi ${(parseInt(editProd.stock) || 0) + addQty} · batch baru dengan ED tersimpan · notifikasi aktif 30 hari sebelumnya.`;
+              previewTone = "ok";
+            } else if (addQty > 0 && !hasED) {
+              preview = `Stok akan jadi ${(parseInt(editProd.stock) || 0) + addQty} · tanpa ED (tidak ada notifikasi kadaluarsa).`;
+              previewTone = "warn";
+            } else if (addQty === 0 && hasED) {
+              preview = "ED diisi tapi jumlah 0 — tidak ada batch dibuat. Isi juga jumlah tambahan supaya ED tersimpan.";
+              previewTone = "warn";
+            } else {
+              preview = "Isi kalau ada barang baru datang. Kalau hanya edit harga/nama, kosongkan saja.";
+              previewTone = "info";
+            }
+            const toneClass = previewTone === "ok" ? th.acc
+              : previewTone === "warn" ? "text-[#BE123C]"
+              : th.txf;
+            return (
+              <div className={`rounded-xl border p-3.5 ${th.bdr} bg-[#FFE4E9]/30`}>
+                <p className={`text-xs font-bold mb-2 ${th.acc}`}>+ Tambah Stok Baru dengan ED</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <p className={`text-xs font-semibold mb-1 ${th.txm}`}>Jumlah tambahan</p>
+                    <input type="number" value={editProd.addStock}
+                      onChange={e => setEditProd({ ...editProd, addStock: e.target.value })}
+                      placeholder="0" className={inp} min="0" />
+                  </div>
+                  <div>
+                    <p className={`text-xs font-semibold mb-1 ${th.txm}`}>Tanggal Kadaluarsa</p>
+                    <input type="date" value={editProd.expiryDate}
+                      onChange={e => setEditProd({ ...editProd, expiryDate: e.target.value })}
+                      className={inp} />
+                  </div>
+                </div>
+                <p className={`text-xs mt-2 ${toneClass}`}>{preview}</p>
               </div>
-              <div>
-                <p className={`text-xs font-semibold mb-1 ${th.txm}`}>Tanggal Kadaluarsa</p>
-                <input type="date" value={editProd.expiryDate}
-                  onChange={e => setEditProd({ ...editProd, expiryDate: e.target.value })}
-                  className={inp} />
-              </div>
-            </div>
-            <p className={`text-xs mt-2 ${th.txf}`}>
-              Kalau diisi, stok akan ditambah <b>{parseInt(editProd.addStock) || 0}</b> dan dibuat batch baru dengan ED itu. Notifikasi muncul 30 hari sebelumnya.
-            </p>
-          </div>
+            );
+          })()}
 
           <div className="flex gap-2 mt-1">
             <button onClick={() => setEditProdOpen(false)} className={`flex-1 py-3 rounded-2xl text-sm font-bold border ${th.bdr} ${th.txm}`}>{t.cancel}</button>

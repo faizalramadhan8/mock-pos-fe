@@ -105,6 +105,7 @@ export function POSPage() {
   const [openRegisterOpen, setOpenRegisterOpen] = useState(false);
   const [openingCashInput, setOpeningCashInput] = useState("");
   const [orderHistoryOpen, setOrderHistoryOpen] = useState(false);
+  const [showCustomerNote, setShowCustomerNote] = useState(false);
   const [labelModalOpen, setLabelModalOpen] = useState(false);
   const [labelSearch, setLabelSearch] = useState("");
   const [selectedLabels, setSelectedLabels] = useState<Set<string>>(new Set());
@@ -374,18 +375,20 @@ export function POSPage() {
   // Shared cart content renderer
   const renderCartContent = (isPanel: boolean) => (
     <div className="flex flex-col gap-3">
-      {/* Active member badge — shown when member is selected */}
+      {/* Active member badge — compact one-row layout. Avoids the 3-line
+          stack that wasted vertical space on tablet (Santi: "rada ribet
+          kalau pesanannya banyak"). Phone + member-price-active info kept
+          but condensed; struk-WA hint removed (already obvious). */}
       {activeMember && (
-        <div className={`flex items-center justify-between px-3 py-2 rounded-xl ${th.dark ? "bg-[#E11D48]/15" : "bg-[#FFE4E9]"}`}>
-          <div className="flex items-center gap-2 min-w-0">
-            <span className="text-base">💎</span>
-            <div className="min-w-0">
-              <p className={`text-xs font-extrabold truncate ${th.acc}`}>{activeMember.name}</p>
-              <p className={`text-xs ${th.txm}`}>{activeMember.phone} · Member price aktif</p>
-              <p className={`text-xs ${th.txm} mt-0.5`}>📱 Struk akan dikirim ke WhatsApp</p>
-            </div>
+        <div className={`flex items-center justify-between gap-2 px-3 py-2 rounded-xl ${th.dark ? "bg-[#E11D48]/15" : "bg-[#FFE4E9]"}`}>
+          <div className="min-w-0">
+            <p className={`text-sm font-extrabold truncate ${th.acc}`}>
+              {activeMember.name} <span className={`text-xs font-semibold ${th.txm}`}>· Member</span>
+            </p>
+            <p className={`text-xs ${th.txm} truncate`}>{activeMember.phone}</p>
           </div>
-          <button onClick={() => setMember(null)} className={`text-xs font-bold px-2 py-1 rounded-lg ${th.txm} hover:opacity-70`}>
+          <button onClick={() => setMember(null)}
+            className={`shrink-0 text-xs font-bold px-2.5 py-1 rounded-lg border ${th.bdr} ${th.txm}`}>
             Lepas
           </button>
         </div>
@@ -444,15 +447,28 @@ export function POSPage() {
         </div>
       )}
 
-      {/* Member-mode note field (add customer note after member selected) */}
-      {activeMember && (
+      {/* Member-mode note field — collapsed by default to save vertical
+          space on tablet (banyak waktu kasir tidak butuh catatan). Klik
+          link kecil → input muncul. Kalau sudah ada isinya, otomatis
+          tampil terus supaya tidak ke-hide. */}
+      {activeMember && ((showCustomerNote || customer) ? (
         <input
+          autoFocus={showCustomerNote && !customer}
           value={customer}
           onChange={e => setCustomer(e.target.value)}
-          placeholder="Tambah catatan pelanggan (opsional)"
-          className={`w-full px-4 py-3 text-sm rounded-2xl border ${th.inp}`}
+          onBlur={() => { if (!customer) setShowCustomerNote(false); }}
+          placeholder="Catatan pelanggan"
+          className={`w-full px-4 py-2.5 text-sm rounded-xl border ${th.inp}`}
         />
-      )}
+      ) : (
+        <button
+          type="button"
+          onClick={() => setShowCustomerNote(true)}
+          className={`text-xs font-semibold underline self-start ${th.txm}`}
+        >
+          + Tambah catatan pelanggan
+        </button>
+      ))}
 
       {/* Add Member mini-modal */}
       {showAddMember && (
@@ -476,10 +492,9 @@ export function POSPage() {
       )}
 
       {cartItems.length === 0 ? (
-        <div className={`text-center py-10 ${th.txm}`}>
-          <ShoppingBag size={40} className="mx-auto opacity-20 mb-3" />
+        <div className={`text-center py-6 ${th.txm}`}>
+          <ShoppingBag size={28} className="mx-auto opacity-20 mb-2" />
           <p className="font-semibold text-sm">{t.emptyCart}</p>
-          <p className={`text-xs mt-1 ${th.txf}`}>{t.emptyCartHint}</p>
         </div>
       ) : cartItems.map(ci => {
         const itemGross = ci.unitPrice * ci.quantity;
@@ -890,7 +905,7 @@ export function POSPage() {
       </div>
 
       {/* Right: cart side panel (desktop only) */}
-      <div className={`hidden lg:flex lg:flex-col lg:w-[380px] lg:sticky lg:top-[68px] lg:max-h-[calc(100vh-148px)] lg:rounded-[22px] lg:border lg:overflow-hidden ${th.card} ${th.bdr}`}>
+      <div className={`hidden lg:flex lg:flex-col lg:w-[440px] lg:shrink-0 lg:sticky lg:top-[68px] lg:max-h-[calc(100vh-148px)] lg:rounded-[22px] lg:border lg:overflow-hidden ${th.card} ${th.bdr}`}>
         <div className={`px-5 py-3.5 border-b ${th.bdr} flex items-center justify-between`}>
           <p className={`text-sm font-extrabold tracking-tight ${th.tx}`}>{t.cart} · {cartCount}</p>
           <p className={`text-sm font-black ${th.acc}`}>{$(cartTotal)}</p>

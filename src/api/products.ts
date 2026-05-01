@@ -39,6 +39,19 @@ export interface SupplierRes {
   created_at: string;
 }
 
+export interface ProductPriceHistoryRes {
+  id: string;
+  product_id: string;
+  price_type: 'regular' | 'member' | 'purchase';
+  price: number;
+  status: 'active' | 'inactive';
+  start_date: string;
+  end_date?: string | null;
+  changed_by?: string | null;
+  note?: string;
+  created_at: string;
+}
+
 export const productApi = {
   getAll: (params?: { search?: string; category_id?: string; page?: number; limit?: number }) => {
     const q = new URLSearchParams();
@@ -96,6 +109,11 @@ export const productApi = {
   toggleActive: (id: string) => api.patch<ProductRes>(`/products/${id}/toggle-active`),
 
   delete: (id: string) => api.del(`/products/${id}`),
+
+  getPriceHistory: (id: string, priceType?: 'regular' | 'member' | 'purchase') => {
+    const qs = priceType ? `?price_type=${priceType}` : '';
+    return api.get<ProductPriceHistoryRes[]>(`/products/${id}/price-history${qs}`);
+  },
 };
 
 export const categoryApi = {
