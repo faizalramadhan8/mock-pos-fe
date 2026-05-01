@@ -299,11 +299,10 @@ function addLabelPageToPdf(pdf: jsPDF, product: Product, lang: "en" | "id", size
   const innerW = pageW - sidePad * 2;
   const contentH = pageH - footH - topPad - 1;  // -1mm bottom safety
 
-  // Font sizes (pt) — disamakan proporsional dengan versi HTML+CSS commit
-  // 2116949 (10px / 11px / 9px → 7.5pt / 8.25pt / 6.75pt at 96 DPI).
-  const nameFontPt = pageW <= 30 ? 7.5 : pageW <= 40 ? 9 : 10.5;
-  const priceFontPt = pageW <= 30 ? 8.25 : pageW <= 40 ? 9.75 : 11.25;
-  const footFontPt = pageW <= 30 ? 6.75 : 7.5;
+  // Font sizes (pt) — kompak untuk label fisik 40×30mm (pageW=30).
+  const nameFontPt = pageW <= 30 ? 6 : pageW <= 40 ? 7.5 : 9;
+  const priceFontPt = pageW <= 30 ? 7 : pageW <= 40 ? 8.5 : 10;
+  const footFontPt = pageW <= 30 ? 5.5 : 6.5;
 
   // Layout: name (top, max 2 line), barcode (middle), price (bottom of content area)
   pdf.setFont("helvetica", "bold");
@@ -321,16 +320,16 @@ function addLabelPageToPdf(pdf: jsPDF, product: Product, lang: "en" | "id", size
     y += nameLineH * 1.05;
   }
 
-  // Barcode area — fill space antara nama dan price (mirip CSS flex:1 di
-  // versi HTML), lebar 95% dari inner width, no height cap.
+  // Barcode — lebar 85% inner, tinggi cap 30% dari label height supaya
+  // tidak dominan; centered dalam available space antara name & price.
   const priceH = priceFontPt * 0.353;
   const priceBaselineY = topPad + contentH - 0.5;
   const availableTop = topPad + nameBlockH + 0.5;
   const availableBottom = priceBaselineY - priceH - 0.8;
   const availableH = Math.max(4, availableBottom - availableTop);
-  const barcodeH = availableH;
-  const barcodeW = innerW * 0.95;
-  const barcodeTop = availableTop;
+  const barcodeH = Math.min(availableH, pageH * 0.3);
+  const barcodeW = innerW * 0.85;
+  const barcodeTop = availableTop + (availableH - barcodeH) / 2;
 
   const barcodeImg = generateBarcodeDataUrl(product.sku, barcodeW, barcodeH);
   if (barcodeImg) {
