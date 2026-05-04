@@ -72,11 +72,12 @@ export default function App() {
   }, []);
 
   const perms = user ? (ROLE_PERMISSIONS[user.role] || []) : [];
-  // Bottom nav max 5 (Material Design rule). Settings dipindah ke header
-  // sebagai icon button — dia secondary nav (admin/maintenance), bukan
-  // operational seperti POS/Stok/Pesanan/Laporan.
-  const navItems = (["dashboard", "pos", "inventory", "orders", "reports"] as PageId[]).filter(p => perms.includes(p));
-  const canOpenSettings = perms.includes("settings");
+  // Bottom nav 6 items — Material Design "max 5" guideline diabaikan di sini
+  // karena Bu Santi (50+, gaptek) sudah familiar dengan Settings di bottom
+  // nav. Discoverability menang dari konvensi: pindahin Settings ke header
+  // bikin "Pengaturan saya hilang ke mana?". Tablet 1024px+ tetap muat 6
+  // icon @74px masing-masing dengan touch target ≥44px.
+  const navItems = (["dashboard", "pos", "inventory", "orders", "reports", "settings"] as PageId[]).filter(p => perms.includes(p));
   const currentPage = user ? (perms.includes(page) ? page : defaultPage()) : null;
 
   // Dynamic page title
@@ -142,19 +143,7 @@ export default function App() {
               <p className={`text-sm truncate ${th.txm}`}>{user.name} · {(t.roles as Record<string, string>)[user.role]}</p>
             </div>
           </div>
-          <div className="flex items-center gap-1">
-            <NotificationBell />
-            {canOpenSettings && (
-              <button
-                onClick={() => setPage("settings")}
-                aria-label={t.settings as string}
-                aria-current={currentPage === "settings" ? "page" : undefined}
-                className={`min-w-[44px] min-h-[44px] flex items-center justify-center rounded-2xl transition-colors ${currentPage === "settings" ? `${th.accBg} ${th.acc}` : `${th.txm} hover:${th.accBg}`}`}
-              >
-                <Settings size={22} />
-              </button>
-            )}
-          </div>
+          <NotificationBell />
         </div>
       </header>
 
