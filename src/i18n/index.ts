@@ -5,7 +5,7 @@ export const translations = {
     signIn: "Sign In", email: "Email address", password: "Password",
     invalidCred: "Wrong email or password", quickAccess: "Quick demo login",
     // Nav
-    dashboard: "Home", pos: "Cashier", inventory: "Stock", orders: "Orders", settings: "Settings",
+    dashboard: "Home", pos: "Cashier", inventory: "Stock", orders: "Orders", reports: "Reports", settings: "Settings",
     // General
     search: "Search ingredients...", all: "All", individual: "Pcs", box: "Box",
     save: "Save", cancel: "Cancel", confirm: "Confirm", close: "Close", clear: "Clear",
@@ -189,7 +189,7 @@ export const translations = {
     appName: "Toko Bahan Kue Santi",
     signIn: "Masuk", email: "Alamat email", password: "Kata sandi",
     invalidCred: "Email atau sandi salah", quickAccess: "Login cepat (demo)",
-    dashboard: "Beranda", pos: "Kasir", inventory: "Stok", orders: "Pesanan", settings: "Pengaturan",
+    dashboard: "Beranda", pos: "Kasir", inventory: "Stok", orders: "Pesanan", reports: "Laporan", settings: "Pengaturan",
     search: "Cari bahan...", all: "Semua", individual: "Satuan", box: "Dus",
     save: "Simpan", cancel: "Batal", confirm: "Konfirmasi", close: "Tutup", clear: "Hapus",
     cart: "Keranjang", emptyCart: "Belum ada isi", emptyCartHint: "Pilih bahan untuk ditambahkan",

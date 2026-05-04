@@ -7,6 +7,7 @@ import { SupplierDetailModal } from "@/components/SupplierDetailModal";
 import { SearchableSelect } from "@/components/SearchableSelect";
 import { useThemeClasses } from "@/hooks/useThemeClasses";
 import { useDebounce } from "@/hooks/useDebounce";
+import { usePageFetch } from "@/hooks/usePageFetch";
 import { formatCurrency as $, formatTime, formatDate, genId, genBatchNumber, calcDueDate, printBarcodeLabel, printBarcodeLabels } from "@/utils";
 import { exportProducts } from "@/utils/export";
 import type { UnitType, StockType, StockMovement, PaymentTerms, PaymentStatus, UnitOfMeasure } from "@/types";
@@ -41,6 +42,13 @@ function generateSku(categoryId: string, products: { sku: string }[], categories
 }
 
 export function InventoryPage() {
+  usePageFetch([
+    { key: "products",   fetch: () => useProductStore.getState().fetchProducts() },
+    { key: "suppliers",  fetch: () => useSupplierStore.getState().fetchSuppliers() },
+    { key: "batches",    fetch: () => useBatchStore.getState().fetchBatches() },
+    { key: "movements",  fetch: () => useInventoryStore.getState().fetchMovements() },
+    { key: "categories", fetch: () => useCategoryStore.getState().fetchCategories() },
+  ]);
   const th = useThemeClasses();
   const { t, lang } = useLangStore();
   const { categories, addCategory } = useCategoryStore();
@@ -296,9 +304,16 @@ export function InventoryPage() {
     }
     adjustStock(prod.id, stockModal === "in" ? total : -total);
 
-    const priceForUnit = stockModal === "in"
-      ? (form.unit === "box" ? prod.purchasePrice * prod.qtyPerBox : prod.purchasePrice)
-      : (form.unit === "box" ? prod.sellingPrice * prod.qtyPerBox : prod.sellingPrice);
+    // Convention: stored unitPrice is ALWAYS per-individual unit, quantity
+    // is ALWAYS individual count. Display calculates `unitPrice \u00d7 quantity`.
+    // Kalau user pilih unit "box" dan isi harga per-dus, dibagi qtyPerBox
+    // dulu sebelum disimpan supaya total tidak inflated.
+    const defaultPriceIndividual = stockModal === "in" ? prod.purchasePrice : prod.sellingPrice;
+    const inputPrice = form.price ? parseInt(form.price) : 0;
+    const qtyPerBox = Math.max(1, prod.qtyPerBox);
+    const unitPriceIndividual = inputPrice > 0
+      ? (form.unit === "box" ? Math.round(inputPrice / qtyPerBox) : inputPrice)
+      : defaultPriceIndividual;
 
     if (stockModal === "in") {
       addBatch({
@@ -313,7 +328,7 @@ export function InventoryPage() {
     const now = new Date().toISOString();
     addMovement({
       id: genId(), productId: prod.id, type: stockModal, quantity: total, unitType: form.unit,
-      unitPrice: form.price ? parseInt(form.price) : priceForUnit,
+      unitPrice: unitPriceIndividual,
       note: form.note || "\u2014", createdAt: now, createdBy: user.id,
       expiryDate: stockModal === "in" ? form.expiryDate || undefined : undefined,
       supplierId: stockModal === "in" && form.supplierId ? form.supplierId : undefined,
@@ -1078,7 +1093,9 @@ export function InventoryPage() {
             </div>
           </div>
           <div>
-            <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>{t.price}</p>
+            <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>
+              {t.price} <span className={th.txm}>· per {form.unit === "box" ? "dus" : "satuan"}</span>
+            </p>
             <input type="number" value={form.price} onChange={e => setForm({ ...form, price: e.target.value })}
               placeholder={form.prod ? (() => {
                 const p = products.find(pr => pr.id === form.prod);
@@ -1089,6 +1106,21 @@ export function InventoryPage() {
                 return $(val);
               })() : ""}
               className={inp} min="0" />
+            {form.prod && form.qty && form.price && (() => {
+              const p = products.find(pr => pr.id === form.prod);
+              if (!p) return null;
+              const qtyN = parseInt(form.qty) || 0;
+              const priceN = parseInt(form.price) || 0;
+              const grandTotal = qtyN * priceN;
+              return (
+                <p className={`text-xs mt-1 ${th.txm}`}>
+                  Total: <span className={`font-bold ${th.acc}`}>{$(grandTotal)}</span>
+                  {form.unit === "box" && p.qtyPerBox > 1 && (
+                    <span> ({qtyN} dus × {$(priceN)})</span>
+                  )}
+                </p>
+              );
+            })()}
           </div>
           {stockModal === "in" && (
             <div>

@@ -1,6 +1,7 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { useAuthStore, useLangStore, useThemeStore, useSettingsStore, useAuditStore } from "@/stores";
 import { useThemeClasses } from "@/hooks/useThemeClasses";
+import { usePageFetch } from "@/hooks/usePageFetch";
 import {
   Sun, Moon, UserPlus, X, Plus, Trash2, Search, Building2,
   Palette, Store, Users, LogOut, Clock, ChevronDown, ChevronUp, Key, Power,
@@ -15,6 +16,11 @@ type SettingsTab = "preferences" | "store" | "team" | "activity";
 const DEFAULT_PASSWORD = "bakeshop123";
 
 export function SettingsPage() {
+  usePageFetch([
+    { key: "settings", fetch: () => useSettingsStore.getState().fetchSettings() },
+    { key: "users",    fetch: () => useAuthStore.getState().fetchUsers() },
+    { key: "audit",    fetch: () => useAuditStore.getState().fetchEntries() },
+  ]);
   const th = useThemeClasses();
   const { t, lang, setLang } = useLangStore();
   const { dark, toggle } = useThemeStore();

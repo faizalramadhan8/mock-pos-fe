@@ -9,7 +9,7 @@ import type { PageId } from "@/types";
 import { Toaster } from "react-hot-toast";
 import { NotificationBell } from "@/components/NotificationBell";
 import {
-  Home, ShoppingBag, Package, FileText, Settings,
+  Home, ShoppingBag, Package, FileText, Settings, BarChart3,
 } from "lucide-react";
 
 // Code-split pages
@@ -18,6 +18,7 @@ const DashboardPage = lazy(() => import("@/pages/DashboardPage").then(m => ({ de
 const POSPage = lazy(() => import("@/pages/POSPage").then(m => ({ default: m.POSPage })));
 const InventoryPage = lazy(() => import("@/pages/InventoryPage").then(m => ({ default: m.InventoryPage })));
 const OrdersPage = lazy(() => import("@/pages/OrdersPage").then(m => ({ default: m.OrdersPage })));
+const ReportsPage = lazy(() => import("@/pages/ReportsPage").then(m => ({ default: m.ReportsPage })));
 const SettingsPage = lazy(() => import("@/pages/SettingsPage").then(m => ({ default: m.SettingsPage })));
 const DeviceApprovalPage = lazy(() => import("@/pages/DeviceApprovalPage").then(m => ({ default: m.DeviceApprovalPage })));
 
@@ -26,6 +27,7 @@ const NAV_ICONS: Record<PageId, React.ReactNode> = {
   pos: <ShoppingBag size={26} />,
   inventory: <Package size={26} />,
   orders: <FileText size={26} />,
+  reports: <BarChart3 size={26} />,
   settings: <Settings size={26} />,
 };
 
@@ -70,7 +72,11 @@ export default function App() {
   }, []);
 
   const perms = user ? (ROLE_PERMISSIONS[user.role] || []) : [];
-  const navItems = (["dashboard", "pos", "inventory", "orders", "settings"] as PageId[]).filter(p => perms.includes(p));
+  // Bottom nav max 5 (Material Design rule). Settings dipindah ke header
+  // sebagai icon button — dia secondary nav (admin/maintenance), bukan
+  // operational seperti POS/Stok/Pesanan/Laporan.
+  const navItems = (["dashboard", "pos", "inventory", "orders", "reports"] as PageId[]).filter(p => perms.includes(p));
+  const canOpenSettings = perms.includes("settings");
   const currentPage = user ? (perms.includes(page) ? page : defaultPage()) : null;
 
   // Dynamic page title
@@ -97,6 +103,7 @@ export default function App() {
       case "pos": return <POSPage />;
       case "inventory": return <InventoryPage />;
       case "orders": return <OrdersPage />;
+      case "reports": return <ReportsPage />;
       case "settings": return <SettingsPage />;
       default: return <DashboardPage />;
     }
@@ -135,7 +142,19 @@ export default function App() {
               <p className={`text-sm truncate ${th.txm}`}>{user.name} · {(t.roles as Record<string, string>)[user.role]}</p>
             </div>
           </div>
-          <NotificationBell />
+          <div className="flex items-center gap-1">
+            <NotificationBell />
+            {canOpenSettings && (
+              <button
+                onClick={() => setPage("settings")}
+                aria-label={t.settings as string}
+                aria-current={currentPage === "settings" ? "page" : undefined}
+                className={`min-w-[44px] min-h-[44px] flex items-center justify-center rounded-2xl transition-colors ${currentPage === "settings" ? `${th.accBg} ${th.acc}` : `${th.txm} hover:${th.accBg}`}`}
+              >
+                <Settings size={22} />
+              </button>
+            )}
+          </div>
         </div>
       </header>
 

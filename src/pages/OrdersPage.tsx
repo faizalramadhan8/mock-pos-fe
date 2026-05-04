@@ -6,10 +6,10 @@ import { MemberStatsModal } from "@/components/MemberStatsModal";
 import { Modal } from "@/components/Modal";
 import { useThemeClasses } from "@/hooks/useThemeClasses";
 import { useDebounce } from "@/hooks/useDebounce";
-import { formatCurrency as $, formatTime, formatDate, printReport, genId } from "@/utils";
-import { exportOrders, exportOrderReport } from "@/utils/export";
+import { usePageFetch } from "@/hooks/usePageFetch";
+import { formatCurrency as $, formatTime, formatDate, genId } from "@/utils";
 import { getDateRange, type DateRange, type CustomRange } from "@/utils/dateRange";
-import { Printer, FileText, Download, Search, Users, Trash2, Plus, Receipt, Pencil } from "lucide-react";
+import { FileText, Search, Users, Trash2, Plus, Receipt, Pencil } from "lucide-react";
 import type { Member } from "@/types";
 import toast from "react-hot-toast";
 
@@ -45,6 +45,11 @@ function FilterPill({
 }
 
 export function OrdersPage() {
+  usePageFetch([
+    { key: "orders",   fetch: () => useOrderStore.getState().fetchOrders() },
+    { key: "members",  fetch: () => useMemberStore.getState().fetchMembers() },
+    { key: "products", fetch: () => useProductStore.getState().fetchProducts() },
+  ]);
   const th = useThemeClasses();
   const { t, lang } = useLangStore();
   const orders = useOrderStore(s => s.orders);
@@ -146,14 +151,6 @@ export function OrdersPage() {
     }
   };
 
-  // Label dipakai untuk filename export
-  const exportRangeLabel = () => {
-    if (dateRange === "custom" && customRange.from && customRange.to) {
-      return `${customRange.from}_sd_${customRange.to}`;
-    }
-    return String(dateRangeLabel(dateRange));
-  };
-
   const statusLabel = (f: string) => {
     switch (f) {
       case "all": return t.allOrders;
@@ -169,29 +166,6 @@ export function OrdersPage() {
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between gap-2">
         <h1 className={`text-[22px] font-black tracking-tight shrink-0 ${th.tx}`}>{t.orders}</h1>
-        {activeTab === "orders" && (
-          <div className="flex gap-1.5 shrink-0">
-            <button onClick={async () => { await exportOrders(dateFiltered, "csv"); toast.success(t.exportSuccess as string); }}
-              className={`flex items-center gap-1 px-2 py-1.5 rounded-xl text-xs font-bold ${th.elev} ${th.txm}`}>
-              <Download size={11} /> CSV
-            </button>
-            <button
-              disabled={!!customError}
-              onClick={async () => {
-                if (customError) { toast.error(customError); return; }
-                await exportOrderReport(dateFiltered, exportRangeLabel());
-                toast.success(lang === "id" ? "Laporan berhasil diunduh" : "Report downloaded");
-              }}
-              title={lang === "id" ? "Excel berisi: Transaksi, Top Produk, Member" : "Excel contains: Transactions, Top Products, Members"}
-              className={`flex items-center gap-1 px-2 py-1.5 rounded-xl text-xs font-bold ${th.elev} ${th.txm} disabled:opacity-40`}>
-              <Download size={11} /> Excel
-            </button>
-            <button onClick={() => printReport(dateFiltered, dateRangeLabel(dateRange) as string)}
-              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold ${th.accBg} ${th.acc}`}>
-              <Printer size={12} /> {t.printReport}
-            </button>
-          </div>
-        )}
       </div>
 
       {/* Tab switcher — only show if user can access members */}

@@ -73,6 +73,58 @@ input[type="number"] {
 .press-spring { transition: transform .08s ease-out; }
 .press-spring:active { transform: scale(0.96); }
 
+/* Bakery-themed dotted divider — mimic perforated thermal-paper struk.
+   Pakai untuk separator antar section di Dashboard / Reports supaya
+   terasa toko kue, bukan generic dashboard. */
+.divider-dotted {
+  height: 1px;
+  background-image: radial-gradient(circle, currentColor 1px, transparent 1px);
+  background-size: 8px 1px;
+  background-repeat: repeat-x;
+  opacity: 0.35;
+}
+
+/* Subtle diagonal pink stripe — kertas pembungkus kue feel.
+   5% opacity supaya halus, tidak distracting. */
+.bg-bakery-stripe {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    rgba(255, 181, 192, 0.08) 0,
+    rgba(255, 181, 192, 0.08) 1px,
+    transparent 1px,
+    transparent 14px
+  );
+}
+.dark .bg-bakery-stripe {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    rgba(255, 181, 192, 0.06) 0,
+    rgba(255, 181, 192, 0.06) 1px,
+    transparent 1px,
+    transparent 14px
+  );
+}
+
+/* Mini bar chart — relative-width bar di list row (Top Produk). Pakai
+   --bar-pct CSS var, set inline via style. */
+.mini-bar {
+  position: relative;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(225, 29, 72, 0.08);
+  overflow: hidden;
+}
+.dark .mini-bar { background: rgba(255, 181, 192, 0.10); }
+.mini-bar::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: var(--bar-pct, 0%);
+  background: linear-gradient(90deg, #FFB5C0 0%, #E11D48 100%);
+  border-radius: inherit;
+  transition: width .5s cubic-bezier(.2, .7, .2, 1);
+}
+
 @media (hover: none) {
   button, a, [role="button"] { -webkit-tap-highlight-color: transparent; }
 }

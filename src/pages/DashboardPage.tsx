@@ -3,6 +3,7 @@ import { useAuthStore, useLangStore, useOrderStore, useProductStore, useBatchSto
 import { ProductDetailModal } from "@/components/ProductDetailModal";
 import { OrderDetailModal } from "@/components/OrderDetailModal";
 import { useThemeClasses } from "@/hooks/useThemeClasses";
+import { usePageFetch } from "@/hooks/usePageFetch";
 import { formatCurrency as $, formatTime } from "@/utils";
 import { AlertCircle, Clock, Package, ChevronRight, TrendingUp, TrendingDown } from "lucide-react";
 
@@ -44,6 +45,11 @@ function getPreviousWindow(mode: Range, customFrom: string, customTo: string): {
 }
 
 export function DashboardPage() {
+  usePageFetch([
+    { key: "orders",   fetch: () => useOrderStore.getState().fetchOrders() },
+    { key: "products", fetch: () => useProductStore.getState().fetchProducts() },
+    { key: "batches",  fetch: () => useBatchStore.getState().fetchBatches() },
+  ]);
   const th = useThemeClasses();
   const { t, lang } = useLangStore();
   const user = useAuthStore(s => s.user)!;

@@ -8,6 +8,7 @@ import { CategoryIconMap } from "@/components/icons";
 import { useThemeClasses } from "@/hooks/useThemeClasses";
 import { useDebounce } from "@/hooks/useDebounce";
 import { useBarcodeScanner } from "@/hooks/useBarcodeScanner";
+import { usePageFetch } from "@/hooks/usePageFetch";
 import { formatCurrency as $, printReceipt, compressImage, genId, formatTime, printBarcodeLabel, printBarcodeLabels } from "@/utils";
 import { calcItemDiscount } from "@/utils/calc";
 import Barcode from "react-barcode";
@@ -18,6 +19,14 @@ import {
 } from "lucide-react";
 
 export function POSPage() {
+  // Auto-refresh data setiap kali kasir buka POS atau balik dari aplikasi
+  // lain (WA, kalkulator). TTL 10s default — cegah spam network.
+  usePageFetch([
+    { key: "products", fetch: () => useProductStore.getState().fetchProducts() },
+    { key: "orders",   fetch: () => useOrderStore.getState().fetchOrders() },
+    { key: "members",  fetch: () => useMemberStore.getState().fetchMembers() },
+    { key: "settings", fetch: () => useSettingsStore.getState().fetchSettings() },
+  ]);
   const th = useThemeClasses();
   const { t, lang } = useLangStore();
   const categories = useCategoryStore(s => s.categories);
@@ -905,7 +914,7 @@ export function POSPage() {
       </div>
 
       {/* Right: cart side panel (desktop only) */}
-      <div className={`hidden lg:flex lg:flex-col lg:w-[440px] lg:shrink-0 lg:sticky lg:top-[68px] lg:max-h-[calc(100vh-148px)] lg:rounded-[22px] lg:border lg:overflow-hidden ${th.card} ${th.bdr}`}>
+      <div className={`hidden lg:flex lg:flex-col lg:w-[480px] xl:w-[560px] 2xl:w-[620px] lg:shrink-0 lg:sticky lg:top-[68px] lg:max-h-[calc(100vh-148px)] lg:rounded-[22px] lg:border lg:overflow-hidden ${th.card} ${th.bdr}`}>
         <div className={`px-5 py-3.5 border-b ${th.bdr} flex items-center justify-between`}>
           <p className={`text-sm font-extrabold tracking-tight ${th.tx}`}>{t.cart} · {cartCount}</p>
           <p className={`text-sm font-black ${th.acc}`}>{$(cartTotal)}</p>

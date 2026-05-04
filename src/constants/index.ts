@@ -5,8 +5,8 @@ import type { User, Category, Product, Order, StockMovement, StockBatch, Supplie
 //   Tidak akses Dashboard (laporan total tidak boleh dilihat kasir/staff).
 // Admin & Owner (superadmin): semua.
 export const ROLE_PERMISSIONS: Record<Role, PageId[]> = {
-  superadmin: ["dashboard", "pos", "inventory", "orders", "settings"],
-  admin: ["dashboard", "pos", "inventory", "orders", "settings"],
+  superadmin: ["dashboard", "pos", "inventory", "orders", "reports", "settings"],
+  admin: ["dashboard", "pos", "inventory", "orders", "reports", "settings"],
   staff: ["pos", "inventory", "orders", "settings"],
   cashier: ["pos", "settings"],
   user: ["pos", "settings"],

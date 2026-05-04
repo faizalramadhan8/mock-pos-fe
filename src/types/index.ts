@@ -7,7 +7,7 @@ export type DiscountType = "percent" | "fixed";
 export type AuditAction = "order_created" | "order_voided" | "order_refunded" | "stock_adjusted" | "product_added" | "product_edited" | "settings_changed" | "user_registered" | "user_toggled" | "user_deleted" | "password_reset" | "register_opened" | "register_closed";
 export type UnitType = "individual" | "box";
 export type StockType = "in" | "out";
-export type PageId = "dashboard" | "pos" | "inventory" | "orders" | "settings";
+export type PageId = "dashboard" | "pos" | "inventory" | "orders" | "reports" | "settings";
 // PaymentTerms — "COD" kept as legacy alias for Cash (data lama masih ada).
 // Label Indonesia dipusatkan di PAYMENT_TERMS_LABELS.
 export type PaymentTerms = "COD" | "NET7" | "NET14" | "NET30" | "NET60" | "NET90";
