@@ -1,5 +1,7 @@
 import { api } from './client';
 
+export type MovementReason = "restock" | "sale" | "repack" | "lost" | "damaged" | "opname" | "sample" | "cancel" | "refund" | "other" | "";
+
 export interface MovementRes {
   id: string;
   product_id: string;
@@ -7,6 +9,7 @@ export interface MovementRes {
   quantity: number;
   unit_type: string;
   unit_price: number;
+  reason?: MovementReason;
   note?: string;
   expiry_date?: string;
   supplier_id?: string;
@@ -55,6 +58,14 @@ export const movementApi = {
 
   updatePaymentStatus: (id: string, status: string) =>
     api.patch<MovementRes>(`/inventory/movements/${id}/payment-status`, { payment_status: status }),
+
+  /** Stock Adjustment — penyesuaian absolut: stok produk diubah ke `new_stock`,
+   * sistem hitung diff dan record movement dengan reason. Audit-trail clear. */
+  adjustStock: (productId: string, data: {
+    new_stock: number;
+    reason: "repack" | "lost" | "damaged" | "opname" | "sample" | "other";
+    note?: string;
+  }) => api.post<MovementRes>(`/inventory/products/${productId}/adjust-stock`, data),
 };
 
 export const batchApi = {

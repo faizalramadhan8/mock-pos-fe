@@ -60,7 +60,8 @@ const mapOrder = (o: any): Order => ({
 
 const mapMovement = (m: any): StockMovement => ({
   id: m.id, productId: m.product_id, type: m.type, quantity: m.quantity,
-  unitType: m.unit_type || 'individual', unitPrice: m.unit_price, note: m.note || '',
+  unitType: m.unit_type || 'individual', unitPrice: m.unit_price,
+  reason: m.reason || '', note: m.note || '',
   createdAt: m.created_at, createdBy: m.created_by,
   expiryDate: m.expiry_date, supplierId: m.supplier_id,
   paymentTerms: m.payment_terms, dueDate: m.due_date, paymentStatus: m.payment_status,
@@ -603,6 +604,9 @@ interface InventoryState {
   fetchMovements: () => Promise<void>;
   addMovement: (m: StockMovement) => Promise<void>;
   updatePaymentStatus: (movementId: string, status: PaymentStatus) => Promise<void>;
+  /** Stock Adjustment — set stok absolut + alasan. Sistem auto-record movement
+   * dengan reason untuk audit trail (Bu Santi: repack, hilang, rusak, opname). */
+  adjustStock: (productId: string, newStock: number, reason: "repack" | "lost" | "damaged" | "opname" | "sample" | "other", note?: string) => Promise<void>;
 }
 export const useInventoryStore = create<InventoryState>((set, get) => ({
   movements: [],
@@ -636,6 +640,19 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
     } catch (e: any) {
       set(s => ({ movements: s.movements.map(m => m.id === id ? { ...m, paymentStatus: status } : m) }));
       toast.error(e.message);
+    }
+  },
+  adjustStock: async (productId, newStock, reason, note) => {
+    try {
+      await movementApi.adjustStock(productId, { new_stock: newStock, reason, note });
+      // Refresh products + movements supaya UI sync.
+      await Promise.all([
+        useProductStore.getState().fetchProducts(),
+        get().fetchMovements(),
+      ]);
+    } catch (e: any) {
+      toast.error(e.message || 'Gagal menyesuaikan stok');
+      throw e;
     }
   },
 }));

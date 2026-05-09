@@ -15,6 +15,22 @@ interface ProductDetailModalProps {
   onClose: () => void;
 }
 
+// REASON_BADGE — visual mapping per reason value supaya Recent Movements
+// gampang scanned. lightClass = light mode, darkClass = dark mode.
+const REASON_BADGE: Record<string, { label: string; lightClass: string; darkClass: string }> = {
+  restock:  { label: "Stok Masuk",  lightClass: "bg-[#FFE4E9] text-[#E11D48]", darkClass: "bg-[#E11D48]/15 text-[#E11D48]" },
+  sale:     { label: "Penjualan",   lightClass: "bg-[#FCE4EC] text-[#BE123C]", darkClass: "bg-[#FB7185]/15 text-[#FB7185]" },
+  repack:   { label: "Repack",      lightClass: "bg-[#FFD1DB] text-[#BE123C]", darkClass: "bg-[#FFB5C0]/15 text-[#FFB5C0]" },
+  lost:     { label: "Hilang",      lightClass: "bg-[#FCE4EC] text-[#BE123C]", darkClass: "bg-[#BE123C]/20 text-[#FB7185]" },
+  damaged:  { label: "Rusak",       lightClass: "bg-[#FCE4EC] text-[#BE123C]", darkClass: "bg-[#BE123C]/20 text-[#FB7185]" },
+  opname:   { label: "Opname",      lightClass: "bg-[#FFE4E9] text-[#E11D48]", darkClass: "bg-[#E11D48]/15 text-[#E11D48]" },
+  sample:   { label: "Sample",      lightClass: "bg-[#FFD1DB] text-[#BE123C]", darkClass: "bg-[#FFB5C0]/15 text-[#FFB5C0]" },
+  cancel:   { label: "Batal",       lightClass: "bg-[#FCE4EC] text-[#BE123C]", darkClass: "bg-[#FB7185]/15 text-[#FB7185]" },
+  refund:   { label: "Refund",      lightClass: "bg-[#FCE4EC] text-[#BE123C]", darkClass: "bg-[#FB7185]/15 text-[#FB7185]" },
+  other:    { label: "Lainnya",     lightClass: "bg-[#F5E1E6] text-[#6E4E57]", darkClass: "bg-[#3D2230] text-[#9F7686]" },
+  default:  { label: "—",           lightClass: "bg-[#F5E1E6] text-[#6E4E57]", darkClass: "bg-[#3D2230] text-[#9F7686]" },
+};
+
 export function ProductDetailModal({ productId, onClose }: ProductDetailModalProps) {
   const th = useThemeClasses();
   const { t, lang } = useLangStore();
@@ -78,7 +94,7 @@ export function ProductDetailModal({ productId, onClose }: ProductDetailModalPro
   const now = Date.now();
 
   return (
-    <Modal open={!!productId} onClose={onClose} title={t.productDetail as string}>
+    <Modal open={!!productId} onClose={onClose} title={t.productDetail as string} size="lg">
       {/* Header */}
       <div className="flex flex-col items-center mb-5">
         <div className={`flex justify-center py-4 px-6 rounded-2xl mb-3 ${th.ring}`}>
@@ -283,21 +299,28 @@ export function ProductDetailModal({ productId, onClose }: ProductDetailModalPro
           <div className="space-y-2">
             {recentMovements.map(m => {
               const sup = m.supplierId ? suppliers.find(s => s.id === m.supplierId) : null;
+              const reasonInfo = REASON_BADGE[m.reason || ""] ?? REASON_BADGE.default;
               return (
-                <div key={m.id} className={`flex items-center justify-between py-1.5 border-b last:border-0 ${th.bdrSoft}`}>
-                  <div className="flex items-center gap-2 min-w-0">
-                    {m.type === "in"
-                      ? <ArrowDownCircle size={14} className="shrink-0 text-[#E11D48]" />
-                      : <ArrowUpCircle size={14} className="shrink-0 text-[#BE123C]" />
-                    }
-                    <div className="min-w-0">
+                <div key={m.id} className={`flex items-start gap-2 py-2 border-b last:border-0 ${th.bdrSoft}`}>
+                  {m.type === "in"
+                    ? <ArrowDownCircle size={14} className="shrink-0 mt-0.5 text-[#E11D48]" />
+                    : <ArrowUpCircle size={14} className="shrink-0 mt-0.5 text-[#BE123C]" />
+                  }
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5 flex-wrap">
                       <p className={`text-xs font-bold ${th.tx}`}>
-                        {m.type === "in" ? "+" : "-"}{m.quantity} · {$(m.unitPrice * m.quantity)}
+                        {m.type === "in" ? "+" : "-"}{m.quantity}
                       </p>
-                      <p className={`text-xs truncate ${th.txf}`}>
-                        {m.note}{sup ? ` · ${sup.name}` : ""} · {formatDate(m.createdAt)} {formatTime(m.createdAt)}
-                      </p>
+                      <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${th.dark ? reasonInfo.darkClass : reasonInfo.lightClass}`}>
+                        {reasonInfo.label}
+                      </span>
+                      {m.unitPrice > 0 && (
+                        <span className={`text-xs ${th.txm}`}>· {$(m.unitPrice * m.quantity)}</span>
+                      )}
                     </div>
+                    <p className={`text-xs truncate ${th.txf} mt-0.5`}>
+                      {m.note}{sup ? ` · ${sup.name}` : ""} · {formatDate(m.createdAt)} {formatTime(m.createdAt)}
+                    </p>
                   </div>
                 </div>
               );

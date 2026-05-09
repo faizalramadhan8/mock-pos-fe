@@ -9,9 +9,17 @@ interface ModalProps {
   onClose: () => void;
   title: string;
   children: React.ReactNode;
+  /** Lebar modal di breakpoint sm+. Default "md" untuk backwards-compat. */
+  size?: "md" | "lg" | "xl";
 }
 
-export function Modal({ open, onClose, title, children }: ModalProps) {
+const SIZE_CLASS: Record<NonNullable<ModalProps["size"]>, string> = {
+  md: "sm:max-w-md",   // 448px — modal compact (form input, confirm)
+  lg: "sm:max-w-2xl",  // 672px — detail dengan banyak konten (produk, pemasok)
+  xl: "sm:max-w-4xl",  // 896px — modal ekspansif (laporan, multi-kolom)
+};
+
+export function Modal({ open, onClose, title, children, size = "md" }: ModalProps) {
   const th = useThemeClasses();
   const modalRef = useRef<HTMLDivElement>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
@@ -55,7 +63,7 @@ export function Modal({ open, onClose, title, children }: ModalProps) {
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center animate-fade-in" onClick={onClose}>
       <div className="absolute inset-0 bg-black/45 backdrop-blur-sm" aria-hidden="true" />
       <div ref={modalRef} role="dialog" aria-modal="true" aria-labelledby="modal-title"
-        className={`relative w-full sm:max-w-md rounded-t-[28px] sm:rounded-[28px] max-h-[88vh] flex flex-col overflow-hidden border ${th.card} ${th.bdr} animate-slide-up`} onClick={e => e.stopPropagation()}>
+        className={`relative w-full ${SIZE_CLASS[size]} rounded-t-[28px] sm:rounded-[28px] max-h-[88vh] flex flex-col overflow-hidden border ${th.card} ${th.bdr} animate-slide-up`} onClick={e => e.stopPropagation()}>
         <div className={`flex items-center justify-between px-6 py-4 border-b ${th.bdr}`}>
           <h3 id="modal-title" className={`font-extrabold text-base tracking-tight ${th.tx}`}>{title}</h3>
           <button onClick={onClose} aria-label="Close" className={`p-1.5 rounded-lg ${th.elev} ${th.txm} hover:opacity-70`}>

@@ -137,6 +137,10 @@ export interface MemberStats {
   topProducts: { productId: string; name: string; quantity: number; spend: number }[];
 }
 
+/** Reason kategori untuk movement — kombinasi `type` (in/out) + `reason`
+ * kasih konteks penuh: "kenapa stok berubah". Empty string = legacy data. */
+export type MovementReason = "restock" | "sale" | "repack" | "lost" | "damaged" | "opname" | "sample" | "cancel" | "refund" | "other" | "";
+
 export interface StockMovement {
   id: string;
   productId: string;
@@ -144,6 +148,7 @@ export interface StockMovement {
   quantity: number;
   unitType: UnitType;
   unitPrice: number;
+  reason?: MovementReason;
   note: string;
   createdAt: string;
   createdBy: string;

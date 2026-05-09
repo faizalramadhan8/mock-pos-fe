@@ -15,6 +15,7 @@ import toast from "react-hot-toast";
 import {
   Package, Plus, ChevronDown, ArrowDownCircle, ArrowUpCircle, Barcode,
   LayoutGrid, AlertTriangle, Truck, Check, Receipt, Pencil, Download, Search, Printer, Trash2,
+  Sliders,
 } from "lucide-react";
 
 type InventoryTab = "overview" | "stockIn" | "stockOut" | "expiry" | "suppliers";
@@ -116,6 +117,19 @@ export function InventoryPage() {
   const [editSupplierId, setEditSupplierId] = useState<string | null>(null);
   const [supForm, setSupForm] = useState({ name: "", phone: "", email: "", address: "" });
 
+  // Stock Adjustment modal — Bu Santi: catat repack/hilang/rusak/opname.
+  type AdjustReason = "repack" | "lost" | "damaged" | "opname" | "sample" | "other";
+  const [adjustOpen, setAdjustOpen] = useState(false);
+  const [adjustProductId, setAdjustProductId] = useState<string | null>(null);
+  const [adjustForm, setAdjustForm] = useState<{ newStock: string; reason: AdjustReason; note: string }>({
+    newStock: "", reason: "opname", note: "",
+  });
+  const [adjustSubmitting, setAdjustSubmitting] = useState(false);
+  const adjustStockAction = useInventoryStore(s => s.adjustStock);
+
+  // Filter pemasok — dropdown di toolbar Inventory list. Empty = semua.
+  const [supplierFilter, setSupplierFilter] = useState<string>("");
+
   // Tab definitions
   const tabs: { id: InventoryTab; label: string; icon: React.ReactNode }[] = [
     { id: "overview", label: t.invOverview as string, icon: <LayoutGrid size={14} /> },
@@ -142,6 +156,9 @@ export function InventoryPage() {
       case "inactive": list = list.filter(p => !p.isActive); break;
       case "member": list = list.filter(p => typeof p.memberPrice === "number" && p.memberPrice > 0 && p.memberPrice < p.sellingPrice); break;
     }
+    if (supplierFilter) {
+      list = list.filter(p => p.supplierId === supplierFilter);
+    }
     if (debouncedProductSearch.trim()) {
       const q = debouncedProductSearch.toLowerCase();
       list = list.filter(p =>
@@ -149,10 +166,10 @@ export function InventoryPage() {
       );
     }
     return list;
-  }, [products, overviewFilter, debouncedProductSearch]);
+  }, [products, overviewFilter, supplierFilter, debouncedProductSearch]);
 
   // Reset page when filter or search changes
-  useEffect(() => { setInvPage(1); }, [overviewFilter, debouncedProductSearch]);
+  useEffect(() => { setInvPage(1); }, [overviewFilter, supplierFilter, debouncedProductSearch]);
 
   const totalInvPages = Math.max(1, Math.ceil(filteredProducts.length / INV_PAGE_SIZE));
   const paginatedProducts = useMemo(
@@ -238,6 +255,34 @@ export function InventoryPage() {
     setNewProd({ name: "", nameId: "", sku: "", category: defaultCatId, supplier: "", purchasePrice: "", sellingPrice: "", memberPrice: "", qtyPerBox: "12", stock: "0", unit: "kg", image: "", minStock: "10", expiryDate: "" });
     setProdFormErrors({});
     toast.success(t.productAdded as string);
+  };
+
+  const openAdjustStock = (productId: string) => {
+    const p = products.find(pr => pr.id === productId);
+    if (!p) return;
+    setAdjustProductId(productId);
+    setAdjustForm({ newStock: String(p.stock), reason: "opname", note: "" });
+    setAdjustOpen(true);
+  };
+
+  const doAdjustStock = async () => {
+    if (!adjustProductId) return;
+    const newStock = parseInt(adjustForm.newStock);
+    if (!Number.isFinite(newStock) || newStock < 0) {
+      toast.error("Stok baru harus angka >= 0");
+      return;
+    }
+    setAdjustSubmitting(true);
+    try {
+      await adjustStockAction(adjustProductId, newStock, adjustForm.reason, adjustForm.note);
+      toast.success("Stok berhasil disesuaikan");
+      setAdjustOpen(false);
+      setAdjustProductId(null);
+    } catch {
+      // toast.error already shown in store
+    } finally {
+      setAdjustSubmitting(false);
+    }
   };
 
   const openEditProduct = (productId: string) => {
@@ -546,12 +591,21 @@ export function InventoryPage() {
             );
           })()}
 
-          {/* Product search */}
-          <div className="relative">
-            <Search size={16} className={`absolute left-3.5 top-1/2 -translate-y-1/2 ${th.txf}`} />
-            <input value={productSearch} onChange={e => setProductSearch(e.target.value)}
-              placeholder={t.searchProducts as string}
-              className={`w-full pl-10 pr-4 py-3 text-sm rounded-2xl border focus:outline-none focus:ring-2 focus:ring-[#E11D48]/20 font-medium ${th.inp}`} />
+          {/* Product search + filter pemasok */}
+          <div className="flex flex-col sm:flex-row gap-2">
+            <div className="relative flex-1">
+              <Search size={16} className={`absolute left-3.5 top-1/2 -translate-y-1/2 ${th.txf}`} />
+              <input value={productSearch} onChange={e => setProductSearch(e.target.value)}
+                placeholder={t.searchProducts as string}
+                className={`w-full pl-10 pr-4 py-3 text-sm rounded-2xl border focus:outline-none focus:ring-2 focus:ring-[#E11D48]/20 font-medium ${th.inp}`} />
+            </div>
+            <select value={supplierFilter} onChange={e => setSupplierFilter(e.target.value)}
+              className={`px-4 py-3 text-sm font-bold rounded-2xl border appearance-none cursor-pointer ${th.inp}`}>
+              <option value="">{lang === "id" ? "Semua Pemasok" : "All Suppliers"}</option>
+              {suppliers.map(s => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
+            </select>
           </div>
 
           {/* Filter chips — compact, inline with count badges. Replaces the
@@ -698,6 +752,14 @@ export function InventoryPage() {
                   </div>
                   {canWrite && (
                     <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); openAdjustStock(product.id); }}
+                        aria-label="Sesuaikan stok"
+                        title="Sesuaikan stok (repack/hilang/opname)"
+                        className={`w-7 h-7 rounded-lg flex items-center justify-center ${th.dark ? "bg-[#FFB5C0]/15 text-[#FFB5C0]" : "bg-[#FFD1DB] text-[#BE123C]"}`}
+                      >
+                        <Sliders size={12} />
+                      </button>
                       <button
                         onClick={(e) => { e.stopPropagation(); openEditProduct(product.id); }}
                         aria-label="Edit product"
@@ -1455,9 +1517,23 @@ export function InventoryPage() {
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>{lang === "id" ? "Stok Saat Ini" : "Current Stock"}</p>
-              <input type="number" value={editProd.stock} onChange={e => setEditProd({ ...editProd, stock: e.target.value })}
-                className={inp} min="0" />
+              <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>
+                {lang === "id" ? "Stok Saat Ini" : "Current Stock"}
+                <span className={`ml-1 font-normal ${th.txf}`}>(read-only)</span>
+              </p>
+              <input type="number" value={editProd.stock} readOnly disabled
+                className={`${inp} opacity-60 cursor-not-allowed`} />
+              <button type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  if (editProdId) {
+                    setEditProdOpen(false);
+                    setTimeout(() => openAdjustStock(editProdId), 100);
+                  }
+                }}
+                className={`mt-1.5 inline-flex items-center gap-1 text-xs font-bold ${th.acc} hover:underline`}>
+                <Sliders size={11} /> Sesuaikan stok dengan alasan
+              </button>
             </div>
             <div>
               <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>{t.minStockLabel}</p>
@@ -1522,6 +1598,92 @@ export function InventoryPage() {
       </Modal>
       <ProductDetailModal productId={detailProductId} onClose={() => setDetailProductId(null)} />
       <SupplierDetailModal supplierId={detailSupplierId} onClose={() => setDetailSupplierId(null)} />
+
+      {/* Modal Penyesuaian Stok — Bu Santi: catat repack/hilang/rusak/opname.
+          Audit trail otomatis ke stock_movements via BE endpoint adjust-stock. */}
+      <Modal open={adjustOpen} onClose={() => setAdjustOpen(false)} title="Sesuaikan Stok">
+        {(() => {
+          const p = adjustProductId ? products.find(pr => pr.id === adjustProductId) : null;
+          if (!p) return null;
+          const newStockN = parseInt(adjustForm.newStock);
+          const diff = Number.isFinite(newStockN) ? newStockN - p.stock : 0;
+          const reasonOptions: { v: AdjustReason; label: string; hint: string }[] = [
+            { v: "repack", label: "Repack ke kemasan kecil", hint: "Stok kemasan besar dipecah jadi kemasan kecil" },
+            { v: "lost", label: "Hilang / dicuri", hint: "Barang fisik tidak ada lagi di rak" },
+            { v: "damaged", label: "Rusak / expired", hint: "Tidak bisa dijual lagi" },
+            { v: "opname", label: "Koreksi opname", hint: "Hasil hitung fisik beda dengan sistem" },
+            { v: "sample", label: "Sample / promo", hint: "Diberikan ke customer / event" },
+            { v: "other", label: "Lainnya", hint: "Isi catatan untuk detail" },
+          ];
+          return (
+            <div className="flex flex-col gap-3">
+              <div className={`rounded-xl border px-3 py-2.5 ${th.bdr} ${th.elev}`}>
+                <p className={`font-bold text-sm ${th.tx}`}>{p.nameId || p.name}</p>
+                <p className={`text-xs ${th.txm}`}>SKU {p.sku} · Stok saat ini: <b>{p.stock}</b> {p.unit}</p>
+              </div>
+
+              <div>
+                <label className={`text-xs font-bold ${th.tx} block mb-1.5`}>Stok Setelah</label>
+                <input type="number" min="0" value={adjustForm.newStock}
+                  onChange={e => setAdjustForm({ ...adjustForm, newStock: e.target.value })}
+                  className={`w-full px-3 py-3 text-sm font-bold rounded-2xl border ${th.inp}`} />
+                {Number.isFinite(newStockN) && diff !== 0 && (
+                  <p className={`text-xs mt-1 ${diff > 0 ? th.acc : "text-[#BE123C]"}`}>
+                    {diff > 0 ? `+${diff}` : diff} {p.unit} dari sekarang
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className={`text-xs font-bold ${th.tx} block mb-1.5`}>Alasan</label>
+                <div className="flex flex-col gap-1">
+                  {reasonOptions.map(opt => (
+                    <label key={opt.v}
+                      className={`flex items-start gap-2.5 cursor-pointer px-3 py-2.5 rounded-xl border ${
+                        adjustForm.reason === opt.v
+                          ? `${th.accBg} border-[#E11D48]/30`
+                          : `${th.bdr}`
+                      }`}>
+                      <input type="radio" name="adjust-reason"
+                        checked={adjustForm.reason === opt.v}
+                        onChange={() => setAdjustForm({ ...adjustForm, reason: opt.v })}
+                        className="mt-0.5 w-4 h-4 accent-[#E11D48]" />
+                      <div className="min-w-0">
+                        <p className={`text-sm font-bold ${th.tx}`}>{opt.label}</p>
+                        <p className={`text-xs ${th.txm}`}>{opt.hint}</p>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className={`text-xs font-bold ${th.tx} block mb-1.5`}>
+                  Catatan {adjustForm.reason === "other" && <span className="text-[#BE123C]">*</span>}
+                </label>
+                <textarea value={adjustForm.note} rows={2}
+                  onChange={e => setAdjustForm({ ...adjustForm, note: e.target.value })}
+                  placeholder={adjustForm.reason === "repack"
+                    ? "Misal: 1 dus jadi 8 pack 250gr"
+                    : adjustForm.reason === "lost" ? "Detail kapan/dimana hilang"
+                    : adjustForm.reason === "damaged" ? "Misal: kemasan rusak waktu bongkar"
+                    : "Catatan tambahan (opsional)"}
+                  className={`w-full px-3 py-2 text-sm rounded-xl border resize-none ${th.inp}`} />
+              </div>
+
+              <div className="flex gap-2 mt-1">
+                <button onClick={() => setAdjustOpen(false)}
+                  className={`flex-1 py-3 rounded-2xl text-sm font-bold border ${th.bdr} ${th.txm}`}>Batal</button>
+                <button onClick={doAdjustStock}
+                  disabled={adjustSubmitting || diff === 0 || !Number.isFinite(newStockN) || newStockN < 0 || (adjustForm.reason === "other" && !adjustForm.note.trim())}
+                  className="flex-1 py-3 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48] disabled:opacity-40">
+                  {adjustSubmitting ? "Menyimpan..." : "Simpan"}
+                </button>
+              </div>
+            </div>
+          );
+        })()}
+      </Modal>
 
       {/* Print Labels Modal — option to include expiry date */}
       {/* Confirm Delete Product */}
