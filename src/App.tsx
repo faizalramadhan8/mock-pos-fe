@@ -148,6 +148,7 @@ export default function App() {
             </div>
           </div>
           <div className="flex items-center gap-1.5">
+            <NotificationBell />
             {canSeeSettings && (
               <button
                 onClick={() => setPage("settings")}
@@ -160,7 +161,6 @@ export default function App() {
                 <Settings size={22} />
               </button>
             )}
-            <NotificationBell />
           </div>
         </div>
       </header>
