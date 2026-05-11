@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLangStore, useOrderStore, useProductStore } from "@/stores";
 import { useThemeClasses } from "@/hooks/useThemeClasses";
 import { usePageFetch } from "@/hooks/usePageFetch";
@@ -6,11 +6,20 @@ import { useCountUp } from "@/hooks/useCountUp";
 import { formatCurrency as $, printReport } from "@/utils";
 import { exportOrders, exportOrderReport } from "@/utils/export";
 import { getDateRange, type DateRange, type CustomRange } from "@/utils/dateRange";
+import { orderApi, type OrderAggregateResponse } from "@/api/orders";
 import { BakeryLogo } from "@/components/icons";
 import { Package, Users, ChevronDown, ChevronUp, TrendingUp, TrendingDown, Minus, Download, Printer } from "lucide-react";
 import toast from "react-hot-toast";
 
 type ReportTab = "products" | "members";
+
+// YYYY-MM-DD in local time (WIB) — BE aggregate expects calendar-date strings.
+function toYMD(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
 
 // In-app report page — Bu Santi: "saya tidak mau ke excel, lihat di dalam
 // sistem saja". Dua tab: Top Produk (urut qty terjual) & Member (urut total
@@ -59,6 +68,9 @@ export function ReportsPage() {
   };
 
   // Filter completed orders saja (cancelled/refunded di-skip).
+  // Dipakai untuk export CSV/Excel/Print + expand item per member.
+  // Untuk ranking + stats besar pakai aggregateData dari BE supaya scalable
+  // (FE-side topProducts/memberStats di-fallback kalau aggregate belum sampai).
   const filteredOrders = useMemo(() => {
     const range = getDateRange(dateRange, customRange);
     const completed = orders.filter(o => o.status === "completed");
@@ -69,10 +81,42 @@ export function ReportsPage() {
     });
   }, [orders, dateRange, customRange]);
 
-  // Aggregate top produk. avgPrice = harga jual rata-rata di periode (snapshot
-  // dari order_items). currentPrice = harga produk saat ini (master data) —
-  // dibandingkan supaya Bu Santi tahu kalau harga sudah berubah sejak periode.
+  // BE-side aggregate. Dipanggil setiap dateRange/customRange berubah.
+  // Cegah FE compute dari full orders array (yang bisa kena hardcoded fetch
+  // limit). Kalau gagal, FE tetap render dari `filteredOrders` di bawah.
+  const [aggregateData, setAggregateData] = useState<OrderAggregateResponse | null>(null);
+  useEffect(() => {
+    if (customError) return;
+    const range = getDateRange(dateRange, customRange);
+    const from = range ? toYMD(range.start) : "";
+    const to = range ? toYMD(range.end) : "";
+    let cancelled = false;
+    orderApi.aggregate({ from, to })
+      .then(res => { if (!cancelled) setAggregateData(res.body ?? null); })
+      .catch(err => { if (!cancelled) { console.error("aggregate failed", err); setAggregateData(null); } });
+    return () => { cancelled = true; };
+  }, [dateRange, customRange, customError]);
+
+  // Aggregate top produk. Prefer BE-side aggregate (scalable). Fallback ke
+  // client-side dari `filteredOrders` kalau BE belum sampai / gagal.
+  // avgPrice = harga jual rata-rata di periode (snapshot dari order_items).
+  // currentPrice = harga produk saat ini (master data) — dibandingkan supaya
+  // Bu Santi tahu kalau harga sudah berubah sejak periode.
   const topProducts = useMemo(() => {
+    if (aggregateData?.top_products) {
+      return aggregateData.top_products.map(p => {
+        const current = products.find(prod => prod.id === p.product_id);
+        return {
+          productId: p.product_id,
+          name: p.name,
+          qty: p.qty,
+          revenue: p.revenue,
+          avgPrice: p.avg_price,
+          currentPrice: current?.sellingPrice,
+          productExists: !!current,
+        };
+      });
+    }
     type Row = { productId: string; name: string; qty: number; revenue: number; avgPrice: number };
     const map = new Map<string, Row>();
     for (const o of filteredOrders) {
@@ -99,7 +143,7 @@ export function ReportsPage() {
         };
       })
       .sort((a, b) => b.qty - a.qty);
-  }, [filteredOrders, products]);
+  }, [aggregateData, filteredOrders, products]);
 
   // Aggregate per member
   type MemberRow = {
@@ -111,7 +155,41 @@ export function ReportsPage() {
     savings: number;
     items: { name: string; qty: number; total: number }[];
   };
-  const memberStats = useMemo(() => {
+  // Member stats: BE-side aggregate kasih ringkasan per member (orders, spend,
+  // savings). Item-level detail (untuk expand row) di-merge dari
+  // `filteredOrders` — yang client-side, tapi sudah cukup karena orders array
+  // di store di-limit ke 2000 (cukup untuk volume Bu Santi sekarang).
+  const memberStats = useMemo<MemberRow[]>(() => {
+    // Build items map per member dari client-side orders (untuk expand panel).
+    const itemsByMember = new Map<string, { name: string; qty: number; total: number }[]>();
+    for (const o of filteredOrders) {
+      if (!o.member?.id) continue;
+      const list = itemsByMember.get(o.member.id) || [];
+      for (const i of o.items) {
+        const idx = list.findIndex(x => x.name === i.name);
+        if (idx >= 0) {
+          list[idx].qty += i.quantity;
+          list[idx].total += i.unitPrice * i.quantity;
+        } else {
+          list.push({ name: i.name, qty: i.quantity, total: i.unitPrice * i.quantity });
+        }
+      }
+      itemsByMember.set(o.member.id, list);
+    }
+
+    if (aggregateData?.members) {
+      return aggregateData.members.map(m => ({
+        id: m.member_id,
+        name: m.name,
+        phone: m.phone || "-",
+        orders: m.orders,
+        spend: m.spend,
+        savings: m.savings,
+        items: (itemsByMember.get(m.member_id) || []).sort((a, b) => b.qty - a.qty),
+      }));
+    }
+
+    // Fallback: client-side aggregation.
     const map = new Map<string, MemberRow>();
     for (const o of filteredOrders) {
       if (!o.member?.id) continue;
@@ -121,15 +199,6 @@ export function ReportsPage() {
         existing.orders += 1;
         existing.spend += o.total;
         existing.savings += savings;
-        for (const i of o.items) {
-          const idx = existing.items.findIndex(x => x.name === i.name);
-          if (idx >= 0) {
-            existing.items[idx].qty += i.quantity;
-            existing.items[idx].total += i.unitPrice * i.quantity;
-          } else {
-            existing.items.push({ name: i.name, qty: i.quantity, total: i.unitPrice * i.quantity });
-          }
-        }
       } else {
         map.set(o.member.id, {
           id: o.member.id,
@@ -138,17 +207,21 @@ export function ReportsPage() {
           orders: 1,
           spend: o.total,
           savings,
-          items: o.items.map(i => ({ name: i.name, qty: i.quantity, total: i.unitPrice * i.quantity })),
+          items: [],
         });
       }
     }
     return Array.from(map.values())
-      .map(m => ({ ...m, items: m.items.sort((a, b) => b.qty - a.qty) }))
+      .map(m => ({ ...m, items: (itemsByMember.get(m.id) || []).sort((a, b) => b.qty - a.qty) }))
       .sort((a, b) => b.spend - a.spend);
-  }, [filteredOrders]);
+  }, [aggregateData, filteredOrders]);
 
-  const totalQty = topProducts.reduce((s, p) => s + p.qty, 0);
-  const totalRevenue = topProducts.reduce((s, p) => s + p.revenue, 0);
+  const totalQty = aggregateData?.total_qty ?? topProducts.reduce((s, p) => s + p.qty, 0);
+  const totalRevenue = aggregateData?.total_revenue ?? topProducts.reduce((s, p) => s + p.revenue, 0);
+
+  // Empty-state: prefer aggregate count kalau ada (truthful source of truth),
+  // else fallback ke filteredOrders.length.
+  const hasData = aggregateData ? aggregateData.total_orders > 0 : filteredOrders.length > 0;
 
   // Filename label untuk export — pakai range custom kalau dipilih, else label periode.
   const exportRangeLabel = () => {
@@ -166,7 +239,7 @@ export function ReportsPage() {
         </h1>
         <div className="flex gap-1.5 shrink-0">
           <button
-            disabled={!!customError || filteredOrders.length === 0}
+            disabled={!!customError || !hasData}
             onClick={async () => {
               if (customError) { toast.error(customError); return; }
               await exportOrders(filteredOrders, "csv");
@@ -176,7 +249,7 @@ export function ReportsPage() {
             <Download size={11} /> CSV
           </button>
           <button
-            disabled={!!customError || filteredOrders.length === 0}
+            disabled={!!customError || !hasData}
             onClick={async () => {
               if (customError) { toast.error(customError); return; }
               await exportOrderReport(filteredOrders, exportRangeLabel());
@@ -187,7 +260,7 @@ export function ReportsPage() {
             <Download size={11} /> Excel
           </button>
           <button
-            disabled={!!customError || filteredOrders.length === 0}
+            disabled={!!customError || !hasData}
             onClick={() => printReport(filteredOrders, exportRangeLabel())}
             className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold ${th.accBg} ${th.acc} disabled:opacity-40`}>
             <Printer size={12} /> {lang === "id" ? "Cetak" : "Print"}
@@ -250,7 +323,7 @@ export function ReportsPage() {
 
       {/* Empty state — pakai BakeryLogo besar supaya warm (toko kue), bukan
           generic icon. */}
-      {filteredOrders.length === 0 && !customError && (
+      {!hasData && !customError && (
         <div className={`rounded-3xl border bg-bakery-stripe p-10 text-center ${th.bdr} ${th.card2}`}>
           <div className="mx-auto mb-4 opacity-70" style={{ width: 80 }}>
             <BakeryLogo size={80} />
@@ -265,7 +338,7 @@ export function ReportsPage() {
       )}
 
       {/* Top Produk */}
-      {tab === "products" && filteredOrders.length > 0 && !customError && (
+      {tab === "products" && hasData && !customError && (
         <div className="flex flex-col gap-3">
           {/* Hero+2-up summary: revenue dominan (rounded-3xl + bakery stripe),
               qty + product count smaller di bawah. Break the 3-up monotony. */}
@@ -346,7 +419,7 @@ export function ReportsPage() {
       )}
 
       {/* Member */}
-      {tab === "members" && filteredOrders.length > 0 && !customError && (
+      {tab === "members" && hasData && !customError && (
         <div className="flex flex-col gap-3">
           {memberStats.length === 0 ? (
             <div className={`rounded-3xl border bg-bakery-stripe p-10 text-center ${th.bdr} ${th.card2}`}>

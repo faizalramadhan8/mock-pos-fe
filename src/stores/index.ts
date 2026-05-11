@@ -473,7 +473,10 @@ export const useOrderStore = create<OrderState>((set, get) => ({
   orders: [],
   fetchOrders: async () => {
     try {
-      const res = await orderApi.getAll({ limit: 200 });
+      // Limit tinggi supaya Reports + Dashboard agregat dari data lengkap
+      // (Bu Santi volume ~50/hari × 30hari = 1500/bulan). Kalau volume
+      // makin besar, perlu BE aggregation endpoint (tidak fetch full).
+      const res = await orderApi.getAll({ limit: 2000 });
       set({ orders: (res.body || []).map(mapOrder) });
     } catch { /* ignore */ }
   },
@@ -613,7 +616,10 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
   movements: [],
   fetchMovements: async () => {
     try {
-      const res = await movementApi.getAll({ limit: 500 });
+      // Limit naik karena setiap sale insert 1 movement 'out' per item.
+      // 439 orders × ~3 items = 1.3k+ movements. Limit lama 500 → miss
+      // banyak data di tab "Barang Keluar" + Recent Movements per produk.
+      const res = await movementApi.getAll({ limit: 5000 });
       set({ movements: (res.body || []).map(mapMovement) });
     } catch { /* ignore */ }
   },

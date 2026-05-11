@@ -43,6 +43,51 @@ export interface OrderRes {
   created_at: string;
 }
 
+export interface AggregateTopProduct {
+  product_id: string;
+  name: string;
+  qty: number;
+  revenue: number;
+  avg_price: number;
+}
+
+export interface AggregateMember {
+  member_id: string;
+  name: string;
+  phone?: string;
+  orders: number;
+  spend: number;
+  savings: number;
+  last_visit?: string;
+}
+
+export interface AggregatePaymentBreakdown {
+  method: string;
+  count: number;
+  total: number;
+}
+
+export interface AggregateCashier {
+  cashier_id: string;
+  name: string;
+  orders: number;
+  revenue: number;
+  payment_breakdown: AggregatePaymentBreakdown[];
+}
+
+export interface OrderAggregateResponse {
+  from: string;
+  to: string;
+  total_orders: number;
+  total_revenue: number;
+  total_qty: number;
+  total_member_saving: number;
+  top_products: AggregateTopProduct[];
+  members: AggregateMember[];
+  payment_breakdown: AggregatePaymentBreakdown[];
+  per_cashier: AggregateCashier[];
+}
+
 export interface RefundItemReq {
   product_id: string;
   name: string;
@@ -75,6 +120,14 @@ export const orderApi = {
   getById: (id: string) => api.get<OrderRes>(`/orders/${id}`),
 
   getStats: () => api.get<{ revenue: number; order_count: number }>('/orders/stats'),
+
+  aggregate: (params?: { from?: string; to?: string }) => {
+    const q = new URLSearchParams();
+    if (params?.from) q.set('from', params.from);
+    if (params?.to) q.set('to', params.to);
+    const qs = q.toString();
+    return api.get<OrderAggregateResponse>(`/orders/aggregate${qs ? '?' + qs : ''}`);
+  },
 
   create: (data: {
     items: {
