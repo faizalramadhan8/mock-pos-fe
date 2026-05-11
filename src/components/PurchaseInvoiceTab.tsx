@@ -77,7 +77,7 @@ export function PurchaseInvoiceTab() {
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div>
           <h2 className={`font-black text-lg ${th.tx}`}>
-            {lang === "id" ? "Faktur Pembelian" : "Purchase Invoices"}
+            {lang === "id" ? "Catat Faktur Barang Masuk" : "Stock-In Invoices"}
           </h2>
           <p className={`text-xs ${th.txm}`}>
             {stats.unpaidCount > 0 ? (
@@ -403,12 +403,12 @@ function CreateModal({ open, onClose, onSubmit }: CreateModalProps) {
   };
 
   return (
-    <Modal open={open} onClose={onClose} title="Buat Faktur Pembelian" size="xl">
+    <Modal open={open} onClose={onClose} title="Catat Faktur Barang Masuk" size="xl">
       <div className="flex flex-col gap-3">
         {/* Supplier + invoice number */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <label className={`text-xs font-bold ${th.tx} block mb-1`}>Pemasok *</label>
+            <label className={`text-xs font-bold ${th.tx} block mb-1`}>Pemasok <span className="text-[#BE123C]">*</span></label>
             <SearchableSelect
               value={supplierId}
               onChange={setSupplierId}
@@ -420,21 +420,21 @@ function CreateModal({ open, onClose, onSubmit }: CreateModalProps) {
             <label className={`text-xs font-bold ${th.tx} block mb-1`}>No. Faktur Supplier</label>
             <input value={invoiceNumber} onChange={e => setInvoiceNumber(e.target.value)}
               placeholder="opsional (e.g. MRA-2026-105001)"
-              className={`w-full px-3 py-2.5 text-sm rounded-xl border ${th.inp}`} />
+              className={`w-full px-3 py-3 text-sm rounded-xl border ${th.inp}`} />
           </div>
         </div>
 
         {/* Dates + payment terms */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div>
-            <label className={`text-xs font-bold ${th.tx} block mb-1`}>Tanggal Faktur</label>
+            <label className={`text-xs font-bold ${th.tx} block mb-1`}>Tanggal Faktur <span className="text-[#BE123C]">*</span></label>
             <input type="date" value={invoiceDate} onChange={e => setInvoiceDate(e.target.value)}
-              className={`w-full px-3 py-2.5 text-sm rounded-xl border ${th.inp}`} />
+              className={`w-full px-3 py-3 text-sm font-bold rounded-xl border ${th.inp}`} />
           </div>
           <div>
-            <label className={`text-xs font-bold ${th.tx} block mb-1`}>Tempo Bayar</label>
+            <label className={`text-xs font-bold ${th.tx} block mb-1`}>Tempo Bayar <span className="text-[#BE123C]">*</span></label>
             <select value={paymentTerms} onChange={e => setPaymentTerms(e.target.value as PaymentTerms)}
-              className={`w-full px-3 py-2.5 text-sm font-bold rounded-xl border ${th.inp}`}>
+              className={`w-full px-3 py-3 text-sm font-bold rounded-xl border ${th.inp}`}>
               {PAYMENT_TERMS_OPTIONS.map(t => (
                 <option key={t} value={t}>{PAYMENT_TERMS_LABELS[t]}</option>
               ))}
@@ -443,17 +443,17 @@ function CreateModal({ open, onClose, onSubmit }: CreateModalProps) {
           <div>
             <label className={`text-xs font-bold ${th.tx} block mb-1`}>Jatuh Tempo</label>
             <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)}
-              className={`w-full px-3 py-2.5 text-sm rounded-xl border ${th.inp}`} />
+              className={`w-full px-3 py-3 text-sm font-bold rounded-xl border ${th.inp}`} />
           </div>
         </div>
 
         {/* Line items */}
         <div className={`rounded-2xl border overflow-hidden ${th.bdr} ${th.card2}`}>
-          <div className={`px-4 py-2.5 border-b ${th.bdr} flex items-center justify-between`}>
+          <div className={`px-4 py-3 border-b ${th.bdr} flex items-center justify-between gap-2`}>
             <p className={`text-xs font-bold uppercase tracking-wider ${th.txf}`}>Item ({items.length})</p>
             <button type="button" onClick={addItem}
-              className={`text-xs font-bold inline-flex items-center gap-1 px-2 py-1 rounded-lg ${th.accBg} ${th.acc}`}>
-              <Plus size={11} /> Tambah Item
+              className={`text-sm font-bold inline-flex items-center gap-1.5 px-3 min-h-[36px] rounded-xl ${th.accBg} ${th.acc}`}>
+              <Plus size={14} /> Tambah Item
             </button>
           </div>
           <div className="max-h-96 overflow-y-auto">
@@ -466,7 +466,7 @@ function CreateModal({ open, onClose, onSubmit }: CreateModalProps) {
               return (
                 <div key={idx} className={`px-4 py-3 border-b last:border-0 ${th.bdrSoft}`}>
                   <div className="flex items-start gap-2 mb-2">
-                    <span className={`text-xs font-bold ${th.txm} mt-2`}>{idx + 1}.</span>
+                    <span className={`text-sm font-bold ${th.txm} mt-2.5`}>{idx + 1}.</span>
                     <div className="flex-1">
                       <SearchableSelect
                         value={it.productId}
@@ -480,46 +480,49 @@ function CreateModal({ open, onClose, onSubmit }: CreateModalProps) {
                     </div>
                     {items.length > 1 && (
                       <button type="button" onClick={() => removeItem(idx)}
-                        className={`p-2 rounded-lg ${th.dark ? "text-[#FB7185] hover:bg-[#BE123C]/15" : "text-[#BE123C] hover:bg-[#FCE4EC]"}`}
-                        aria-label="Hapus item">
-                        <Trash2 size={13} />
+                        className={`shrink-0 min-w-[40px] min-h-[40px] flex items-center justify-center rounded-xl ${th.dark ? "text-[#FB7185] hover:bg-[#BE123C]/15" : "text-[#BE123C] hover:bg-[#FCE4EC]"}`}
+                        aria-label={`Hapus item ${idx + 1}`}
+                        title="Hapus item">
+                        <Trash2 size={16} />
                       </button>
                     )}
                   </div>
                   <div className="grid grid-cols-3 gap-2 ml-6">
                     <div>
-                      <label className={`text-xs ${th.txf} block mb-0.5`}>Qty</label>
+                      <label className={`text-xs font-bold ${th.txm} block mb-1`}>Qty <span className="text-[#BE123C]">*</span></label>
                       <input type="number" min="1" value={it.qty}
+                        inputMode="numeric"
                         onChange={e => updateItem(idx, { qty: e.target.value })}
-                        className={`w-full px-2 py-1.5 text-sm rounded-lg border ${th.inp}`} />
+                        className={`w-full px-2.5 py-2.5 text-sm font-bold rounded-xl border ${th.inp}`} />
                     </div>
                     <div>
-                      <label className={`text-xs ${th.txf} block mb-0.5`}>Unit</label>
+                      <label className={`text-xs font-bold ${th.txm} block mb-1`}>Unit</label>
                       <select value={it.unit}
                         onChange={e => updateItem(idx, { unit: e.target.value as "box" | "individual" })}
-                        className={`w-full px-2 py-1.5 text-sm rounded-lg border ${th.inp}`}>
+                        className={`w-full px-2.5 py-2.5 text-sm font-bold rounded-xl border ${th.inp}`}>
                         <option value="individual">Satuan</option>
                         <option value="box">Dus</option>
                       </select>
                     </div>
                     <div>
-                      <label className={`text-xs ${th.txf} block mb-0.5`}>Harga /Satuan</label>
+                      <label className={`text-xs font-bold ${th.txm} block mb-1`}>Harga /Satuan <span className="text-[#BE123C]">*</span></label>
                       <input type="number" min="0" step="any" value={it.unitPrice}
+                        inputMode="decimal"
                         onChange={e => updateItem(idx, { unitPrice: e.target.value })}
                         placeholder={product ? String(product.purchasePrice) : "0"}
-                        className={`w-full px-2 py-1.5 text-sm rounded-lg border ${th.inp}`} />
+                        className={`w-full px-2.5 py-2.5 text-sm font-bold rounded-xl border ${th.inp}`} />
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-2 ml-6 mt-2">
                     <div>
-                      <label className={`text-xs ${th.txf} block mb-0.5`}>ED (opsional)</label>
+                      <label className={`text-xs font-bold ${th.txm} block mb-1`}>ED (opsional)</label>
                       <input type="date" value={it.expiryDate}
                         onChange={e => updateItem(idx, { expiryDate: e.target.value })}
-                        className={`w-full px-2 py-1.5 text-sm rounded-lg border ${th.inp}`} />
+                        className={`w-full px-2.5 py-2.5 text-sm rounded-xl border ${th.inp}`} />
                     </div>
-                    <div className="text-right pt-3">
+                    <div className="text-right pt-4">
                       <p className={`text-xs ${th.txf}`}>Subtotal item</p>
-                      <p className={`font-display text-sm font-bold ${th.tx}`}>{$(lineTotal)}</p>
+                      <p className={`font-display text-base font-bold ${th.tx}`}>{$(lineTotal)}</p>
                     </div>
                   </div>
                 </div>
@@ -530,10 +533,10 @@ function CreateModal({ open, onClose, onSubmit }: CreateModalProps) {
 
         {/* PPN + Total */}
         <div className={`rounded-2xl border p-4 ${th.bdr} ${th.card2}`}>
-          <label className={`flex items-center gap-2 cursor-pointer mb-3`}>
+          <label className={`flex items-center gap-2 cursor-pointer mb-3 min-h-[36px]`}>
             <input type="checkbox" checked={ppnEnabled}
               onChange={e => setPpnEnabled(e.target.checked)}
-              className="w-4 h-4 accent-[#E11D48]" />
+              className="w-5 h-5 accent-[#E11D48]" />
             <span className={`text-sm font-bold ${th.tx}`}>Faktur ini ada PPN</span>
             <span className={`text-xs ${th.txm}`}>(default 11%)</span>
           </label>
@@ -541,9 +544,10 @@ function CreateModal({ open, onClose, onSubmit }: CreateModalProps) {
             <div className="mb-3">
               <label className={`text-xs font-bold ${th.txm} block mb-1`}>PPN (kosongkan untuk auto 11%)</label>
               <input type="number" min="0" step="any" value={ppnOverride}
+                inputMode="decimal"
                 onChange={e => setPpnOverride(e.target.value)}
                 placeholder={Math.round(subtotal * PPN_RATE).toString()}
-                className={`w-full px-3 py-2 text-sm rounded-xl border ${th.inp}`} />
+                className={`w-full px-3 py-2.5 text-sm rounded-xl border ${th.inp}`} />
             </div>
           )}
           <div className="space-y-1.5 text-sm">

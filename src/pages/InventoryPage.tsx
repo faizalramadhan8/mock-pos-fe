@@ -137,7 +137,7 @@ export function InventoryPage() {
     { id: "stockIn", label: t.invStockIn as string, icon: <ArrowDownCircle size={14} /> },
     { id: "stockOut", label: t.invStockOut as string, icon: <ArrowUpCircle size={14} /> },
     { id: "expiry", label: t.invExpiry as string, icon: <AlertTriangle size={14} /> },
-    { id: "invoices", label: lang === "id" ? "Faktur Pembelian" : "Purchase Invoices", icon: <Receipt size={14} /> },
+    { id: "invoices", label: lang === "id" ? "Catat Faktur Barang Masuk" : "Stock-In Invoices", icon: <Receipt size={14} /> },
     { id: "suppliers", label: t.invSuppliers as string, icon: <Truck size={14} /> },
   ];
 
@@ -837,7 +837,7 @@ export function InventoryPage() {
           {canWrite && (
             <button onClick={() => { setStockModal("in"); setForm({ prod: "", qty: "", unit: "individual", price: "", note: "", expiryDate: "", supplierId: "", paymentTerms: "COD", paymentStatus: "unpaid" }); }}
               className="w-full py-3.5 rounded-2xl text-sm font-black text-white bg-gradient-to-br from-[#FB7185] to-[#E11D48] shadow-[0_4px_14px_-4px_rgba(225,29,72,0.45)] flex items-center justify-center gap-2">
-              <ArrowDownCircle size={16} strokeWidth={3} /> Catat Faktur Barang Masuk
+              <ArrowDownCircle size={16} strokeWidth={3} /> Barang Masuk
             </button>
           )}
           {/* Summary ringkas: total barang masuk + total faktur belum lunas */}
