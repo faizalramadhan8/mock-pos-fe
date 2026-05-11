@@ -81,9 +81,9 @@ export function printReceipt(order: Order, opts?: { cashierName?: string }) {
   const cashier = opts?.cashierName || "-";
   const customerName = order.member ? order.member.name : (order.customer || "");
 
-  // Format Bu Santi: thermal 58mm, font tipis (regular weight, no bold global).
+  // Format owner: thermal 58mm, font tipis (regular weight, no bold global).
   // Header centered, body left/right kolom, footer centered. NO Diskon /
-  // Biaya Tambahan / Biaya CC / Pembulatan baris (Bu Santi: tidak perlu).
+  // Biaya Tambahan / Biaya CC / Pembulatan baris (owner: tidak perlu).
   const PAPER_W = "58mm";
   const BODY_W = "54mm"; // 2mm margin sisi
 

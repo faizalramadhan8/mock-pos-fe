@@ -1,4 +1,5 @@
 import type { Order, Product, StockMovement } from "@/types";
+import type { ProfitLossRes } from "@/api/expenses";
 import { formatCurrency } from "./index";
 
 type ExportFormat = "csv" | "xlsx";
@@ -45,10 +46,12 @@ export async function exportOrders(orders: Order[], format: ExportFormat) {
   await sheetToFile(data, "Orders", `orders-${new Date().toISOString().slice(0, 10)}`, format);
 }
 
-// Multi-sheet Excel report: Transaksi + Top Produk + Member.
+// Multi-sheet Excel report: Laba Rugi + Transaksi + Top Produk + Member.
 // Hanya order completed yang masuk (cancelled/refunded di-skip dari agregat
 // supaya angka revenue/qty bersih). dateLabel masuk ke filename.
-export async function exportOrderReport(orders: Order[], dateLabel: string) {
+// profitLoss optional — kalau tersedia (dari /expenses/profit-loss), sheet
+// "Laba Rugi" ditambah di urutan pertama supaya owner lihat ringkasan dulu.
+export async function exportOrderReport(orders: Order[], dateLabel: string, profitLoss?: ProfitLossRes | null) {
   const completed = orders.filter(o => o.status === "completed");
 
   // Sheet 1 — Transaksi (sama dengan exportOrders tapi semua status)
@@ -129,6 +132,47 @@ export async function exportOrderReport(orders: Order[], dateLabel: string) {
 
   const XLSX = await import("xlsx");
   const wb = XLSX.utils.book_new();
+
+  // Sheet 0 — Laba Rugi (kalau tersedia). Pakai aoa_to_sheet supaya bisa
+  // multi-section + judul section, bukan tabel datar.
+  if (profitLoss) {
+    const pl = profitLoss;
+    const period = pl.from && pl.to ? `${pl.from} sampai ${pl.to}` : (dateLabel || "Semua periode");
+    const rows: (string | number)[][] = [
+      ["LAPORAN LABA RUGI"],
+      ["Periode", period],
+      ["Jumlah Transaksi", pl.total_orders],
+      [],
+      ["RINCIAN LABA RUGI"],
+      ["Pendapatan (Omzet)", pl.revenue],
+      ["Modal Barang Terjual", -pl.cogs],
+      ["Laba Kotor", pl.gross_profit],
+      ["Pengeluaran Operasional", -pl.expense_total],
+    ];
+    // Rincian per kategori pengeluaran
+    for (const b of pl.expense_breakdown) {
+      rows.push([`  - ${b.category_name}`, -b.total]);
+    }
+    rows.push(
+      ["Untung Bersih", pl.net_profit],
+      [],
+      ["ARUS KAS PERIODE INI"],
+      ["(Beda dari Laba Rugi — ini uang real masuk-keluar)"],
+      ["Uang Masuk (Penjualan)", pl.revenue],
+      ["Bayar Supplier (Faktur lunas)", -pl.supplier_paid],
+      ["Pengeluaran Operasional", -pl.expense_total],
+      ["Total Uang Keluar", -(pl.supplier_paid + pl.expense_total)],
+      ["Selisih Kas", pl.cash_diff],
+    );
+    if (pl.supplier_unpaid > 0) {
+      rows.push([], ["Faktur Tempo Belum Lunas (info)", pl.supplier_unpaid]);
+    }
+    const wsPL = XLSX.utils.aoa_to_sheet(rows);
+    // Kasih lebar kolom yang readable
+    wsPL["!cols"] = [{ wch: 36 }, { wch: 18 }];
+    XLSX.utils.book_append_sheet(wb, wsPL, "Laba Rugi");
+  }
+
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(transaksi), "Transaksi");
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(topProduk), "Top Produk");
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(member), "Member");

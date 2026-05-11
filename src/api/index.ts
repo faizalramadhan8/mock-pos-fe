@@ -10,6 +10,8 @@ export { movementApi, batchApi } from './inventory';
 export type { MovementRes, BatchRes } from './inventory';
 export { purchaseInvoiceApi } from './purchase_invoice';
 export type { PurchaseInvoiceRes, PurchaseInvoiceItemRes, CreatePurchaseInvoiceBody, PaymentTermsValue, PaymentStatusValue } from './purchase_invoice';
+export { expenseApi } from './expenses';
+export type { ExpenseRes, ExpenseCategoryRes, CreateExpenseBody, ProfitLossRes, ExpenseCategoryBreakdownRes } from './expenses';
 export { memberApi, cashSessionApi, auditApi, settingsApi, dashboardApi } from './support';
 export type { MemberRes, CashSessionRes, AuditRes, SettingsRes, DashboardRes } from './support';
 export { uploadApi } from './upload';

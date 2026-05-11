@@ -118,7 +118,7 @@ export function InventoryPage() {
   const [editSupplierId, setEditSupplierId] = useState<string | null>(null);
   const [supForm, setSupForm] = useState({ name: "", phone: "", email: "", address: "" });
 
-  // Stock Adjustment modal — Bu Santi: catat repack/hilang/rusak/opname.
+  // Stock Adjustment modal — owner: catat repack/hilang/rusak/opname.
   type AdjustReason = "repack" | "lost" | "damaged" | "opname" | "sample" | "other";
   const [adjustOpen, setAdjustOpen] = useState(false);
   const [adjustProductId, setAdjustProductId] = useState<string | null>(null);
@@ -1604,7 +1604,7 @@ export function InventoryPage() {
       <ProductDetailModal productId={detailProductId} onClose={() => setDetailProductId(null)} />
       <SupplierDetailModal supplierId={detailSupplierId} onClose={() => setDetailSupplierId(null)} />
 
-      {/* Modal Penyesuaian Stok — Bu Santi: catat repack/hilang/rusak/opname.
+      {/* Modal Penyesuaian Stok — owner: catat repack/hilang/rusak/opname.
           Audit trail otomatis ke stock_movements via BE endpoint adjust-stock. */}
       <Modal open={adjustOpen} onClose={() => setAdjustOpen(false)} title="Sesuaikan Stok">
         {(() => {

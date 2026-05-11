@@ -31,7 +31,7 @@ const emptyDraftItem = (): DraftItem => ({
 });
 
 /** Tab Faktur Pembelian (Faktur dari supplier dengan multi-line items).
- *  Bu Santi: 1 surat jalan = banyak produk dari 1 supplier dengan PPN
+ *  owner: 1 surat jalan = banyak produk dari 1 supplier dengan PPN
  *  terpisah + tempo bayar. WA reminder H-0 dikirim oleh BE cron. */
 export function PurchaseInvoiceTab() {
   const th = useThemeClasses();
@@ -55,7 +55,7 @@ export function PurchaseInvoiceTab() {
     fetchInvoices({ status: statusFilter, supplierId: supplierFilter });
   }, [statusFilter, supplierFilter, fetchInvoices]);
 
-  // Stats — count + total unpaid (untuk awareness Bu Santi)
+  // Stats — count + total unpaid (untuk awareness owner)
   const stats = useMemo(() => {
     const unpaid = invoices.filter(i => i.paymentStatus === "unpaid");
     const today = new Date();
@@ -326,7 +326,7 @@ function CreateModal({ open, onClose, onSubmit }: CreateModalProps) {
   const [invoiceDate, setInvoiceDate] = useState(today);
   const [paymentTerms, setPaymentTerms] = useState<PaymentTerms>("COD");
   const [dueDate, setDueDate] = useState(today);
-  const [ppnEnabled, setPpnEnabled] = useState(false); // toggle PPN — Bu Santi: kalau supplier UMKM no-PPN, off
+  const [ppnEnabled, setPpnEnabled] = useState(false); // toggle PPN — owner: kalau supplier UMKM no-PPN, off
   const [ppnOverride, setPpnOverride] = useState(""); // empty = auto 11% × subtotal
   const [note, setNote] = useState("");
   const [items, setItems] = useState<DraftItem[]>([emptyDraftItem()]);

@@ -1,11 +1,11 @@
-import { useState, useMemo } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useAuthStore, useLangStore, useOrderStore, useProductStore, useBatchStore } from "@/stores";
 import { ProductDetailModal } from "@/components/ProductDetailModal";
-import { OrderDetailModal } from "@/components/OrderDetailModal";
 import { useThemeClasses } from "@/hooks/useThemeClasses";
 import { usePageFetch } from "@/hooks/usePageFetch";
-import { formatCurrency as $, formatTime } from "@/utils";
-import { AlertCircle, Clock, Package, ChevronRight, TrendingUp, TrendingDown } from "lucide-react";
+import { formatCurrency as $ } from "@/utils";
+import { AlertCircle, Clock, Package, ChevronRight, TrendingUp, TrendingDown, Wallet } from "lucide-react";
+import { expenseApi } from "@/api/expenses";
 
 type Range = "today" | "yesterday" | "week" | "month" | "custom";
 
@@ -66,7 +66,6 @@ export function DashboardPage() {
   const [profitPerProdOpen, setProfitPerProdOpen] = useState(false);
   const [profitSort, setProfitSort] = useState<"net" | "gross" | "qty" | "margin">("net");
   const [detailProductId, setDetailProductId] = useState<string | null>(null);
-  const [detailOrderId, setDetailOrderId] = useState<string | null>(null);
 
   const isOwner = user.role === "superadmin" || user.role === "admin";
   const isCashier = user.role === "cashier";
@@ -100,6 +99,28 @@ export function DashboardPage() {
   const rangeRevenue = useMemo(() => rangedOrders.reduce((s, o) => s + o.total, 0), [rangedOrders]);
   const prevRevenue = useMemo(() => prevRangedOrders.reduce((s, o) => s + o.total, 0), [prevRangedOrders]);
   const revenueDeltaPct = prevRevenue > 0 ? ((rangeRevenue - prevRevenue) / prevRevenue) * 100 : (rangeRevenue > 0 ? 100 : 0);
+
+  // Pengeluaran periode ini — fetch via BE supaya konsisten dengan halaman
+  // Pengeluaran + Laporan Laba Rugi. Owner/Admin only (kasir tidak lihat).
+  // supplierPaid: pembelian faktur yang sudah lunas di periode — di-tampilkan
+  // sebagai info di card Pengeluaran (cash awareness). Untung Bersih TIDAK
+  // termasuk ini supaya tetap akrual (HPP sudah cover modal via order_items).
+  const [rangeExpense, setRangeExpense] = useState(0);
+  const [rangeSupplierPaid, setRangeSupplierPaid] = useState(0);
+  useEffect(() => {
+    if (!isOwner) return;
+    const fmtYMD = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    const toInc = new Date(to.getTime() - 1);
+    let cancelled = false;
+    expenseApi.profitLoss({ from: fmtYMD(from), to: fmtYMD(toInc) })
+      .then(res => {
+        if (cancelled) return;
+        setRangeExpense(res.body?.expense_total || 0);
+        setRangeSupplierPaid(res.body?.supplier_paid || 0);
+      })
+      .catch(() => { /* silent */ });
+    return () => { cancelled = true; };
+  }, [isOwner, from, to]);
 
   const rangeLabel: Record<Range, string> = {
     today: "Hari Ini", yesterday: "Kemarin", week: "Minggu Ini", month: "Bulan Ini", custom: "Custom",
@@ -304,6 +325,58 @@ export function DashboardPage() {
         </div>
       )}
 
+      {/* ─── PENGELUARAN + UNTUNG BERSIH (Owner/Admin only) ─── */}
+      {isOwner && (() => {
+        const net = rangeRevenue - finReport.cogs - rangeExpense;
+        const netPositive = net >= 0;
+        return (
+          <div className="grid grid-cols-2 gap-3">
+            <div className={`rounded-[20px] border p-4 sm:p-5 ${th.card} ${th.bdr}`}>
+              <div className="flex items-center gap-1.5 mb-1">
+                <Wallet size={14} className={th.acc} />
+                <p className={`text-xs font-bold uppercase tracking-wider ${th.txm}`}>
+                  Pengeluaran · {rangeLabel[range]}
+                </p>
+              </div>
+              <p className={`font-display text-[26px] sm:text-[30px] font-black tracking-tight ${th.tx}`} style={{ fontVariationSettings: '"wght" 900' }}>
+                {$(rangeExpense)}
+              </p>
+              <p className={`text-xs mt-1 ${th.txf}`}>Operasional + gaji + dll</p>
+              {rangeSupplierPaid > 0 && (
+                // Info bayar supplier — terpisah dari nominal utama supaya
+                // tidak merusak formula Untung Bersih (accrual). Owner aware
+                // ada uang keluar lain ke supplier. Detail di Laporan → Arus Kas.
+                <div className={`mt-3 pt-3 border-t flex items-baseline justify-between gap-2 ${th.bdrSoft}`}>
+                  <p className={`text-xs ${th.txm}`}>+ Bayar Supplier</p>
+                  <p className={`font-display text-sm font-bold tabular-nums ${th.txm}`}>{$(rangeSupplierPaid)}</p>
+                </div>
+              )}
+            </div>
+            <div className={`rounded-[20px] border p-4 sm:p-5 ${
+              netPositive
+                ? (th.dark ? "bg-[#3A1F2A] border-[#FB7185]/40" : "bg-[#FFF4F6] border-[#E11D48]/40")
+                : (th.dark ? "bg-[#3D1F2C] border-[#BE123C]/60" : "bg-[#FCE4EC] border-[#BE123C]/40")
+            }`}>
+              <div className="flex items-center gap-1.5 mb-1">
+                {/* Trend icon switches on sign — accessibility (color-not-only).
+                    Untung = ↗ panah naik. Rugi = ↘ panah turun. */}
+                {netPositive
+                  ? <TrendingUp size={14} className={th.acc} aria-hidden />
+                  : <TrendingDown size={14} className={th.dark ? "text-[#FB7185]" : "text-[#BE123C]"} aria-hidden />}
+                <p className={`text-xs font-bold uppercase tracking-wider ${netPositive ? th.acc : (th.dark ? "text-[#FB7185]" : "text-[#BE123C]")}`}>
+                  {netPositive ? "Untung Bersih" : "Rugi"} · {rangeLabel[range]}
+                </p>
+              </div>
+              <p className={`font-display text-[26px] sm:text-[30px] font-black tracking-tight ${netPositive ? th.acc : (th.dark ? "text-[#FB7185]" : "text-[#BE123C]")}`}
+                 style={{ fontVariationSettings: '"wght" 900' }}>
+                {$(net)}
+              </p>
+              <p className={`text-xs mt-1 ${th.txf}`}>Omzet − Modal − Pengeluaran</p>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* ─── CASHIER STATS (cashier only) ─── */}
       {isCashier && (
         <div className="grid grid-cols-2 gap-3">
@@ -437,39 +510,6 @@ export function DashboardPage() {
         </div>
       )}
 
-      {/* ─── RECENT ORDERS (Owner + Cashier) ─── moved up, top 3 */}
-      {(isOwner || isCashier) && (
-        <div className={`rounded-[22px] border overflow-hidden ${th.card} ${th.bdr}`}>
-          <div className={`px-5 py-4 border-b flex items-center justify-between ${th.bdr}`}>
-            <p className={`text-base font-extrabold tracking-tight ${th.tx}`}>{t.recentOrders}</p>
-            {orders.length > 3 && (
-              <span className={`text-xs ${th.txm}`}>{orders.length} total</span>
-            )}
-          </div>
-          {orders.length === 0 ? (
-            <div className={`px-5 py-6 text-center text-sm ${th.txf}`}>Belum ada transaksi</div>
-          ) : orders.slice(0, 3).map(o => (
-            <div key={o.id} onClick={() => setDetailOrderId(o.id)}
-              className={`flex items-center justify-between px-5 py-4 border-b last:border-0 cursor-pointer active:opacity-70 ${th.bdrSoft}`}>
-              <div className="flex items-center gap-3 min-w-0">
-                <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${
-                  o.status === "completed" ? "bg-[#E11D48]"
-                  : o.status === "pending" ? "bg-[#FB7185]"
-                  : "bg-[#C4504A]"
-                }`} />
-                <div className="min-w-0">
-                  <p className={`text-sm font-bold font-mono truncate max-w-[220px] ${th.tx}`}>#{o.id.slice(-8).toUpperCase()}</p>
-                  <p className={`text-sm mt-0.5 ${th.txm}`}>{o.customer || "Umum"} · {formatTime(o.createdAt)}</p>
-                </div>
-              </div>
-              <p className={`font-display text-lg font-black ${th.tx}`} style={{ fontVariationSettings: '"wght" 900' }}>
-                {$(o.total)}
-              </p>
-            </div>
-          ))}
-        </div>
-      )}
-
       {/* ─── PENDAPATAN PER KASIR + PAYMENT BREAKDOWN (merged) ─── */}
       {isOwner && (
         <div className={`rounded-[22px] border p-5 ${th.card} ${th.bdr}`}>
@@ -574,7 +614,6 @@ export function DashboardPage() {
       )}
 
       <ProductDetailModal productId={detailProductId} onClose={() => setDetailProductId(null)} />
-      <OrderDetailModal orderId={detailOrderId} onClose={() => setDetailOrderId(null)} />
     </div>
   );
 }

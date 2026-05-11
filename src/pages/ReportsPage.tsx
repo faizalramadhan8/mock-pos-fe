@@ -3,15 +3,16 @@ import { useLangStore, useOrderStore, useProductStore } from "@/stores";
 import { useThemeClasses } from "@/hooks/useThemeClasses";
 import { usePageFetch } from "@/hooks/usePageFetch";
 import { useCountUp } from "@/hooks/useCountUp";
-import { formatCurrency as $, printReport } from "@/utils";
+import { formatCurrency as $ } from "@/utils";
 import { exportOrders, exportOrderReport } from "@/utils/export";
 import { getDateRange, type DateRange, type CustomRange } from "@/utils/dateRange";
 import { orderApi, type OrderAggregateResponse } from "@/api/orders";
+import { expenseApi, type ProfitLossRes } from "@/api/expenses";
 import { BakeryLogo } from "@/components/icons";
-import { Package, Users, ChevronDown, ChevronUp, TrendingUp, TrendingDown, Minus, Download, Printer } from "lucide-react";
+import { Package, Users, Wallet, ChevronDown, ChevronUp, TrendingUp, TrendingDown, Minus, Download, Info } from "lucide-react";
 import toast from "react-hot-toast";
 
-type ReportTab = "products" | "members";
+type ReportTab = "products" | "members" | "profit-loss";
 
 // YYYY-MM-DD in local time (WIB) — BE aggregate expects calendar-date strings.
 function toYMD(d: Date): string {
@@ -21,7 +22,7 @@ function toYMD(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
-// In-app report page — Bu Santi: "saya tidak mau ke excel, lihat di dalam
+// In-app report page — owner: "saya tidak mau ke excel, lihat di dalam
 // sistem saja". Dua tab: Top Produk (urut qty terjual) & Member (urut total
 // belanja, expandable untuk lihat detail item). Filter date range konsisten
 // dengan halaman lain (today/yesterday/week/month/all/custom).
@@ -97,11 +98,27 @@ export function ReportsPage() {
     return () => { cancelled = true; };
   }, [dateRange, customRange, customError]);
 
+  // Profit/Loss — fetch setiap range berubah (tidak gated by tab) supaya
+  // selalu siap saat user export ke Excel dari tab manapun. Payload kecil
+  // (summary saja), aman dipanggil eager.
+  const [profitLoss, setProfitLoss] = useState<ProfitLossRes | null>(null);
+  useEffect(() => {
+    if (customError) return;
+    const range = getDateRange(dateRange, customRange);
+    const from = range ? toYMD(range.start) : "";
+    const to = range ? toYMD(range.end) : "";
+    let cancelled = false;
+    expenseApi.profitLoss({ from, to })
+      .then(res => { if (!cancelled) setProfitLoss(res.body ?? null); })
+      .catch(err => { if (!cancelled) { console.error("profit-loss failed", err); setProfitLoss(null); } });
+    return () => { cancelled = true; };
+  }, [dateRange, customRange, customError]);
+
   // Aggregate top produk. Prefer BE-side aggregate (scalable). Fallback ke
   // client-side dari `filteredOrders` kalau BE belum sampai / gagal.
   // avgPrice = harga jual rata-rata di periode (snapshot dari order_items).
   // currentPrice = harga produk saat ini (master data) — dibandingkan supaya
-  // Bu Santi tahu kalau harga sudah berubah sejak periode.
+  // owner tahu kalau harga sudah berubah sejak periode.
   const topProducts = useMemo(() => {
     if (aggregateData?.top_products) {
       return aggregateData.top_products.map(p => {
@@ -158,7 +175,7 @@ export function ReportsPage() {
   // Member stats: BE-side aggregate kasih ringkasan per member (orders, spend,
   // savings). Item-level detail (untuk expand row) di-merge dari
   // `filteredOrders` — yang client-side, tapi sudah cukup karena orders array
-  // di store di-limit ke 2000 (cukup untuk volume Bu Santi sekarang).
+  // di store di-limit ke 2000 (cukup untuk volume owner sekarang).
   const memberStats = useMemo<MemberRow[]>(() => {
     // Build items map per member dari client-side orders (untuk expand panel).
     const itemsByMember = new Map<string, { name: string; qty: number; total: number }[]>();
@@ -252,18 +269,12 @@ export function ReportsPage() {
             disabled={!!customError || !hasData}
             onClick={async () => {
               if (customError) { toast.error(customError); return; }
-              await exportOrderReport(filteredOrders, exportRangeLabel());
+              await exportOrderReport(filteredOrders, exportRangeLabel(), profitLoss);
               toast.success(lang === "id" ? "Laporan diunduh" : "Report downloaded");
             }}
-            title={lang === "id" ? "Excel berisi: Transaksi, Top Produk, Member" : "Excel contains: Transactions, Top Products, Members"}
-            className={`flex items-center gap-1 px-2 py-1.5 rounded-xl text-xs font-bold ${th.elev} ${th.txm} disabled:opacity-40`}>
-            <Download size={11} /> Excel
-          </button>
-          <button
-            disabled={!!customError || !hasData}
-            onClick={() => printReport(filteredOrders, exportRangeLabel())}
+            title={lang === "id" ? "Excel berisi: Laba Rugi, Transaksi, Top Produk, Member" : "Excel contains: Profit/Loss, Transactions, Top Products, Members"}
             className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold ${th.accBg} ${th.acc} disabled:opacity-40`}>
-            <Printer size={12} /> {lang === "id" ? "Cetak" : "Print"}
+            <Download size={12} /> Excel
           </button>
         </div>
       </div>
@@ -310,6 +321,7 @@ export function ReportsPage() {
         {([
           { id: "products" as ReportTab, label: lang === "id" ? "Top Produk" : "Top Products", icon: <Package size={16} /> },
           { id: "members" as ReportTab, label: lang === "id" ? "Member" : "Members", icon: <Users size={16} /> },
+          { id: "profit-loss" as ReportTab, label: lang === "id" ? "Laba Rugi" : "Profit/Loss", icon: <Wallet size={16} /> },
         ]).map(item => (
           <button key={item.id} role="tab" aria-selected={tab === item.id}
             onClick={() => setTab(item.id)}
@@ -516,6 +528,292 @@ export function ReportsPage() {
           )}
         </div>
       )}
+
+      {/* Laba Rugi — owner format: Pendapatan − Modal Barang = Laba Kotor
+          − Pengeluaran = Untung Bersih. Bahasa harian, hindari istilah
+          akuntansi yang menakutkan (HPP/COGS/Gross Profit/dll). */}
+      {tab === "profit-loss" && !customError && (
+        <ProfitLossView pl={profitLoss} th={th} lang={lang} />
+      )}
+    </div>
+  );
+}
+
+// ProfitLossView — full Laporan Laba Rugi UI. Diisolasi sebagai komponen
+// terpisah supaya ReportsPage tetap manageable.
+function ProfitLossView({ pl, th, lang }: { pl: ProfitLossRes | null; th: ThemeClasses; lang: "en" | "id" }) {
+  const revenueDisplay = useCountUp(pl?.revenue || 0);
+  const cogsDisplay = useCountUp(pl?.cogs || 0);
+  const grossDisplay = useCountUp(pl?.gross_profit || 0);
+  const expenseDisplay = useCountUp(pl?.expense_total || 0);
+  const netDisplay = useCountUp(pl?.net_profit || 0);
+  const supplierPaidDisplay = useCountUp(pl?.supplier_paid || 0);
+  const cashOutDisplay = useCountUp(pl?.cash_out_total || 0);
+  const cashDiffDisplay = useCountUp(pl?.cash_diff || 0);
+
+  if (!pl) {
+    return (
+      <div className={`rounded-3xl border bg-bakery-stripe p-10 text-center ${th.bdr} ${th.card2}`}>
+        <div className="mx-auto mb-4 opacity-70" style={{ width: 64 }}>
+          <BakeryLogo size={64} />
+        </div>
+        <p className={`text-base font-bold ${th.tx}`}>
+          {lang === "id" ? "Memuat laporan..." : "Loading report..."}
+        </p>
+      </div>
+    );
+  }
+
+  const netPositive = pl.net_profit >= 0;
+
+  return (
+    <div className="flex flex-col gap-3">
+      {/* Untung Bersih hero — warna mengikuti positif/negatif */}
+      <div className={`rounded-3xl border p-5 bg-bakery-stripe ${th.bdr} ${th.card2} relative overflow-hidden`}>
+        <p className={`text-xs font-black uppercase tracking-wider mb-1.5 ${th.acc}`}>
+          {netPositive
+            ? (lang === "id" ? "Untung Bersih" : "Net Profit")
+            : (lang === "id" ? "Rugi Bersih" : "Net Loss")}
+        </p>
+        <p className={`font-display text-3xl sm:text-4xl font-black tracking-tight ${
+          netPositive ? th.acc : (th.dark ? "text-[#FB7185]" : "text-[#BE123C]")
+        }`}>
+          Rp {netDisplay.toLocaleString("id-ID")}
+        </p>
+        <p className={`text-xs mt-1 ${th.txm}`}>
+          {pl.total_orders} {lang === "id" ? "transaksi penjualan" : "sales transactions"}
+        </p>
+      </div>
+
+      {/* Breakdown layar utama: Pendapatan / Modal Barang / Laba Kotor /
+          Pengeluaran / Untung Bersih — pakai bahasa harian. */}
+      <div className={`rounded-2xl border overflow-hidden ${th.bdr} ${th.card2}`}>
+        <div className={`px-4 py-3 border-b ${th.bdrSoft}`}>
+          <p className={`text-xs font-black uppercase tracking-wider ${th.txf}`}>
+            {lang === "id" ? "Rincian Laba Rugi" : "Profit/Loss Breakdown"}
+          </p>
+        </div>
+
+        {/* Pendapatan */}
+        <div className="px-4 py-3 flex items-baseline justify-between gap-3">
+          <div className="min-w-0">
+            <p className={`font-bold text-sm ${th.tx}`}>
+              {lang === "id" ? "Pendapatan (Omzet)" : "Revenue"}
+            </p>
+            <p className={`text-xs ${th.txf}`}>
+              {lang === "id" ? "Total penjualan periode ini" : "Total sales in period"}
+            </p>
+          </div>
+          <p className={`font-display font-bold text-base ${th.tx}`}>
+            Rp {revenueDisplay.toLocaleString("id-ID")}
+          </p>
+        </div>
+
+        {/* Modal Barang (HPP) */}
+        <div className={`px-4 py-3 flex items-baseline justify-between gap-3 border-t ${th.bdrSoft}`}>
+          <div className="min-w-0">
+            <p className={`font-bold text-sm ${th.tx}`}>
+              − {lang === "id" ? "Modal Barang Terjual" : "Cost of Goods Sold"}
+            </p>
+            <p className={`text-xs ${th.txf}`}>
+              {lang === "id" ? "Harga modal barang yang sudah laku" : "Purchase cost of items sold"}
+            </p>
+          </div>
+          <p className={`font-display font-bold text-base ${th.txm}`}>
+            Rp {cogsDisplay.toLocaleString("id-ID")}
+          </p>
+        </div>
+
+        {/* Laba Kotor */}
+        <div className={`px-4 py-3 flex items-baseline justify-between gap-3 border-t ${th.bdrSoft} ${th.elev}`}>
+          <p className={`font-bold text-sm ${th.tx}`}>
+            = {lang === "id" ? "Laba Kotor" : "Gross Profit"}
+          </p>
+          <p className={`font-display font-bold text-base ${th.acc}`}>
+            Rp {grossDisplay.toLocaleString("id-ID")}
+          </p>
+        </div>
+
+        {/* Pengeluaran total */}
+        <div className={`px-4 py-3 flex items-baseline justify-between gap-3 border-t ${th.bdrSoft}`}>
+          <div className="min-w-0">
+            <p className={`font-bold text-sm ${th.tx}`}>
+              − {lang === "id" ? "Pengeluaran Operasional" : "Operating Expenses"}
+            </p>
+            <p className={`text-xs ${th.txf}`}>
+              {pl.expense_breakdown.length > 0
+                ? `${pl.expense_breakdown.length} ${lang === "id" ? "kategori" : "categories"}`
+                : (lang === "id" ? "Belum ada pengeluaran" : "No expenses yet")}
+            </p>
+          </div>
+          <p className={`font-display font-bold text-base ${th.txm}`}>
+            Rp {expenseDisplay.toLocaleString("id-ID")}
+          </p>
+        </div>
+
+        {/* Rincian per kategori (kalau ada) */}
+        {pl.expense_breakdown.map((b) => (
+          <div key={b.category_id} className={`px-4 pl-8 py-2 flex items-baseline justify-between gap-3 border-t ${th.bdrSoft}`}>
+            <p className={`text-sm ${th.txm}`}>· {b.category_name}</p>
+            <p className={`font-display text-sm ${th.txm}`}>Rp {b.total.toLocaleString("id-ID")}</p>
+          </div>
+        ))}
+
+        {/* Untung Bersih final */}
+        <div className={`px-4 py-4 flex items-center justify-between gap-3 border-t-2 ${
+          netPositive
+            ? (th.dark ? "border-[#FB7185] bg-[#3A1F2A]/40" : "border-[#E11D48] bg-[#FFF4F6]")
+            : (th.dark ? "border-[#BE123C] bg-[#3A1F2A]/40" : "border-[#BE123C] bg-[#FCE4EC]/40")
+        }`}>
+          <div className="flex items-center gap-2">
+            {/* Trend icon: accessibility (color-not-only) — untung naik, rugi turun. */}
+            {netPositive
+              ? <TrendingUp size={18} className={th.acc} aria-hidden />
+              : <TrendingDown size={18} className={th.dark ? "text-[#FB7185]" : "text-[#BE123C]"} aria-hidden />}
+            <p className={`font-black text-base uppercase tracking-wider ${
+              netPositive ? th.acc : (th.dark ? "text-[#FB7185]" : "text-[#BE123C]")
+            }`}>
+              = {netPositive
+                ? (lang === "id" ? "Untung Bersih" : "Net Profit")
+                : (lang === "id" ? "Rugi Bersih" : "Net Loss")}
+            </p>
+          </div>
+          <p className={`font-display font-black text-lg ${
+            netPositive ? th.acc : (th.dark ? "text-[#FB7185]" : "text-[#BE123C]")
+          }`}>
+            Rp {netDisplay.toLocaleString("id-ID")}
+          </p>
+        </div>
+      </div>
+
+      {/* ─── Arus Kas (cash basis view) ─────────────────────────────────────
+          Beda dari Laba Rugi di atas (accrual). Ini hitung uang real yang
+          keluar masuk di periode — termasuk bayar supplier (faktur lunas),
+          bukan cuma modal barang yang sudah laku. Yang sehari-hari owner
+          rasakan di kantong/rekening. */}
+      <div className={`rounded-2xl border overflow-hidden ${th.bdr} ${th.card2}`}>
+        <div className={`px-4 py-3 border-b ${th.bdrSoft}`}>
+          <p className={`text-xs font-black uppercase tracking-wider ${th.txf}`}>
+            {lang === "id" ? "Arus Kas Periode Ini" : "Cash Flow This Period"}
+          </p>
+          <p className={`text-xs mt-0.5 ${th.txf}`}>
+            {lang === "id"
+              ? "Uang real yang masuk-keluar (beda dari Laba Rugi di atas)"
+              : "Actual cash in/out (different from P/L above)"}
+          </p>
+        </div>
+
+        {/* Uang Masuk */}
+        <div className="px-4 py-3 flex items-baseline justify-between gap-3">
+          <p className={`font-bold text-sm ${th.tx}`}>
+            {lang === "id" ? "Uang Masuk (Penjualan)" : "Cash In (Sales)"}
+          </p>
+          <p className={`font-display font-bold text-base ${th.tx}`}>
+            Rp {revenueDisplay.toLocaleString("id-ID")}
+          </p>
+        </div>
+
+        {/* Uang Keluar group label */}
+        <div className={`px-4 py-2 border-t ${th.bdrSoft} ${th.elev}`}>
+          <p className={`text-xs font-bold uppercase tracking-wider ${th.txm}`}>
+            {lang === "id" ? "Uang Keluar" : "Cash Out"}
+          </p>
+        </div>
+
+        {/* Bayar Supplier (Faktur lunas) */}
+        <div className={`px-4 py-3 pl-8 flex items-baseline justify-between gap-3 border-t ${th.bdrSoft}`}>
+          <div className="min-w-0">
+            <p className={`text-sm ${th.tx}`}>
+              · {lang === "id" ? "Bayar Supplier (Faktur lunas)" : "Pay Supplier (Paid invoices)"}
+            </p>
+            <p className={`text-xs ${th.txf}`}>
+              {lang === "id" ? "Pembelian bahan yang sudah dibayar periode ini" : "Material purchases paid this period"}
+            </p>
+          </div>
+          <p className={`font-display font-bold text-sm ${th.txm}`}>
+            Rp {supplierPaidDisplay.toLocaleString("id-ID")}
+          </p>
+        </div>
+
+        {/* Pengeluaran Operasional */}
+        <div className={`px-4 py-3 pl-8 flex items-baseline justify-between gap-3 border-t ${th.bdrSoft}`}>
+          <p className={`text-sm ${th.tx}`}>
+            · {lang === "id" ? "Pengeluaran Operasional" : "Operating Expenses"}
+          </p>
+          <p className={`font-display font-bold text-sm ${th.txm}`}>
+            Rp {expenseDisplay.toLocaleString("id-ID")}
+          </p>
+        </div>
+
+        {/* Total Uang Keluar */}
+        <div className={`px-4 py-3 flex items-baseline justify-between gap-3 border-t ${th.bdrSoft}`}>
+          <p className={`font-bold text-sm ${th.tx}`}>
+            {lang === "id" ? "Total Uang Keluar" : "Total Cash Out"}
+          </p>
+          <p className={`font-display font-bold text-base ${th.txm}`}>
+            Rp {cashOutDisplay.toLocaleString("id-ID")}
+          </p>
+        </div>
+
+        {/* Selisih Kas */}
+        <div className={`px-4 py-4 flex items-center justify-between gap-3 border-t-2 ${
+          (pl.cash_diff || 0) >= 0
+            ? (th.dark ? "border-[#FB7185] bg-[#3A1F2A]/40" : "border-[#E11D48] bg-[#FFF4F6]")
+            : (th.dark ? "border-[#BE123C] bg-[#3D1F2C]/40" : "border-[#BE123C] bg-[#FCE4EC]/40")
+        }`}>
+          <div className="flex items-center gap-2 min-w-0">
+            {/* Trend icon: accessibility (color-not-only). */}
+            {(pl.cash_diff || 0) >= 0
+              ? <TrendingUp size={18} className={th.acc} aria-hidden />
+              : <TrendingDown size={18} className={th.dark ? "text-[#FB7185]" : "text-[#BE123C]"} aria-hidden />}
+            <div className="min-w-0">
+              <p className={`font-black text-base uppercase tracking-wider ${
+                (pl.cash_diff || 0) >= 0 ? th.acc : (th.dark ? "text-[#FB7185]" : "text-[#BE123C]")
+              }`}>
+                {lang === "id" ? "Selisih Kas" : "Cash Diff"}
+              </p>
+              <p className={`text-xs ${th.txf}`}>
+                {lang === "id" ? "Uang Masuk − Uang Keluar" : "Cash In − Cash Out"}
+              </p>
+            </div>
+          </div>
+          <p className={`font-display font-black text-lg ${
+            (pl.cash_diff || 0) >= 0 ? th.acc : (th.dark ? "text-[#FB7185]" : "text-[#BE123C]")
+          }`}>
+            Rp {cashDiffDisplay.toLocaleString("id-ID")}
+          </p>
+        </div>
+
+        {/* Info faktur belum lunas (kewajiban yang masih jalan) */}
+        {pl.supplier_unpaid > 0 && (
+          <div className={`px-4 py-3 border-t ${th.bdrSoft} flex items-start gap-2 ${th.elev}`}>
+            <Info size={14} className={`mt-0.5 shrink-0 ${th.txm}`} aria-hidden />
+            <p className={`text-xs ${th.txm}`}>
+              <b className={th.tx}>{lang === "id" ? "Faktur tempo belum lunas:" : "Unpaid invoices (term):"}</b>{" "}
+              Rp {pl.supplier_unpaid.toLocaleString("id-ID")}{" "}
+              <span className={th.txf}>
+                — {lang === "id" ? "akan jadi uang keluar saat dibayar." : "will become cash out when paid."}
+              </span>
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* Glossary singkat — buka untuk owner yang gak tahu istilah */}
+      <details className={`rounded-2xl border p-4 ${th.bdr} ${th.card2}`}>
+        <summary className={`text-xs font-bold cursor-pointer inline-flex items-center gap-1.5 ${th.txm}`}>
+          <Info size={14} aria-hidden />
+          {lang === "id" ? "Apa artinya istilah-istilah ini?" : "What do these terms mean?"}
+        </summary>
+        <div className={`mt-3 text-sm space-y-2 ${th.txm}`}>
+          <p><b className={th.tx}>{lang === "id" ? "Pendapatan" : "Revenue"}:</b> {lang === "id" ? "Total uang masuk dari penjualan." : "Total money from sales."}</p>
+          <p><b className={th.tx}>{lang === "id" ? "Modal Barang Terjual" : "Cost of Goods Sold"}:</b> {lang === "id" ? "Harga beli barang dari supplier yang sudah terjual ke pelanggan." : "Supplier cost of items sold to customers."}</p>
+          <p><b className={th.tx}>{lang === "id" ? "Laba Kotor" : "Gross Profit"}:</b> {lang === "id" ? "Untung dari jual barang sebelum dikurangi biaya operasional." : "Profit from selling goods before operating expenses."}</p>
+          <p><b className={th.tx}>{lang === "id" ? "Pengeluaran Operasional" : "Operating Expenses"}:</b> {lang === "id" ? "Biaya menjalankan toko: gaji, listrik, plastik, dll." : "Cost of running the store: salary, electricity, packaging, etc."}</p>
+          <p><b className={th.tx}>{lang === "id" ? "Untung Bersih" : "Net Profit"}:</b> {lang === "id" ? "Hasil akhir = Pendapatan − Modal − Pengeluaran. Ini yang masuk kantong Anda." : "Bottom line = Revenue − COGS − Expenses."}</p>
+          <p><b className={th.tx}>{lang === "id" ? "Arus Kas / Selisih Kas" : "Cash Flow / Cash Diff"}:</b> {lang === "id" ? "Uang real yang masuk-keluar di periode (termasuk bayar supplier). Beda dengan Untung Bersih: barang yang dibeli tapi belum laku tetap ngurangi kas, tapi tidak ngurangi untung." : "Real cash in/out (includes supplier payments). Different from Net Profit: bought but unsold goods reduce cash but not profit."}</p>
+        </div>
+      </details>
     </div>
   );
 }

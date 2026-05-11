@@ -86,7 +86,7 @@ export function SupplierDetailModal({ supplierId, onClose }: SupplierDetailModal
       </div>
 
       {/* Products supplied — list saja, tanpa checkbox / qty / draft pesan.
-          Bu Santi: kirim WA otomatis ke supplier tidak diperlukan; cukup
+          owner: kirim WA otomatis ke supplier tidak diperlukan; cukup
           lihat produk apa saja di pemasok ini, plus highlight stok rendah. */}
       {supplierProducts.length > 0 && (
         <div className={`rounded-2xl border overflow-hidden mb-3 ${th.bdr} ${th.card2}`}>

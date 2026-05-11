@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 
 // TTL global per-key. Cegah multi-fetch berurutan (rapid tab switch / mount).
-// Default 10 detik — cukup untuk POS volume Bu Santi (1-2 kasir).
+// Default 10 detik — cukup untuk POS volume owner (1-2 kasir).
 const lastFetchAt = new Map<string, number>();
 const DEFAULT_TTL_MS = 10_000;
 

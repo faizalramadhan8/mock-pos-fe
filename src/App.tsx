@@ -9,7 +9,7 @@ import type { PageId } from "@/types";
 import { Toaster } from "react-hot-toast";
 import { NotificationBell } from "@/components/NotificationBell";
 import {
-  Home, ShoppingBag, Package, FileText, Settings, BarChart3,
+  Home, ShoppingBag, Package, FileText, Settings, BarChart3, Wallet,
 } from "lucide-react";
 
 // Code-split pages
@@ -19,6 +19,7 @@ const POSPage = lazy(() => import("@/pages/POSPage").then(m => ({ default: m.POS
 const InventoryPage = lazy(() => import("@/pages/InventoryPage").then(m => ({ default: m.InventoryPage })));
 const OrdersPage = lazy(() => import("@/pages/OrdersPage").then(m => ({ default: m.OrdersPage })));
 const ReportsPage = lazy(() => import("@/pages/ReportsPage").then(m => ({ default: m.ReportsPage })));
+const ExpensesPage = lazy(() => import("@/pages/ExpensesPage").then(m => ({ default: m.ExpensesPage })));
 const SettingsPage = lazy(() => import("@/pages/SettingsPage").then(m => ({ default: m.SettingsPage })));
 const DeviceApprovalPage = lazy(() => import("@/pages/DeviceApprovalPage").then(m => ({ default: m.DeviceApprovalPage })));
 
@@ -28,6 +29,7 @@ const NAV_ICONS: Record<PageId, React.ReactNode> = {
   inventory: <Package size={26} />,
   orders: <FileText size={26} />,
   reports: <BarChart3 size={26} />,
+  expenses: <Wallet size={26} />,
   settings: <Settings size={26} />,
 };
 
@@ -72,12 +74,13 @@ export default function App() {
   }, []);
 
   const perms = user ? (ROLE_PERMISSIONS[user.role] || []) : [];
-  // Bottom nav 6 items — Material Design "max 5" guideline diabaikan di sini
-  // karena Bu Santi (50+, gaptek) sudah familiar dengan Settings di bottom
-  // nav. Discoverability menang dari konvensi: pindahin Settings ke header
-  // bikin "Pengaturan saya hilang ke mana?". Tablet 1024px+ tetap muat 6
-  // icon @74px masing-masing dengan touch target ≥44px.
-  const navItems = (["dashboard", "pos", "inventory", "orders", "reports", "settings"] as PageId[]).filter(p => perms.includes(p));
+  // Bottom nav: top-level ops (Beranda/Kasir/Stok/Pesanan/Laporan/Pengeluaran).
+  // Settings = utility/secondary nav → diakses via gear icon di header.
+  // Mengikuti nav-hierarchy rule (Material): bottom nav untuk primary ops
+  // sehari-hari (catat penjualan, stok, pesanan, laporan, pengeluaran),
+  // secondary actions (config, profile) di header.
+  const navItems = (["dashboard", "pos", "inventory", "orders", "reports", "expenses"] as PageId[]).filter(p => perms.includes(p));
+  const canSeeSettings = perms.includes("settings");
   const currentPage = user ? (perms.includes(page) ? page : defaultPage()) : null;
 
   // Dynamic page title
@@ -105,6 +108,7 @@ export default function App() {
       case "inventory": return <InventoryPage />;
       case "orders": return <OrdersPage />;
       case "reports": return <ReportsPage />;
+      case "expenses": return <ExpensesPage />;
       case "settings": return <SettingsPage />;
       default: return <DashboardPage />;
     }
@@ -143,7 +147,21 @@ export default function App() {
               <p className={`text-sm truncate ${th.txm}`}>{user.name} · {(t.roles as Record<string, string>)[user.role]}</p>
             </div>
           </div>
-          <NotificationBell />
+          <div className="flex items-center gap-1.5">
+            {canSeeSettings && (
+              <button
+                onClick={() => setPage("settings")}
+                aria-label={t.settings as string}
+                aria-current={currentPage === "settings" ? "page" : undefined}
+                title={t.settings as string}
+                className={`min-w-[44px] min-h-[44px] rounded-2xl flex items-center justify-center transition-all ${
+                  currentPage === "settings" ? `${th.accBg} ${th.acc}` : th.txm
+                }`}>
+                <Settings size={22} />
+              </button>
+            )}
+            <NotificationBell />
+          </div>
         </div>
       </header>
 

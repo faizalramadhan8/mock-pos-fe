@@ -5,8 +5,8 @@ import type { User, Product, CartItem, Order, OrderItem, StockMovement, StockBat
 import { translations } from "@/i18n";
 import { ROLE_PERMISSIONS } from "@/constants";
 import { genId } from "@/utils";
-import { authApi, userApi, productApi, categoryApi, supplierApi, orderApi, refundApi, movementApi, batchApi, memberApi, cashSessionApi, auditApi, settingsApi, purchaseInvoiceApi } from "@/api";
-import type { CreatePurchaseInvoiceBody, PurchaseInvoiceRes, PurchaseInvoiceItemRes } from "@/api";
+import { authApi, userApi, productApi, categoryApi, supplierApi, orderApi, refundApi, movementApi, batchApi, memberApi, cashSessionApi, auditApi, settingsApi, purchaseInvoiceApi, expenseApi } from "@/api";
+import type { CreatePurchaseInvoiceBody, PurchaseInvoiceRes, PurchaseInvoiceItemRes, ExpenseRes, ExpenseCategoryRes, CreateExpenseBody } from "@/api";
 import { setToken, getToken } from "@/api/client";
 
 // ─── Mappers (BE → FE) ───
@@ -474,7 +474,7 @@ export const useOrderStore = create<OrderState>((set, get) => ({
   fetchOrders: async () => {
     try {
       // Limit tinggi supaya Reports + Dashboard agregat dari data lengkap
-      // (Bu Santi volume ~50/hari × 30hari = 1500/bulan). Kalau volume
+      // (owner volume ~50/hari × 30hari = 1500/bulan). Kalau volume
       // makin besar, perlu BE aggregation endpoint (tidak fetch full).
       const res = await orderApi.getAll({ limit: 2000 });
       set({ orders: (res.body || []).map(mapOrder) });
@@ -609,7 +609,7 @@ interface InventoryState {
   addMovement: (m: StockMovement) => Promise<void>;
   updatePaymentStatus: (movementId: string, status: PaymentStatus) => Promise<void>;
   /** Stock Adjustment — set stok absolut + alasan. Sistem auto-record movement
-   * dengan reason untuk audit trail (Bu Santi: repack, hilang, rusak, opname). */
+   * dengan reason untuk audit trail (owner: repack, hilang, rusak, opname). */
   adjustStock: (productId: string, newStock: number, reason: "repack" | "lost" | "damaged" | "opname" | "sample" | "other", note?: string) => Promise<void>;
 }
 export const useInventoryStore = create<InventoryState>((set, get) => ({
@@ -1088,6 +1088,75 @@ export const usePurchaseInvoiceStore = create<PurchaseInvoiceState>((set, get) =
   },
 }));
 
+interface ExpenseState {
+  expenses: ExpenseRes[];
+  categories: ExpenseCategoryRes[];
+  fetchExpenses: (params?: { from?: string; to?: string; categoryId?: string }) => Promise<void>;
+  fetchCategories: () => Promise<void>;
+  createExpense: (body: CreateExpenseBody) => Promise<ExpenseRes | null>;
+  updateExpense: (id: string, body: CreateExpenseBody) => Promise<ExpenseRes | null>;
+  deleteExpense: (id: string) => Promise<void>;
+}
+
+export const useExpenseStore = create<ExpenseState>((set) => ({
+  expenses: [],
+  categories: [],
+  fetchExpenses: async (params) => {
+    try {
+      const res = await expenseApi.list({
+        from: params?.from,
+        to: params?.to,
+        category_id: params?.categoryId,
+        limit: 2000,
+      });
+      set({ expenses: res.body || [] });
+    } catch { /* silent */ }
+  },
+  fetchCategories: async () => {
+    try {
+      const res = await expenseApi.listCategories(false);
+      set({ categories: res.body || [] });
+    } catch { /* silent */ }
+  },
+  createExpense: async (body) => {
+    try {
+      const res = await expenseApi.create(body);
+      const created = res.body || null;
+      if (created) {
+        set(s => ({ expenses: [created, ...s.expenses] }));
+        toast.success("Pengeluaran disimpan");
+      }
+      return created;
+    } catch (e: any) {
+      toast.error(e.message || "Gagal menyimpan pengeluaran");
+      return null;
+    }
+  },
+  updateExpense: async (id, body) => {
+    try {
+      const res = await expenseApi.update(id, body);
+      const updated = res.body || null;
+      if (updated) {
+        set(s => ({ expenses: s.expenses.map(e => e.id === id ? updated : e) }));
+        toast.success("Pengeluaran diperbarui");
+      }
+      return updated;
+    } catch (e: any) {
+      toast.error(e.message || "Gagal memperbarui pengeluaran");
+      return null;
+    }
+  },
+  deleteExpense: async (id) => {
+    try {
+      await expenseApi.delete(id);
+      set(s => ({ expenses: s.expenses.filter(e => e.id !== id) }));
+      toast.success("Pengeluaran dihapus");
+    } catch (e: any) {
+      toast.error(e.message || "Gagal menghapus pengeluaran");
+    }
+  },
+}));
+
 // ─── Hydrate stores from API after login ───
 // Critical data fetched first (blocks UI); non-critical deferred after paint.
 export async function hydrateStores() {
@@ -1109,6 +1178,7 @@ export async function hydrateStores() {
       useCashSessionStore.getState().fetchSessions(),
       useAuditStore.getState().fetchEntries(),
       useAuthStore.getState().fetchUsers(),
+      useExpenseStore.getState().fetchCategories(),
     ]);
   }, 100);
 }
