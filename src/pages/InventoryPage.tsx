@@ -4,6 +4,7 @@ import { INVENTORY_WRITE_ROLES, UNIT_OPTIONS, PAYMENT_TERMS_OPTIONS, PAYMENT_TER
 import { Modal } from "@/components/Modal";
 import { ProductDetailModal } from "@/components/ProductDetailModal";
 import { SupplierDetailModal } from "@/components/SupplierDetailModal";
+import { PurchaseInvoiceTab } from "@/components/PurchaseInvoiceTab";
 import { SearchableSelect } from "@/components/SearchableSelect";
 import { useThemeClasses } from "@/hooks/useThemeClasses";
 import { useDebounce } from "@/hooks/useDebounce";
@@ -18,7 +19,7 @@ import {
   Sliders,
 } from "lucide-react";
 
-type InventoryTab = "overview" | "stockIn" | "stockOut" | "expiry" | "suppliers";
+type InventoryTab = "overview" | "stockIn" | "stockOut" | "expiry" | "invoices" | "suppliers";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function getDateLabel(dateStr: string, t: Record<string, any>): string {
@@ -136,6 +137,7 @@ export function InventoryPage() {
     { id: "stockIn", label: t.invStockIn as string, icon: <ArrowDownCircle size={14} /> },
     { id: "stockOut", label: t.invStockOut as string, icon: <ArrowUpCircle size={14} /> },
     { id: "expiry", label: t.invExpiry as string, icon: <AlertTriangle size={14} /> },
+    { id: "invoices", label: lang === "id" ? "Faktur Pembelian" : "Purchase Invoices", icon: <Receipt size={14} /> },
     { id: "suppliers", label: t.invSuppliers as string, icon: <Truck size={14} /> },
   ];
 
@@ -943,6 +945,9 @@ export function InventoryPage() {
           )}
         </>
       )}
+
+      {/* ======= PURCHASE INVOICES TAB ======= */}
+      {activeTab === "invoices" && <PurchaseInvoiceTab />}
 
       {/* ======= SUPPLIERS TAB ======= */}
       {activeTab === "suppliers" && (

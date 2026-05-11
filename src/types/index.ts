@@ -166,6 +166,41 @@ export interface BankAccount {
   accountHolder: string;
 }
 
+/** Faktur Pembelian — header faktur dari supplier (multi-line items). */
+export interface PurchaseInvoiceItem {
+  id: string;
+  productId: string;
+  productName?: string;
+  productSku?: string;
+  quantity: number;        // individual units count
+  unitType: "box" | "individual";
+  unitPrice: number;       // per individual unit
+  expiryDate?: string;     // YYYY-MM-DD
+  batchId?: string;
+  movementId?: string;
+  note?: string;
+}
+
+export interface PurchaseInvoice {
+  id: string;
+  invoiceNumber?: string;
+  supplierId: string;
+  supplierName?: string;
+  invoiceDate: string;
+  dueDate?: string;
+  paymentTerms: PaymentTerms;
+  paymentStatus: PaymentStatus;
+  paidAt?: string;
+  subtotalAmount: number;
+  ppnAmount: number;
+  totalAmount: number;
+  reminderSentAt?: string;
+  note?: string;
+  createdBy: string;
+  createdAt: string;
+  items: PurchaseInvoiceItem[];
+}
+
 export interface StockBatch {
   id: string;
   productId: string;

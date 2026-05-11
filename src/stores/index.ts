@@ -1,11 +1,12 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import toast from "react-hot-toast";
-import type { User, Product, CartItem, Order, OrderItem, StockMovement, StockBatch, Category, Supplier, BankAccount, Member, Refund, RefundItem, CashSession, AuditEntry, PaymentMethod, PaymentStatus, DiscountType, UnitType, Lang, PageId, AuditAction } from "@/types";
+import type { User, Product, CartItem, Order, OrderItem, StockMovement, StockBatch, Category, Supplier, BankAccount, Member, Refund, RefundItem, CashSession, AuditEntry, PaymentMethod, PaymentStatus, DiscountType, UnitType, Lang, PageId, AuditAction, PurchaseInvoice, PurchaseInvoiceItem } from "@/types";
 import { translations } from "@/i18n";
 import { ROLE_PERMISSIONS } from "@/constants";
 import { genId } from "@/utils";
-import { authApi, userApi, productApi, categoryApi, supplierApi, orderApi, refundApi, movementApi, batchApi, memberApi, cashSessionApi, auditApi, settingsApi } from "@/api";
+import { authApi, userApi, productApi, categoryApi, supplierApi, orderApi, refundApi, movementApi, batchApi, memberApi, cashSessionApi, auditApi, settingsApi, purchaseInvoiceApi } from "@/api";
+import type { CreatePurchaseInvoiceBody, PurchaseInvoiceRes, PurchaseInvoiceItemRes } from "@/api";
 import { setToken, getToken } from "@/api/client";
 
 // ─── Mappers (BE → FE) ───
@@ -979,6 +980,104 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     } catch (e: any) {
       set(s => ({ bankAccounts: s.bankAccounts.filter(ba => ba.id !== id) }));
       toast.error(e.message);
+    }
+  },
+}));
+
+// ─── Purchase Invoices (Faktur Pembelian) ───
+const mapPurchaseInvoiceItem = (i: PurchaseInvoiceItemRes): PurchaseInvoiceItem => ({
+  id: i.id,
+  productId: i.product_id,
+  productName: i.product?.name,
+  productSku: i.product?.sku,
+  quantity: i.quantity,
+  unitType: (i.unit_type as "box" | "individual") || "individual",
+  unitPrice: i.unit_price,
+  expiryDate: i.expiry_date,
+  batchId: i.batch_id,
+  movementId: i.movement_id,
+  note: i.note,
+});
+
+const mapPurchaseInvoice = (p: PurchaseInvoiceRes): PurchaseInvoice => ({
+  id: p.id,
+  invoiceNumber: p.invoice_number,
+  supplierId: p.supplier_id,
+  supplierName: p.supplier?.name,
+  invoiceDate: p.invoice_date,
+  dueDate: p.due_date,
+  paymentTerms: p.payment_terms,
+  paymentStatus: p.payment_status,
+  paidAt: p.paid_at,
+  subtotalAmount: p.subtotal_amount,
+  ppnAmount: p.ppn_amount,
+  totalAmount: p.total_amount,
+  reminderSentAt: p.reminder_sent_at,
+  note: p.note,
+  createdBy: p.created_by,
+  createdAt: p.created_at,
+  items: (p.items || []).map(mapPurchaseInvoiceItem),
+});
+
+interface PurchaseInvoiceState {
+  invoices: PurchaseInvoice[];
+  fetchInvoices: (params?: { status?: "paid" | "unpaid" | "all"; supplierId?: string; from?: string; to?: string }) => Promise<void>;
+  createInvoice: (body: CreatePurchaseInvoiceBody) => Promise<PurchaseInvoice | null>;
+  markPaid: (id: string) => Promise<void>;
+  deleteInvoice: (id: string) => Promise<void>;
+}
+
+export const usePurchaseInvoiceStore = create<PurchaseInvoiceState>((set, get) => ({
+  invoices: [],
+  fetchInvoices: async (params) => {
+    try {
+      const res = await purchaseInvoiceApi.getAll({
+        status: params?.status,
+        supplier_id: params?.supplierId,
+        from: params?.from,
+        to: params?.to,
+        limit: 200,
+      });
+      set({ invoices: (res.body || []).map(mapPurchaseInvoice) });
+    } catch { /* silent */ }
+  },
+  createInvoice: async (body) => {
+    try {
+      const res = await purchaseInvoiceApi.create(body);
+      const created = res.body ? mapPurchaseInvoice(res.body) : null;
+      // Refresh list + side-effects (stock/movements/batches updated by BE)
+      await Promise.all([
+        get().fetchInvoices(),
+        useProductStore.getState().fetchProducts(),
+        useInventoryStore.getState().fetchMovements(),
+        useBatchStore.getState().fetchBatches(),
+      ]);
+      return created;
+    } catch (e: any) {
+      toast.error(e.message || "Gagal menyimpan faktur");
+      return null;
+    }
+  },
+  markPaid: async (id) => {
+    try {
+      await purchaseInvoiceApi.markPaid(id);
+      set(s => ({
+        invoices: s.invoices.map(inv =>
+          inv.id === id ? { ...inv, paymentStatus: "paid", paidAt: new Date().toISOString() } : inv
+        ),
+      }));
+      toast.success("Faktur ditandai lunas");
+    } catch (e: any) {
+      toast.error(e.message || "Gagal update status");
+    }
+  },
+  deleteInvoice: async (id) => {
+    try {
+      await purchaseInvoiceApi.delete(id);
+      set(s => ({ invoices: s.invoices.filter(inv => inv.id !== id) }));
+      toast.success("Faktur dihapus");
+    } catch (e: any) {
+      toast.error(e.message || "Gagal menghapus faktur");
     }
   },
 }));
