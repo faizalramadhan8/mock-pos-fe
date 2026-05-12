@@ -15,7 +15,7 @@ import Barcode from "react-barcode";
 import type { PaymentMethod, UnitType, DiscountType, Product, Order, Member } from "@/types";
 import toast from "react-hot-toast";
 import {
-  Search, ScanLine, ShoppingBag, Minus, Plus, Trash2, ImagePlus, X, UserPlus, Tag, Percent, Wallet, FileText, Printer, Barcode as BarcodeIcon, Clock, Send, AlertCircle,
+  Search, ScanLine, ShoppingBag, Minus, Plus, Trash2, ImagePlus, X, UserPlus, Tag, Percent, Wallet, FileText, Printer, Barcode as BarcodeIcon, Clock, Send, AlertCircle, Eye, EyeOff,
 } from "lucide-react";
 
 export function POSPage() {
@@ -62,6 +62,9 @@ export function POSPage() {
   const PAGE_SIZE = 60;
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [shiftDetailOpen, setShiftDetailOpen] = useState(false);
+  // Default-hidden total sales — privacy concern di toko, customer dari depan
+  // kasir bisa intip layar. Cashier toggle eye icon kalau perlu lihat.
+  const [salesRevealed, setSalesRevealed] = useState(false);
   const [discountItemId, setDiscountItemId] = useState<string | null>(null);
   const [discountInput, setDiscountInput] = useState("");
   const [discountMode, setDiscountMode] = useState<DiscountType>("percent");
@@ -803,47 +806,68 @@ export function POSPage() {
           const itemsSold = Array.from(itemsMap.values()).sort((a, b) => b.qty - a.qty);
           return (
             <div className={`rounded-[18px] border p-3.5 mb-5 ${th.card2} ${th.bdr}`}>
-              <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center justify-between mb-2 gap-2">
                 <p className={`text-sm font-extrabold ${th.tx}`}>
                   {activeSession ? "Shift Ini" : "Hari Ini"} · {mine.length} transaksi
                 </p>
-                <p className={`text-base font-black ${th.acc}`}>{$(total)}</p>
-              </div>
-              <div className="grid grid-cols-3 gap-2">
-                <div className={`rounded-xl px-2 py-1.5 text-center ${th.dark ? "bg-[#E11D48]/10" : "bg-[#FFE4E9]"}`}>
-                  <p className={`text-xs font-semibold text-[#E11D48]`}>Tunai</p>
-                  <p className={`text-sm font-black text-[#E11D48]`}>{$(byMethod.cash || 0)}</p>
-                </div>
-                <div className={`rounded-xl px-2 py-1.5 text-center ${th.dark ? "bg-[#FB7185]/10" : "bg-[#FFE4E9]"}`}>
-                  <p className={`text-xs font-semibold ${th.acc}`}>QRIS</p>
-                  <p className={`text-sm font-black ${th.acc}`}>{$(byMethod.qris || 0)}</p>
-                </div>
-                <div className={`rounded-xl px-2 py-1.5 text-center ${th.dark ? "bg-[#E11D48]/10" : "bg-[#FFE4E9]"}`}>
-                  <p className={`text-xs font-semibold text-[#E11D48]`}>Transfer</p>
-                  <p className={`text-sm font-black text-[#E11D48]`}>{$((byMethod.transfer || 0) + (byMethod.card || 0))}</p>
-                </div>
-              </div>
-              {itemsSold.length > 0 && (
-                <>
+                <div className="flex items-center gap-2">
+                  {/* Privacy-first: nominal sembunyi default supaya customer di
+                      depan kasir tidak intip total penjualan. Cashier tap mata
+                      kalau perlu lihat sendiri. */}
+                  <p className={`text-base font-black ${th.acc} tabular-nums`}>
+                    {salesRevealed ? $(total) : "Rp •••"}
+                  </p>
                   <button
                     type="button"
-                    onClick={() => setShiftDetailOpen(v => !v)}
-                    className={`mt-2.5 w-full text-xs font-bold py-1.5 rounded-lg border ${th.bdr} ${th.txm}`}
+                    onClick={() => setSalesRevealed(v => !v)}
+                    aria-label={salesRevealed ? "Sembunyikan total" : "Lihat total"}
+                    aria-pressed={salesRevealed}
+                    title={salesRevealed ? "Sembunyikan" : "Lihat total"}
+                    className={`min-w-[36px] min-h-[36px] flex items-center justify-center rounded-lg ${th.elev} ${th.txm}`}
                   >
-                    {shiftDetailOpen ? "Tutup Rincian" : `Lihat Rincian Barang (${itemsSold.length})`}
+                    {salesRevealed ? <EyeOff size={14} /> : <Eye size={14} />}
                   </button>
-                  {shiftDetailOpen && (
-                    <div className={`mt-2 border rounded-xl overflow-hidden max-h-60 overflow-y-auto ${th.bdr}`}>
-                      {itemsSold.map((it, idx) => (
-                        <div key={idx} className={`flex items-center justify-between px-3 py-2 border-b last:border-0 ${th.bdrSoft}`}>
-                          <div className="min-w-0 flex-1 mr-2">
-                            <p className={`text-xs font-bold truncate ${th.tx}`}>{it.name}</p>
-                            <p className={`text-xs ${th.txm}`}>{it.qty}× · {$(it.total)}</p>
-                          </div>
-                          <span className={`text-sm font-black shrink-0 ${th.acc}`}>{it.qty}</span>
-                        </div>
-                      ))}
+                </div>
+              </div>
+              {salesRevealed && (
+                <>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className={`rounded-xl px-2 py-1.5 text-center ${th.dark ? "bg-[#E11D48]/10" : "bg-[#FFE4E9]"}`}>
+                      <p className={`text-xs font-semibold text-[#E11D48]`}>Tunai</p>
+                      <p className={`text-sm font-black text-[#E11D48] tabular-nums`}>{$(byMethod.cash || 0)}</p>
                     </div>
+                    <div className={`rounded-xl px-2 py-1.5 text-center ${th.dark ? "bg-[#FB7185]/10" : "bg-[#FFE4E9]"}`}>
+                      <p className={`text-xs font-semibold ${th.acc}`}>QRIS</p>
+                      <p className={`text-sm font-black ${th.acc} tabular-nums`}>{$(byMethod.qris || 0)}</p>
+                    </div>
+                    <div className={`rounded-xl px-2 py-1.5 text-center ${th.dark ? "bg-[#E11D48]/10" : "bg-[#FFE4E9]"}`}>
+                      <p className={`text-xs font-semibold text-[#E11D48]`}>Transfer</p>
+                      <p className={`text-sm font-black text-[#E11D48] tabular-nums`}>{$((byMethod.transfer || 0) + (byMethod.card || 0))}</p>
+                    </div>
+                  </div>
+                  {itemsSold.length > 0 && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setShiftDetailOpen(v => !v)}
+                        className={`mt-2.5 w-full text-xs font-bold py-1.5 rounded-lg border ${th.bdr} ${th.txm}`}
+                      >
+                        {shiftDetailOpen ? "Tutup Rincian" : `Lihat Rincian Barang (${itemsSold.length})`}
+                      </button>
+                      {shiftDetailOpen && (
+                        <div className={`mt-2 border rounded-xl overflow-hidden max-h-60 overflow-y-auto ${th.bdr}`}>
+                          {itemsSold.map((it, idx) => (
+                            <div key={idx} className={`flex items-center justify-between px-3 py-2 border-b last:border-0 ${th.bdrSoft}`}>
+                              <div className="min-w-0 flex-1 mr-2">
+                                <p className={`text-xs font-bold truncate ${th.tx}`}>{it.name}</p>
+                                <p className={`text-xs ${th.txm}`}>{it.qty}× · {$(it.total)}</p>
+                              </div>
+                              <span className={`text-sm font-black shrink-0 ${th.acc}`}>{it.qty}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </>
                   )}
                 </>
               )}

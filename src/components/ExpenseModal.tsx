@@ -17,10 +17,6 @@ interface Props {
 // kalau owner edit nama kategori.
 const EMPLOYEE_CATEGORY_NAMES = ["gaji", "lemburan", "pegawai", "beban pegawai"];
 
-// Sentinel value untuk opsi "Pegawai lain..." di dropdown — buka text input
-// bebas. Pakai prefix __ supaya tidak collide dengan user name yang valid.
-const EMPLOYEE_OTHER = "__other__";
-
 function todayYMD(): string {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -65,10 +61,10 @@ export function ExpenseModal({ open, onClose, expense }: Props) {
     return EMPLOYEE_CATEGORY_NAMES.some(k => name.includes(k));
   }, [selectedCategory]);
 
-  // Pegawai diambil langsung dari users table (yang sudah punya akun di
-  // sistem). Filter: active, exclude superadmin (owner sendiri — jarang
-  // gajian dari pengeluaran usaha). owner pilih dari dropdown, atau pilih
-  // "Pegawai lain..." untuk pegawai gudang/non-system → text input bebas.
+  // Pegawai diambil langsung dari users table — strict dropdown. Filter:
+  // active + exclude superadmin (owner sendiri jarang gajian dari pengeluaran).
+  // Kalau pegawai gudang/non-system perlu di-track, owner tambah dulu
+  // user-nya di Pengaturan (role staff/cashier) — biar konsisten + audit jelas.
   const employeeOptions = useMemo(
     () => users
       .filter(u => u.isActive !== false && u.role !== "superadmin")
@@ -77,12 +73,6 @@ export function ExpenseModal({ open, onClose, expense }: Props) {
       .sort((a, b) => a.localeCompare(b)),
     [users]
   );
-
-  // Apakah employeeName saat ini cocok dengan opsi dropdown? Kalau tidak,
-  // berarti sudah diisi manual (pegawai non-system) — show as "Lainnya".
-  const employeeSelectValue = employeeName === ""
-    ? ""
-    : employeeOptions.includes(employeeName) ? employeeName : EMPLOYEE_OTHER;
 
   // Description optional — kalau kosong, BE auto-fallback ke nama kategori.
   const valid = categoryId && expenseDate && parseFloat(amount) > 0;
@@ -166,29 +156,18 @@ export function ExpenseModal({ open, onClose, expense }: Props) {
               {lang === "id" ? "Nama Pegawai" : "Employee Name"}
             </label>
             <select
-              value={employeeSelectValue}
-              onChange={e => {
-                const v = e.target.value;
-                if (v === EMPLOYEE_OTHER) {
-                  // Buka text input — kosongkan dulu supaya placeholder
-                  // muncul, biar user paham harus ketik nama.
-                  setEmployeeName("");
-                } else {
-                  setEmployeeName(v);
-                }
-              }}
+              value={employeeName}
+              onChange={e => setEmployeeName(e.target.value)}
               className={`w-full px-3 py-3 text-sm font-bold rounded-xl border ${th.inp}`}>
               <option value="">{lang === "id" ? "Pilih pegawai..." : "Select employee..."}</option>
               {employeeOptions.map(n => <option key={n} value={n}>{n}</option>)}
-              <option value={EMPLOYEE_OTHER}>
-                {lang === "id" ? "+ Pegawai lain (ketik nama)..." : "+ Other employee (type name)..."}
-              </option>
             </select>
-            {(employeeSelectValue === EMPLOYEE_OTHER || (employeeName && !employeeOptions.includes(employeeName))) && (
-              <input type="text" value={employeeName} onChange={e => setEmployeeName(e.target.value)}
-                maxLength={100} autoFocus
-                placeholder={lang === "id" ? "Ketik nama pegawai..." : "Type employee name..."}
-                className={`w-full mt-2 px-3 py-3 text-sm rounded-xl border ${th.inp}`} />
+            {employeeOptions.length === 0 && (
+              <p className={`text-xs mt-1.5 ${th.txf}`}>
+                {lang === "id"
+                  ? "Belum ada pegawai. Tambahkan dulu di Pengaturan → Pengguna."
+                  : "No employees yet. Add via Settings → Users first."}
+              </p>
             )}
           </div>
         )}
