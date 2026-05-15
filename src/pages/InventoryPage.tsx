@@ -11,6 +11,7 @@ import { useDebounce } from "@/hooks/useDebounce";
 import { usePageFetch } from "@/hooks/usePageFetch";
 import { formatCurrency as $, formatTime, formatDate, genId, genBatchNumber, calcDueDate, printBarcodeLabel, printBarcodeLabels } from "@/utils";
 import { exportProducts } from "@/utils/export";
+import { productApi } from "@/api";
 import type { UnitType, StockType, StockMovement, PaymentTerms, PaymentStatus, UnitOfMeasure } from "@/types";
 import toast from "react-hot-toast";
 import {
@@ -32,9 +33,29 @@ function getDateLabel(dateStr: string, t: Record<string, any>): string {
   return date.toLocaleDateString("en", { day: "numeric", month: "short", year: "numeric" });
 }
 
-function generateSku(categoryId: string, products: { sku: string }[], categories: { id: string; name: string }[]): string {
+// SKU prefix dari nama kategori — 3 huruf pertama (alphanumeric only),
+// uppercase. Fallback "GEN" kalau tidak ada nama yang valid.
+function skuPrefix(categoryId: string, categories: { id: string; name: string }[]): string {
   const cat = categories.find(c => c.id === categoryId);
-  const prefix = cat ? cat.name.replace(/[^A-Za-z]/g, "").slice(0, 3).toUpperCase() : "GEN";
+  if (!cat) return "GEN";
+  return cat.name.replace(/[^A-Za-z]/g, "").slice(0, 3).toUpperCase() || "GEN";
+}
+
+// Async: ambil next SKU dari BE (aware soft-deleted rows supaya tidak collide
+// dengan SKU yang stuck di tombstone). Fallback ke FE-side generate kalau
+// API gagal (e.g. offline) — fallback hanya scan FE products, bisa collide
+// dengan soft-deleted tapi minimal nggak block flow user offline.
+async function fetchNextSku(
+  categoryId: string,
+  products: { sku: string }[],
+  categories: { id: string; name: string }[]
+): Promise<string> {
+  const prefix = skuPrefix(categoryId, categories);
+  try {
+    const res = await productApi.getNextSku(prefix);
+    if (res.body?.sku) return res.body.sku;
+  } catch { /* fallback below */ }
+  // Fallback FE-side (offline / API error)
   const existing = products
     .filter(p => p.sku.startsWith(prefix + "-"))
     .map(p => parseInt(p.sku.split("-")[1], 10))
@@ -528,7 +549,17 @@ export function InventoryPage() {
           buried the main CTA. */}
       {canWrite && activeTab === "overview" && (
         <div className="grid grid-cols-[1.5fr_1fr] gap-2.5">
-          <button onClick={() => { const catId = categories.length > 0 ? categories[0].id : ""; setNewProd(p => ({ ...p, category: catId, sku: generateSku(catId, products, categories) })); setAddProdOpen(true); }}
+          <button onClick={async () => {
+              const catId = categories.length > 0 ? categories[0].id : "";
+              // Buka modal dulu supaya UI responsive, lalu update SKU saat
+              // datang dari BE. Hindari async tombol stuck.
+              setNewProd(p => ({ ...p, category: catId, sku: "" }));
+              setAddProdOpen(true);
+              if (catId) {
+                const sku = await fetchNextSku(catId, products, categories);
+                setNewProd(p => ({ ...p, sku }));
+              }
+            }}
             className="press-spring py-3 rounded-2xl text-sm font-black flex items-center justify-center gap-2 text-white bg-gradient-to-br from-[#FB7185] to-[#E11D48] shadow-[0_4px_14px_-4px_rgba(225,29,72,0.45)]">
             <Plus size={16} strokeWidth={3} /> {t.addProduct}
           </button>
@@ -1241,9 +1272,11 @@ export function InventoryPage() {
               <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>{lang === "id" ? "Kategori" : "Category"}</p>
               <SearchableSelect
                 value={newProd.category}
-                onChange={(cat) => {
-                  const sku = generateSku(cat, products, categories);
-                  setNewProd({ ...newProd, category: cat, sku });
+                onChange={async (cat) => {
+                  // Set kategori immediate, kosongkan SKU sambil await BE.
+                  setNewProd(p => ({ ...p, category: cat, sku: "" }));
+                  const sku = await fetchNextSku(cat, products, categories);
+                  setNewProd(p => ({ ...p, sku }));
                 }}
                 placeholder={lang === "id" ? "Pilih kategori" : "Select category"}
                 options={categories.map(c => ({
@@ -1691,36 +1724,63 @@ export function InventoryPage() {
       </Modal>
 
       {/* Print Labels Modal — option to include expiry date */}
-      {/* Confirm Delete Product */}
+      {/* Confirm Delete Product — dua tombol aksi:
+          1. Non-aktifkan (rekomendasi, reversible)
+          2. Tetap Hapus (permanen, SKU terkunci) */}
       <Modal open={!!confirmDeleteProductId} onClose={() => setConfirmDeleteProductId(null)} title="Hapus Produk?">
         {(() => {
           const p = products.find(pr => pr.id === confirmDeleteProductId);
           return (
             <div className="flex flex-col gap-3">
               <p className={`text-sm ${th.tx}`}>
-                {p ? <>Produk <b>{lang === "id" ? p.nameId : p.name}</b> (SKU {p.sku}) akan dihapus.</> : "Produk akan dihapus."}
+                {p ? <>Produk <b>{lang === "id" ? p.nameId : p.name}</b> (SKU <span className="font-mono">{p.sku}</span>)</> : "Produk ini"} akan dihapus.
               </p>
-              <div className={`rounded-xl border px-3 py-2.5 text-xs ${th.dark ? "border-[#E11D48]/30 bg-[#E11D48]/5 text-[#E11D48]" : "border-[#FFB5C0] bg-[#FFE4E9] text-[#E11D48]"}`}>
-                ⚠️ Produk akan hilang dari daftar dan POS. Riwayat transaksi lama tetap aman (nama & harga sudah tersimpan di order).
-                <br />
-                <span className="opacity-70">Kalau ragu, pakai toggle "Sembunyikan dari POS" saja.</span>
+
+              {/* Konsekuensi hapus — penting agar owner paham SKU lock-nya */}
+              <div className={`rounded-xl border px-3 py-3 text-xs flex items-start gap-2 ${th.dark ? "border-[#BE123C]/40 bg-[#3A1F2A]/40 text-[#FB7185]" : "border-[#BE123C]/30 bg-[#FCE4EC] text-[#BE123C]"}`}>
+                <AlertTriangle size={14} className="shrink-0 mt-0.5" aria-hidden />
+                <div>
+                  <p className="font-bold mb-1">SKU akan terkunci selamanya.</p>
+                  <p className="opacity-80">SKU "{p?.sku}" tidak bisa dipakai lagi untuk produk baru, walau nanti Bu Santi mau register ulang produk yang sama. Riwayat transaksi tetap aman.</p>
+                </div>
               </div>
-              <div className="flex gap-2 mt-1">
+
+              {/* Rekomendasi alternatif — non-aktifkan saja kalau cuma stok habis */}
+              <div className={`rounded-xl border px-3 py-3 text-xs ${th.bdr} ${th.elev}`}>
+                <p className={`font-bold mb-1 ${th.tx}`}>Saran: Non-Aktifkan saja</p>
+                <p className={th.txm}>Kalau cuma stok habis sementara atau discontinued, lebih aman non-aktifkan — produk hilang dari kasir tapi bisa diaktifkan lagi kapan saja tanpa input ulang.</p>
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-2 mt-1">
                 <button onClick={() => setConfirmDeleteProductId(null)}
-                  className={`flex-1 py-2.5 rounded-xl text-sm font-bold border ${th.bdr} ${th.txm}`}>
+                  className={`flex-1 min-h-[44px] rounded-xl text-sm font-bold border ${th.bdr} ${th.txm}`}>
                   Batal
                 </button>
+                {p && p.isActive && (
+                  <button
+                    onClick={async () => {
+                      if (confirmDeleteProductId) {
+                        await toggleActive(confirmDeleteProductId);
+                        toast.success("Produk dinon-aktifkan");
+                      }
+                      setConfirmDeleteProductId(null);
+                    }}
+                    className={`flex-1 min-h-[44px] rounded-xl text-sm font-bold ${th.accBg} ${th.acc}`}
+                  >
+                    Non-Aktifkan
+                  </button>
+                )}
                 <button
                   onClick={async () => {
                     if (confirmDeleteProductId) {
                       await deleteProduct(confirmDeleteProductId);
-                      toast.success("Produk dihapus");
+                      toast.success("Produk dihapus permanen");
                     }
                     setConfirmDeleteProductId(null);
                   }}
-                  className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white bg-[#C4504A]"
+                  className="flex-1 min-h-[44px] rounded-xl text-sm font-bold text-white bg-[#C4504A]"
                 >
-                  Hapus
+                  Tetap Hapus
                 </button>
               </div>
             </div>

@@ -69,6 +69,11 @@ export const productApi = {
 
   getLowStock: () => api.get<ProductRes[]>('/products/low-stock'),
 
+  // Auto-gen SKU next number untuk prefix tertentu. BE aware soft-deleted
+  // SKUs supaya tidak collide dengan tombstone rows.
+  getNextSku: (prefix: string) =>
+    api.get<{ sku: string }>(`/products/next-sku?prefix=${encodeURIComponent(prefix)}`),
+
   create: (data: {
     sku: string;
     barcode?: string;
