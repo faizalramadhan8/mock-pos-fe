@@ -449,12 +449,13 @@ function CreateModal({ open, onClose, onSubmit }: CreateModalProps) {
 
         {/* Line items */}
         <div className={`rounded-2xl border overflow-hidden ${th.bdr} ${th.card2}`}>
-          <div className={`px-4 py-3 border-b ${th.bdr} flex items-center justify-between gap-2`}>
+          <div className={`px-4 py-3 border-b ${th.bdr}`}>
             <p className={`text-xs font-bold uppercase tracking-wider ${th.txf}`}>Item ({items.length})</p>
-            <button type="button" onClick={addItem}
-              className={`text-sm font-bold inline-flex items-center gap-1.5 px-3 min-h-[36px] rounded-xl ${th.accBg} ${th.acc}`}>
-              <Plus size={14} /> Tambah Item
-            </button>
+            {/* Hint discoverability — owner pernah ngira harus bikin faktur
+                terpisah per produk. Jelaskan multi-item langsung di sini. */}
+            <p className={`text-xs mt-1.5 ${th.txm}`}>
+              1 faktur bisa berisi banyak produk dari supplier yang sama. Klik <b>Tambah Produk Lain</b> di bawah list untuk tambah produk.
+            </p>
           </div>
           <div className="max-h-96 overflow-y-auto">
             {items.map((it, idx) => {
@@ -528,6 +529,14 @@ function CreateModal({ open, onClose, onSubmit }: CreateModalProps) {
                 </div>
               );
             })}
+            {/* Bottom Tambah Item — full-width, dashed border supaya feel
+                "add row" like spreadsheet. Diletakkan setelah item terakhir
+                karena itu posisi mata user setelah isi field harga. */}
+            <button type="button" onClick={addItem}
+              className={`w-full flex items-center justify-center gap-2 px-4 py-4 border-t-2 border-dashed text-sm font-bold ${th.bdr} ${th.acc} hover:opacity-80 active:opacity-60`}>
+              <Plus size={16} strokeWidth={2.5} />
+              {items.length === 0 ? "Tambah Produk Pertama" : "Tambah Produk Lain"}
+            </button>
           </div>
         </div>
 
