@@ -16,7 +16,7 @@ interface DraftItem {
   productId: string;
   qty: string;
   unit: "individual" | "box";
-  unitPrice: string;
+  lineTotal: string;  // total Rp per baris item; unit_price di-compute dari ini saat submit
   expiryDate: string;
   note: string;
 }
@@ -25,7 +25,7 @@ const emptyDraftItem = (): DraftItem => ({
   productId: "",
   qty: "",
   unit: "individual",
-  unitPrice: "",
+  lineTotal: "",
   expiryDate: "",
   note: "",
 });
@@ -339,17 +339,12 @@ function CreateModal({ open, onClose, onSubmit }: CreateModalProps) {
     setDueDate(newDue);
   }, [invoiceDate, paymentTerms]);
 
-  // Compute subtotal from items
+  // Compute subtotal from items — sekarang langsung sum dari lineTotal yang
+  // di-input user (bukan dihitung qty × harga satuan lagi). Lebih simple +
+  // match input style.
   const subtotal = useMemo(() => {
-    return items.reduce((s, it) => {
-      const qtyN = parseInt(it.qty) || 0;
-      const priceN = parseFloat(it.unitPrice) || 0;
-      const product = products.find(p => p.id === it.productId);
-      // Convert to individual count for total calc (priceN per individual)
-      const qtyIndividual = it.unit === "box" && product ? qtyN * (product.qtyPerBox || 1) : qtyN;
-      return s + qtyIndividual * priceN;
-    }, 0);
-  }, [items, products]);
+    return items.reduce((s, it) => s + (parseFloat(it.lineTotal) || 0), 0);
+  }, [items]);
 
   const ppnAmount = useMemo(() => {
     if (!ppnEnabled) return 0;
@@ -368,7 +363,7 @@ function CreateModal({ open, onClose, onSubmit }: CreateModalProps) {
   };
 
   const valid = supplierId && items.length > 0 &&
-    items.every(it => it.productId && parseInt(it.qty) > 0 && parseFloat(it.unitPrice) >= 0);
+    items.every(it => it.productId && parseInt(it.qty) > 0 && parseFloat(it.lineTotal) >= 0);
 
   const handleSubmit = async () => {
     if (!valid) {
@@ -387,14 +382,24 @@ function CreateModal({ open, onClose, onSubmit }: CreateModalProps) {
         ppn_amount: ppnAmount,
         total_amount: total,
         note: note.trim() || undefined,
-        items: items.map(it => ({
-          product_id: it.productId,
-          quantity: parseInt(it.qty),
-          unit_type: it.unit,
-          unit_price: parseFloat(it.unitPrice),
-          expiry_date: it.expiryDate || undefined,
-          note: it.note.trim() || undefined,
-        })),
+        items: items.map(it => {
+          // Compute unit_price dari total / qty_individual untuk audit trail
+          // di purchase_invoice_items.unit_price. User input total saja —
+          // unit_price ini behind-the-scene saja, snapshot harga historis.
+          const qtyN = parseInt(it.qty) || 0;
+          const product = products.find(p => p.id === it.productId);
+          const qtyIndividual = it.unit === "box" && product ? qtyN * (product.qtyPerBox || 1) : qtyN;
+          const totalN = parseFloat(it.lineTotal) || 0;
+          const unitPrice = qtyIndividual > 0 ? totalN / qtyIndividual : 0;
+          return {
+            product_id: it.productId,
+            quantity: parseInt(it.qty),
+            unit_type: it.unit,
+            unit_price: unitPrice,
+            expiry_date: it.expiryDate || undefined,
+            note: it.note.trim() || undefined,
+          };
+        }),
       };
       await onSubmit(body);
     } finally {
@@ -461,9 +466,10 @@ function CreateModal({ open, onClose, onSubmit }: CreateModalProps) {
             {items.map((it, idx) => {
               const product = products.find(p => p.id === it.productId);
               const qtyN = parseInt(it.qty) || 0;
-              const priceN = parseFloat(it.unitPrice) || 0;
               const qtyIndividual = it.unit === "box" && product ? qtyN * (product.qtyPerBox || 1) : qtyN;
-              const lineTotal = qtyIndividual * priceN;
+              const lineTotalN = parseFloat(it.lineTotal) || 0;
+              // Display: harga per pcs untuk informational (auto-compute dari total).
+              const pricePerUnit = qtyIndividual > 0 ? lineTotalN / qtyIndividual : 0;
               return (
                 <div key={idx} className={`px-4 py-3 border-b last:border-0 ${th.bdrSoft}`}>
                   <div className="flex items-start gap-2 mb-2">
@@ -506,11 +512,11 @@ function CreateModal({ open, onClose, onSubmit }: CreateModalProps) {
                       </select>
                     </div>
                     <div>
-                      <label className={`text-xs font-bold ${th.txm} block mb-1`}>Harga /Satuan <span className="text-[#BE123C]">*</span></label>
-                      <input type="number" min="0" step="any" value={it.unitPrice}
+                      <label className={`text-xs font-bold ${th.txm} block mb-1`}>Total <span className="text-[#BE123C]">*</span></label>
+                      <input type="number" min="0" step="any" value={it.lineTotal}
                         inputMode="decimal"
-                        onChange={e => updateItem(idx, { unitPrice: e.target.value })}
-                        placeholder={product ? String(product.purchasePrice) : "0"}
+                        onChange={e => updateItem(idx, { lineTotal: e.target.value })}
+                        placeholder="0"
                         className={`w-full px-2.5 py-2.5 text-sm font-bold rounded-xl border ${th.inp}`} />
                     </div>
                   </div>
@@ -522,8 +528,13 @@ function CreateModal({ open, onClose, onSubmit }: CreateModalProps) {
                         className={`w-full px-2.5 py-2.5 text-sm rounded-xl border ${th.inp}`} />
                     </div>
                     <div className="text-right pt-4">
-                      <p className={`text-xs ${th.txf}`}>Subtotal item</p>
-                      <p className={`font-display text-base font-bold ${th.tx}`}>{$(lineTotal)}</p>
+                      {/* Display info: harga per pcs (auto-compute dari total/qty).
+                          Owner cuma input total, harga per unit otomatis muncul
+                          sebagai info — tidak perlu dihitung manual. */}
+                      {pricePerUnit > 0 && (
+                        <p className={`text-xs ${th.txf}`}>≈ {$(Math.round(pricePerUnit))} / pcs</p>
+                      )}
+                      <p className={`font-display text-base font-bold ${th.tx}`}>{$(lineTotalN)}</p>
                     </div>
                   </div>
                 </div>
