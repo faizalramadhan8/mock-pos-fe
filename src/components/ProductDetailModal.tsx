@@ -55,12 +55,35 @@ export function ProductDetailModal({ productId, onClose }: ProductDetailModalPro
     [product, batches]
   );
 
-  const recentMovements = useMemo(() =>
+  // Semua movement untuk produk (sorted by date desc — newest first). Dipakai
+  // dua kali: untuk display awal (slice 5) dan saat user expand "Lihat semua".
+  const allProductMovements = useMemo(() =>
     product
-      ? movements.filter(m => m.productId === product.id).slice(0, 5)
+      ? [...movements.filter(m => m.productId === product.id)]
+          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
       : [],
     [product, movements]
   );
+
+  // Toggle "Lihat semua" — default false, tampilkan 5 latest. Reset saat
+  // produk berganti supaya tidak carry-over state ke produk lain.
+  const [showAllMovements, setShowAllMovements] = useState(false);
+  useEffect(() => { setShowAllMovements(false); }, [product?.id]);
+
+  const recentMovements = useMemo(() =>
+    showAllMovements ? allProductMovements : allProductMovements.slice(0, 5),
+    [allProductMovements, showAllMovements]
+  );
+
+  // Summary qty in vs out untuk audit selisih cepat.
+  const movementSummary = useMemo(() => {
+    let totalIn = 0, totalOut = 0;
+    for (const m of allProductMovements) {
+      if (m.type === "in") totalIn += m.quantity;
+      else totalOut += m.quantity;
+    }
+    return { totalIn, totalOut, count: allProductMovements.length };
+  }, [allProductMovements]);
 
   // Price history — load when modal opens for a product. Fail silent: empty
   // history just hides the section, the rest of the modal still renders.
@@ -290,9 +313,22 @@ export function ProductDetailModal({ productId, onClose }: ProductDetailModalPro
         )}
       </div>
 
-      {/* Recent Movements */}
+      {/* Recent Movements — dengan toggle "Lihat semua" + summary in/out
+          untuk audit selisih per produk. */}
       <div className={`rounded-2xl border p-4 mb-3 ${th.bdr} ${th.card2}`}>
-        <p className={`text-xs font-bold uppercase tracking-wider mb-2.5 ${th.txf}`}>{t.recentMovements}</p>
+        <div className="flex items-center justify-between mb-2.5 gap-2 flex-wrap">
+          <p className={`text-xs font-bold uppercase tracking-wider ${th.txf}`}>
+            {t.recentMovements}
+            {movementSummary.count > 0 && (
+              <span className={`ml-1.5 ${th.txm}`}>({movementSummary.count})</span>
+            )}
+          </p>
+          {movementSummary.count > 0 && (
+            <span className={`text-xs ${th.txm}`}>
+              Masuk +{movementSummary.totalIn} · Keluar −{movementSummary.totalOut}
+            </span>
+          )}
+        </div>
         {recentMovements.length === 0 ? (
           <p className={`text-xs ${th.txf}`}>{t.noRecentMovements}</p>
         ) : (
@@ -325,6 +361,17 @@ export function ProductDetailModal({ productId, onClose }: ProductDetailModalPro
                 </div>
               );
             })}
+            {allProductMovements.length > 5 && (
+              <button
+                type="button"
+                onClick={() => setShowAllMovements(v => !v)}
+                className={`w-full min-h-[44px] mt-2 text-sm font-bold rounded-xl ${th.accBg} ${th.acc}`}
+              >
+                {showAllMovements
+                  ? `Sembunyikan (tampil ${allProductMovements.length})`
+                  : `Lihat semua (${allProductMovements.length - 5} lagi)`}
+              </button>
+            )}
           </div>
         )}
       </div>

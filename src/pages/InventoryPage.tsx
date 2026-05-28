@@ -494,8 +494,34 @@ export function InventoryPage() {
   const [showAllIn, setShowAllIn] = useState(false);
   const [showAllOut, setShowAllOut] = useState(false);
 
-  const stockInMovements = useMemo(() => movements.filter(m => m.type === "in"), [movements]);
-  const stockOutMovements = useMemo(() => movements.filter(m => m.type === "out"), [movements]);
+  // Filter produk untuk tab Barang Masuk/Keluar — supaya owner bisa audit
+  // selisih per produk (mis. "winchiz 2 kg keluar berapa kali bulan ini?").
+  const [movementProductFilter, setMovementProductFilter] = useState("");
+
+  const filterByProduct = (list: StockMovement[]) => {
+    if (!movementProductFilter) return list;
+    return list.filter(m => m.productId === movementProductFilter);
+  };
+
+  const stockInMovements = useMemo(
+    () => filterByProduct(movements.filter(m => m.type === "in")),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [movements, movementProductFilter]
+  );
+  const stockOutMovements = useMemo(
+    () => filterByProduct(movements.filter(m => m.type === "out")),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [movements, movementProductFilter]
+  );
+
+  // Summary qty untuk produk yang sedang di-filter — info cepat di header tab.
+  const movementSummary = useMemo(() => {
+    if (!movementProductFilter) return null;
+    const inQty = stockInMovements.reduce((s, m) => s + m.quantity, 0);
+    const outQty = stockOutMovements.reduce((s, m) => s + m.quantity, 0);
+    const product = products.find(p => p.id === movementProductFilter);
+    return { inQty, outQty, productName: product?.nameId || product?.name || "" };
+  }, [movementProductFilter, stockInMovements, stockOutMovements, products]);
 
   const getDaysUntilExpiry = (dateStr: string) => {
     const now = new Date();
@@ -894,6 +920,23 @@ export function InventoryPage() {
               </div>
             );
           })()}
+          {/* Filter produk — biar Bu Santi bisa audit per produk specific.
+              Default kosong = tampilkan semua. */}
+          <div className={`rounded-[18px] border p-3.5 ${th.card} ${th.bdr}`}>
+            <p className={`text-xs font-bold ${th.txm} mb-1.5`}>{lang === "id" ? "Filter Produk" : "Filter Product"}</p>
+            <SearchableSelect
+              value={movementProductFilter}
+              onChange={setMovementProductFilter}
+              options={products.map(p => ({ id: p.id, label: `${lang === "id" ? p.nameId : p.name} (${p.sku})` }))}
+              placeholder={lang === "id" ? "Pilih produk untuk filter…" : "Pick product to filter…"}
+            />
+            {movementSummary && (
+              <p className={`text-xs mt-2 ${th.txm}`}>
+                <b className={th.tx}>{movementSummary.productName}</b> · Masuk +{movementSummary.inQty} ·
+                {" "}<button onClick={() => setMovementProductFilter("")} className={`${th.acc} font-bold underline`}>Reset</button>
+              </p>
+            )}
+          </div>
           <div className={`rounded-[22px] border overflow-hidden ${th.card} ${th.bdr}`}>
             <div className={`px-5 py-3.5 border-b ${th.bdr}`}>
               <p className={`text-sm font-extrabold tracking-tight ${th.tx}`}>Riwayat Faktur Masuk</p>
@@ -915,6 +958,23 @@ export function InventoryPage() {
           <div className={`rounded-[18px] border p-3.5 ${th.card} ${th.bdr}`}>
             <p className={`text-xs font-semibold uppercase tracking-wider ${th.txm}`}>{t.totalOut}</p>
             <p className="text-xl font-black mt-1 text-[#C4504A]">-{totalOutCount}</p>
+          </div>
+          {/* Filter produk — sama dengan tab stockIn, state di-share supaya
+              konsisten saat owner switch tab. */}
+          <div className={`rounded-[18px] border p-3.5 ${th.card} ${th.bdr}`}>
+            <p className={`text-xs font-bold ${th.txm} mb-1.5`}>{lang === "id" ? "Filter Produk" : "Filter Product"}</p>
+            <SearchableSelect
+              value={movementProductFilter}
+              onChange={setMovementProductFilter}
+              options={products.map(p => ({ id: p.id, label: `${lang === "id" ? p.nameId : p.name} (${p.sku})` }))}
+              placeholder={lang === "id" ? "Pilih produk untuk filter…" : "Pick product to filter…"}
+            />
+            {movementSummary && (
+              <p className={`text-xs mt-2 ${th.txm}`}>
+                <b className={th.tx}>{movementSummary.productName}</b> · Keluar −{movementSummary.outQty} ·
+                {" "}<button onClick={() => setMovementProductFilter("")} className={`${th.acc} font-bold underline`}>Reset</button>
+              </p>
+            )}
           </div>
           <div className={`rounded-[22px] border overflow-hidden ${th.card} ${th.bdr}`}>
             {renderMovementList(stockOutMovements, showAllOut, setShowAllOut, stockOutMovements.length)}
