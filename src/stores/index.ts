@@ -1029,6 +1029,7 @@ interface PurchaseInvoiceState {
   invoices: PurchaseInvoice[];
   fetchInvoices: (params?: { status?: "paid" | "unpaid" | "all"; supplierId?: string; from?: string; to?: string }) => Promise<void>;
   createInvoice: (body: CreatePurchaseInvoiceBody) => Promise<PurchaseInvoice | null>;
+  updateInvoice: (id: string, body: CreatePurchaseInvoiceBody) => Promise<PurchaseInvoice | null>;
   markPaid: (id: string) => Promise<void>;
   deleteInvoice: (id: string) => Promise<void>;
 }
@@ -1061,6 +1062,20 @@ export const usePurchaseInvoiceStore = create<PurchaseInvoiceState>((set, get) =
       return created;
     } catch (e: any) {
       toast.error(e.message || "Gagal menyimpan faktur");
+      return null;
+    }
+  },
+  updateInvoice: async (id, body) => {
+    try {
+      const res = await purchaseInvoiceApi.update(id, body);
+      const updated = res.body ? mapPurchaseInvoice(res.body) : null;
+      if (updated) {
+        set(s => ({ invoices: s.invoices.map(inv => inv.id === id ? updated : inv) }));
+        toast.success("Faktur diperbarui");
+      }
+      return updated;
+    } catch (e: any) {
+      toast.error(e.message || "Gagal memperbarui faktur");
       return null;
     }
   },

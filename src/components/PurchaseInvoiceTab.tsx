@@ -7,7 +7,7 @@ import { formatCurrency as $, formatDate, calcDueDate } from "@/utils";
 import { PAYMENT_TERMS_OPTIONS, PAYMENT_TERMS_LABELS, INVENTORY_WRITE_ROLES } from "@/constants";
 import type { PaymentTerms, PurchaseInvoice } from "@/types";
 import type { CreatePurchaseInvoiceBody } from "@/api";
-import { Plus, Trash2, Receipt, Calendar, Check, AlertTriangle } from "lucide-react";
+import { Plus, Trash2, Receipt, Calendar, Check, AlertTriangle, Pencil } from "lucide-react";
 import toast from "react-hot-toast";
 
 const PPN_RATE = 0.11;
@@ -42,6 +42,8 @@ export function PurchaseInvoiceTab() {
   const invoices = usePurchaseInvoiceStore(s => s.invoices);
   const fetchInvoices = usePurchaseInvoiceStore(s => s.fetchInvoices);
   const createInvoice = usePurchaseInvoiceStore(s => s.createInvoice);
+  const updateInvoice = usePurchaseInvoiceStore(s => s.updateInvoice);
+  const deleteInvoice = usePurchaseInvoiceStore(s => s.deleteInvoice);
   const markPaid = usePurchaseInvoiceStore(s => s.markPaid);
   const products = useProductStore(s => s.products);
   const suppliers = useSupplierStore(s => s.suppliers);
@@ -49,7 +51,10 @@ export function PurchaseInvoiceTab() {
   const [statusFilter, setStatusFilter] = useState<"all" | "paid" | "unpaid">("all");
   const [supplierFilter, setSupplierFilter] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
+  // editInvoice: kalau set, modal jadi mode "edit" — prefill data + call update
+  const [editInvoice, setEditInvoice] = useState<PurchaseInvoice | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchInvoices({ status: statusFilter, supplierId: supplierFilter });
@@ -177,23 +182,66 @@ export function PurchaseInvoiceTab() {
         invoice={detail}
         onClose={() => setDetailId(null)}
         onMarkPaid={(id) => { markPaid(id); setDetailId(null); }}
+        onEdit={(inv) => { setEditInvoice(inv); setDetailId(null); }}
+        onDelete={(id) => { setConfirmDeleteId(id); setDetailId(null); }}
         canWrite={canWrite}
       />
 
-      {/* Create Modal */}
-      {createOpen && (
+      {/* Create / Edit Modal — reused. editInvoice menentukan mode. */}
+      {(createOpen || editInvoice) && (
         <CreateModal
-          open={createOpen}
-          onClose={() => setCreateOpen(false)}
+          open={createOpen || !!editInvoice}
+          initialInvoice={editInvoice}
+          onClose={() => { setCreateOpen(false); setEditInvoice(null); }}
           onSubmit={async (body) => {
-            const created = await createInvoice(body);
-            if (created) {
-              toast.success("Faktur tersimpan, stok di-update");
-              setCreateOpen(false);
+            if (editInvoice) {
+              const updated = await updateInvoice(editInvoice.id, body);
+              if (updated) setEditInvoice(null);
+            } else {
+              const created = await createInvoice(body);
+              if (created) {
+                toast.success("Faktur tersimpan");
+                setCreateOpen(false);
+              }
             }
           }}
         />
       )}
+
+      {/* Confirm Delete Modal */}
+      {confirmDeleteId && (() => {
+        const inv = invoices.find(i => i.id === confirmDeleteId);
+        if (!inv) return null;
+        const sup = suppliers.find(s => s.id === inv.supplierId);
+        return (
+          <Modal open={!!confirmDeleteId} onClose={() => setConfirmDeleteId(null)} title="Hapus Faktur?">
+            <div className="flex flex-col gap-3">
+              <p className={`text-sm ${th.tx}`}>
+                Faktur dari <b>{sup?.name || "supplier"}</b> tanggal <b>{formatDate(inv.invoiceDate)}</b>
+                {" "}senilai <b>{$(inv.totalAmount)}</b> akan dihapus.
+              </p>
+              <div className={`rounded-xl border px-3 py-2.5 text-xs flex items-start gap-2 ${th.dark ? "border-[#BE123C]/40 bg-[#3A1F2A]/40 text-[#FB7185]" : "border-[#BE123C]/30 bg-[#FCE4EC] text-[#BE123C]"}`}>
+                <AlertTriangle size={14} className="shrink-0 mt-0.5" aria-hidden />
+                <span>Tindakan ini tidak bisa dibatalkan. Faktur ini hanya catatan — stok produk tidak terpengaruh.</span>
+              </div>
+              <div className="flex gap-2 mt-1">
+                <button onClick={() => setConfirmDeleteId(null)}
+                  className={`flex-1 min-h-[44px] rounded-xl text-sm font-bold border ${th.bdr} ${th.txm}`}>
+                  Batal
+                </button>
+                <button
+                  onClick={async () => {
+                    await deleteInvoice(confirmDeleteId);
+                    setConfirmDeleteId(null);
+                  }}
+                  className="flex-1 min-h-[44px] rounded-xl text-sm font-bold text-white bg-[#C4504A]">
+                  Hapus
+                </button>
+              </div>
+            </div>
+          </Modal>
+        );
+      })()}
     </div>
   );
 }
@@ -204,10 +252,12 @@ interface DetailModalProps {
   invoice: PurchaseInvoice | null;
   onClose: () => void;
   onMarkPaid: (id: string) => void;
+  onEdit: (invoice: PurchaseInvoice) => void;
+  onDelete: (id: string) => void;
   canWrite: boolean;
 }
 
-function DetailModal({ invoice, onClose, onMarkPaid, canWrite }: DetailModalProps) {
+function DetailModal({ invoice, onClose, onMarkPaid, onEdit, onDelete, canWrite }: DetailModalProps) {
   const th = useThemeClasses();
   const { lang } = useLangStore();
   if (!invoice) return null;
@@ -295,11 +345,25 @@ function DetailModal({ invoice, onClose, onMarkPaid, canWrite }: DetailModalProp
         </div>
 
         {/* Actions */}
-        {canWrite && invoice.paymentStatus === "unpaid" && (
-          <button onClick={() => onMarkPaid(invoice.id)}
-            className="w-full py-3 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48] inline-flex items-center justify-center gap-2">
-            <Check size={14} /> Tandai Lunas
-          </button>
+        {canWrite && (
+          <div className="flex flex-col gap-2">
+            {invoice.paymentStatus === "unpaid" && (
+              <button onClick={() => onMarkPaid(invoice.id)}
+                className="w-full min-h-[44px] rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48] inline-flex items-center justify-center gap-2">
+                <Check size={14} /> Tandai Lunas
+              </button>
+            )}
+            <div className="flex gap-2">
+              <button onClick={() => onEdit(invoice)}
+                className={`flex-1 min-h-[44px] rounded-2xl text-sm font-bold border inline-flex items-center justify-center gap-1.5 ${th.bdr} ${th.acc}`}>
+                <Pencil size={14} /> Edit Faktur
+              </button>
+              <button onClick={() => onDelete(invoice.id)}
+                className={`flex-1 min-h-[44px] rounded-2xl text-sm font-bold border inline-flex items-center justify-center gap-1.5 ${th.dark ? "border-[#BE123C]/40 text-[#FB7185]" : "border-[#BE123C]/30 text-[#BE123C]"}`}>
+                <Trash2 size={14} /> Hapus
+              </button>
+            </div>
+          </div>
         )}
       </div>
     </Modal>
@@ -312,24 +376,50 @@ interface CreateModalProps {
   open: boolean;
   onClose: () => void;
   onSubmit: (body: CreatePurchaseInvoiceBody) => Promise<void>;
+  /** Kalau set, modal jadi mode "Edit Faktur" — prefill semua field dari
+   *  invoice ini. onSubmit pemanggil yang handle update endpoint. */
+  initialInvoice?: PurchaseInvoice | null;
 }
 
-function CreateModal({ open, onClose, onSubmit }: CreateModalProps) {
+function CreateModal({ open, onClose, onSubmit, initialInvoice }: CreateModalProps) {
   const th = useThemeClasses();
   const products = useProductStore(s => s.products);
   const suppliers = useSupplierStore(s => s.suppliers);
 
   const today = new Date().toISOString().slice(0, 10);
+  const isEdit = !!initialInvoice;
 
-  const [invoiceNumber, setInvoiceNumber] = useState("");
-  const [supplierId, setSupplierId] = useState("");
-  const [invoiceDate, setInvoiceDate] = useState(today);
-  const [paymentTerms, setPaymentTerms] = useState<PaymentTerms>("COD");
-  const [dueDate, setDueDate] = useState(today);
-  const [ppnEnabled, setPpnEnabled] = useState(false); // toggle PPN — owner: kalau supplier UMKM no-PPN, off
-  const [ppnOverride, setPpnOverride] = useState(""); // empty = auto 11% × subtotal
-  const [note, setNote] = useState("");
-  const [items, setItems] = useState<DraftItem[]>([emptyDraftItem()]);
+  // Helper: map PurchaseInvoice → DraftItem[] untuk prefill di edit mode.
+  // qty_per_box conversion: kalau item disimpan dengan unit_type='box' dan
+  // qty sudah dikali qtyPerBox saat create, balik ke nilai semula. Untuk
+  // simplicity di edit, default ke 'individual' dengan qty actual.
+  const prefillItems = (inv: PurchaseInvoice): DraftItem[] => {
+    if (!inv.items || inv.items.length === 0) return [emptyDraftItem()];
+    return inv.items.map(it => ({
+      productId: it.productId,
+      qty: String(it.quantity),
+      unit: "individual" as const,  // simplify: edit selalu individual
+      lineTotal: String(it.unitPrice * it.quantity),
+      expiryDate: it.expiryDate || "",
+      note: it.note || "",
+    }));
+  };
+
+  const [invoiceNumber, setInvoiceNumber] = useState(initialInvoice?.invoiceNumber || "");
+  const [supplierId, setSupplierId] = useState(initialInvoice?.supplierId || "");
+  const [invoiceDate, setInvoiceDate] = useState(
+    initialInvoice ? initialInvoice.invoiceDate.slice(0, 10) : today
+  );
+  const [paymentTerms, setPaymentTerms] = useState<PaymentTerms>(initialInvoice?.paymentTerms as PaymentTerms || "COD");
+  const [dueDate, setDueDate] = useState(
+    initialInvoice?.dueDate ? initialInvoice.dueDate.slice(0, 10) : today
+  );
+  const [ppnEnabled, setPpnEnabled] = useState(initialInvoice ? initialInvoice.ppnAmount > 0 : false);
+  const [ppnOverride, setPpnOverride] = useState(initialInvoice && initialInvoice.ppnAmount > 0 ? String(initialInvoice.ppnAmount) : "");
+  const [note, setNote] = useState(initialInvoice?.note || "");
+  const [items, setItems] = useState<DraftItem[]>(
+    initialInvoice ? prefillItems(initialInvoice) : [emptyDraftItem()]
+  );
   const [submitting, setSubmitting] = useState(false);
 
   // Auto-update dueDate when paymentTerms or invoiceDate changes
@@ -408,8 +498,22 @@ function CreateModal({ open, onClose, onSubmit }: CreateModalProps) {
   };
 
   return (
-    <Modal open={open} onClose={onClose} title="Catat Faktur Barang Masuk" size="xl">
+    <Modal open={open} onClose={onClose} title={isEdit ? "Edit Faktur Barang Masuk" : "Catat Faktur Barang Masuk"} size="xl">
       <div className="flex flex-col gap-3">
+        {/* Info banner — Faktur sekarang PURE RECORD (request owner):
+            tidak update stok, batch, atau movement. Owner aware via banner ini. */}
+        <div className={`rounded-2xl border px-4 py-3 text-xs flex items-start gap-2 ${th.dark ? "border-[#FB7185]/30 bg-[#3A1F2A]/40" : "border-[#FFB5C0] bg-[#FFF4F6]"}`}>
+          <AlertTriangle size={14} className={`shrink-0 mt-0.5 ${th.acc}`} aria-hidden />
+          <div className={th.txm}>
+            <p className={`font-bold mb-0.5 ${th.tx}`}>Faktur ini hanya sebagai catatan</p>
+            <p>
+              Stok produk <b>tidak otomatis bertambah</b> dari faktur ini.
+              Update stok lewat <b>Edit Produk → Tambah Stok Baru</b> (kalau ada ED)
+              atau <b>Sesuaikan Stok</b> untuk koreksi tanpa ED.
+            </p>
+          </div>
+        </div>
+
         {/* Supplier + invoice number */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
@@ -605,7 +709,7 @@ function CreateModal({ open, onClose, onSubmit }: CreateModalProps) {
           </button>
           <button onClick={handleSubmit} disabled={!valid || submitting}
             className="flex-1 py-3 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48] disabled:opacity-40">
-            {submitting ? "Menyimpan..." : "Simpan Faktur"}
+            {submitting ? "Menyimpan..." : (isEdit ? "Simpan Perubahan" : "Simpan Faktur")}
           </button>
         </div>
       </div>

@@ -85,6 +85,11 @@ export const purchaseInvoiceApi = {
   create: (data: CreatePurchaseInvoiceBody) =>
     api.post<PurchaseInvoiceRes>("/purchase-invoices/", data),
 
+  // Full replace edit — body sama dengan create. BE handle: update header
+  // + delete all old items + insert new items. Pure record, no stock impact.
+  update: (id: string, data: CreatePurchaseInvoiceBody) =>
+    api.put<PurchaseInvoiceRes>(`/purchase-invoices/${id}`, data),
+
   markPaid: (id: string) =>
     api.post<PurchaseInvoiceRes>(`/purchase-invoices/${id}/mark-paid`, {}),
 
