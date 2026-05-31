@@ -1,7 +1,7 @@
 import { api } from './client';
 import type { SupplierRes } from './products';
 
-export type PaymentTermsValue = "COD" | "NET7" | "NET14" | "NET30" | "NET60" | "NET90";
+export type PaymentTermsValue = "COD" | "NET7" | "NET14" | "NET21" | "NET30" | "NET60" | "NET90";
 export type PaymentStatusValue = "paid" | "unpaid";
 
 export interface PurchaseInvoiceItemRes {

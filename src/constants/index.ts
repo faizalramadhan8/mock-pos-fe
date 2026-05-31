@@ -19,12 +19,13 @@ export const UNIT_OPTIONS: UnitOfMeasure[] = ["kg","gr","ltr","ml","pcs","pack",
 // Payment terms untuk catat faktur barang masuk (Santi: Cash / 1 minggu /
 // 2 minggu / 1 bulan). NET60/NET90 tidak ditawarkan lagi tapi tetap ada di
 // type agar baca data lama tidak error.
-export const PAYMENT_TERMS_OPTIONS: PaymentTerms[] = ["COD","NET7","NET14","NET30"];
+export const PAYMENT_TERMS_OPTIONS: PaymentTerms[] = ["COD","NET7","NET14","NET21","NET30"];
 
 export const PAYMENT_TERMS_LABELS: Record<PaymentTerms, string> = {
   COD: "Cash",
   NET7: "Tempo 1 Minggu",
   NET14: "Tempo 2 Minggu",
+  NET21: "Tempo 3 Minggu",
   NET30: "Tempo 1 Bulan",
   NET60: "Tempo 2 Bulan",
   NET90: "Tempo 3 Bulan",

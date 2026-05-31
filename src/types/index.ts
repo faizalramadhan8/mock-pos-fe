@@ -10,7 +10,7 @@ export type StockType = "in" | "out";
 export type PageId = "dashboard" | "pos" | "inventory" | "orders" | "reports" | "expenses" | "settings";
 // PaymentTerms — "COD" kept as legacy alias for Cash (data lama masih ada).
 // Label Indonesia dipusatkan di PAYMENT_TERMS_LABELS.
-export type PaymentTerms = "COD" | "NET7" | "NET14" | "NET30" | "NET60" | "NET90";
+export type PaymentTerms = "COD" | "NET7" | "NET14" | "NET21" | "NET30" | "NET60" | "NET90";
 export type PaymentStatus = "paid" | "unpaid";
 export type UnitOfMeasure = "kg" | "gr" | "ltr" | "ml" | "pcs" | "pack" | "btl" | "can" | "bar" | "blk" | "tray" | "sachet";
 
