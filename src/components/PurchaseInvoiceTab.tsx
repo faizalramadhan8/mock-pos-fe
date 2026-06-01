@@ -4,6 +4,7 @@ import { SearchableSelect } from "./SearchableSelect";
 import { useProductStore, useSupplierStore, usePurchaseInvoiceStore, useAuthStore, useLangStore } from "@/stores";
 import { useThemeClasses } from "@/hooks/useThemeClasses";
 import { formatCurrency as $, formatDate, calcDueDate } from "@/utils";
+import { getDateRange, type DateRange, type CustomRange } from "@/utils/dateRange";
 import { PAYMENT_TERMS_OPTIONS, PAYMENT_TERMS_LABELS, INVENTORY_WRITE_ROLES } from "@/constants";
 import type { PaymentTerms, PurchaseInvoice } from "@/types";
 import type { CreatePurchaseInvoiceBody } from "@/api";
@@ -50,15 +51,37 @@ export function PurchaseInvoiceTab() {
 
   const [statusFilter, setStatusFilter] = useState<"all" | "paid" | "unpaid">("all");
   const [supplierFilter, setSupplierFilter] = useState("");
+  // Period filter — default "month" (Bulan Ini) supaya list tidak overwhelming.
+  // Pattern sama dengan Laporan + Pengeluaran page.
+  const [dateRange, setDateRange] = useState<DateRange>("month");
+  const [customRange, setCustomRange] = useState<CustomRange>({ from: "", to: "" });
   const [createOpen, setCreateOpen] = useState(false);
   // editInvoice: kalau set, modal jadi mode "edit" — prefill data + call update
   const [editInvoice, setEditInvoice] = useState<PurchaseInvoice | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
+  // Custom-range validation — kalau dipilih tapi tanggal kosong/salah,
+  // skip fetch supaya tidak kirim request invalid.
+  const customError = dateRange === "custom" && (
+    !customRange.from || !customRange.to
+      ? "Pilih tanggal awal dan akhir."
+      : new Date(customRange.from) > new Date(customRange.to)
+        ? "Tanggal awal tidak boleh setelah tanggal akhir."
+        : ""
+  );
+
   useEffect(() => {
-    fetchInvoices({ status: statusFilter, supplierId: supplierFilter });
-  }, [statusFilter, supplierFilter, fetchInvoices]);
+    if (customError) return;
+    const range = getDateRange(dateRange, customRange);
+    const fmtYMD = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    fetchInvoices({
+      status: statusFilter,
+      supplierId: supplierFilter,
+      from: range ? fmtYMD(range.start) : undefined,
+      to: range ? fmtYMD(range.end) : undefined,
+    });
+  }, [statusFilter, supplierFilter, dateRange, customRange, customError, fetchInvoices]);
 
   // Stats — count + total unpaid (untuk awareness owner)
   const stats = useMemo(() => {
@@ -108,7 +131,7 @@ export function PurchaseInvoiceTab() {
       </div>
 
       {/* Filters */}
-      <div className="flex gap-2 flex-wrap">
+      <div className="flex gap-2 flex-wrap items-center">
         <select value={statusFilter} onChange={e => setStatusFilter(e.target.value as typeof statusFilter)}
           className={`px-3 py-2 text-sm font-bold rounded-xl border ${th.inp}`}>
           <option value="all">Semua Status</option>
@@ -120,7 +143,34 @@ export function PurchaseInvoiceTab() {
           <option value="">Semua Pemasok</option>
           {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
         </select>
+        <select value={dateRange} onChange={e => setDateRange(e.target.value as DateRange)}
+          className={`px-3 py-2 text-sm font-bold rounded-xl border ${th.inp}`}>
+          <option value="today">Hari Ini</option>
+          <option value="yesterday">Kemarin</option>
+          <option value="week">Minggu Ini</option>
+          <option value="month">Bulan Ini</option>
+          <option value="all">Semua</option>
+          <option value="custom">Pilih Tanggal</option>
+        </select>
+        {dateRange === "custom" && (
+          <>
+            <input type="date" value={customRange.from} max={customRange.to || undefined}
+              onChange={e => setCustomRange(r => ({ ...r, from: e.target.value }))}
+              aria-label="Tanggal awal"
+              className={`px-3 py-2 text-sm font-bold rounded-xl border ${th.inp}`} />
+            <span className={`text-xs ${th.txm}`}>s/d</span>
+            <input type="date" value={customRange.to} min={customRange.from || undefined}
+              onChange={e => setCustomRange(r => ({ ...r, to: e.target.value }))}
+              aria-label="Tanggal akhir"
+              className={`px-3 py-2 text-sm font-bold rounded-xl border ${th.inp}`} />
+          </>
+        )}
       </div>
+      {customError && (
+        <p role="alert" className={`text-xs font-bold ${th.dark ? "text-[#FB7185]" : "text-[#BE123C]"} -mt-1`}>
+          {customError}
+        </p>
+      )}
 
       {/* List */}
       {invoices.length === 0 ? (
