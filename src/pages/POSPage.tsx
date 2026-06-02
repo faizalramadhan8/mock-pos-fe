@@ -11,6 +11,7 @@ import { useBarcodeScanner } from "@/hooks/useBarcodeScanner";
 import { usePageFetch } from "@/hooks/usePageFetch";
 import { formatCurrency as $, printReceipt, compressImage, genId, formatTime, printBarcodeLabel, printBarcodeLabels } from "@/utils";
 import { calcItemDiscount } from "@/utils/calc";
+import { orderApi } from "@/api";
 import Barcode from "react-barcode";
 import type { PaymentMethod, UnitType, DiscountType, Product, Order, Member } from "@/types";
 import toast from "react-hot-toast";
@@ -65,6 +66,12 @@ export function POSPage() {
   // Default-hidden total sales — privacy concern di toko, customer dari depan
   // kasir bisa intip layar. Cashier toggle eye icon kalau perlu lihat.
   const [salesRevealed, setSalesRevealed] = useState(false);
+  // Loading flag untuk tombol "Kirim WA" di modal struk — cegah double-click
+  // dan tampilkan spinner saat fetch.
+  const [waSending, setWaSending] = useState(false);
+  // Track per-order: sudah ke-kirim WA atau belum. Cegah dobel kirim ke
+  // customer yang sama dalam 1 sesi modal sukses.
+  const [waSentForOrderId, setWaSentForOrderId] = useState<string | null>(null);
   const [discountItemId, setDiscountItemId] = useState<string | null>(null);
   const [discountInput, setDiscountInput] = useState("");
   const [discountMode, setDiscountMode] = useState<DiscountType>("percent");
@@ -1181,12 +1188,51 @@ export function POSPage() {
               <Barcode value={lastOrder.id} format="CODE128" width={1.5} height={40} displayValue={true}
                 fontSize={11} font="DM Sans" background="transparent" margin={0} />
             </div>
-            <button onClick={() => { printReceipt(lastOrder, { cashierName: user.name }); }}
-              className={`w-full py-3 rounded-2xl text-sm font-bold border-2 ${th.bdr} ${th.tx}`}>
-              🖨 {t.printReceipt}
-            </button>
-            <button onClick={() => setLastOrder(null)}
-              className="w-full py-3 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48]">{t.close}</button>
+            {(() => {
+              // Punya nomor HP penerima? Member.phone atau customer_phone.
+              // Kalau ada, tampilkan tombol "Kirim Struk WA" — kasir manual
+              // putuskan kirim atau tidak (cegah double form vs cetak fisik).
+              const recipient = lastOrder.member?.phone || lastOrder.customerPhone || "";
+              const hasRecipient = !!recipient;
+              const alreadySent = waSentForOrderId === lastOrder.id;
+              return (
+                <div className="flex flex-col gap-2">
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => { printReceipt(lastOrder, { cashierName: user.name }); }}
+                      className={`flex-1 min-h-[44px] rounded-2xl text-sm font-bold border-2 inline-flex items-center justify-center gap-1.5 ${th.bdr} ${th.tx}`}
+                    >
+                      <Printer size={14} /> {t.printReceipt}
+                    </button>
+                    {hasRecipient && (
+                      <button
+                        onClick={async () => {
+                          if (waSending || alreadySent) return;
+                          setWaSending(true);
+                          try {
+                            await orderApi.resendWA(lastOrder.id);
+                            setWaSentForOrderId(lastOrder.id);
+                            toast.success(`Struk terkirim ke WhatsApp ${recipient}`);
+                          } catch (e: any) {
+                            toast.error(e.message || "Gagal kirim ke WhatsApp");
+                          } finally {
+                            setWaSending(false);
+                          }
+                        }}
+                        disabled={waSending || alreadySent}
+                        className={`flex-1 min-h-[44px] rounded-2xl text-sm font-bold inline-flex items-center justify-center gap-1.5 text-white ${alreadySent ? "bg-[#C4504A] opacity-60" : "bg-[#25D366]"} disabled:opacity-50`}
+                        aria-busy={waSending}
+                      >
+                        <Send size={14} />
+                        {waSending ? "Mengirim..." : alreadySent ? "Sudah Dikirim" : "Kirim Struk WA"}
+                      </button>
+                    )}
+                  </div>
+                  <button onClick={() => setLastOrder(null)}
+                    className="w-full min-h-[44px] rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48]">{t.close}</button>
+                </div>
+              );
+            })()}
           </div>
         )}
       </Modal>
