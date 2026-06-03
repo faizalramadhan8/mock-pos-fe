@@ -20,6 +20,7 @@ interface ProductDetailModalProps {
 // gampang scanned. lightClass = light mode, darkClass = dark mode.
 const REASON_BADGE: Record<string, { label: string; lightClass: string; darkClass: string }> = {
   restock:  { label: "Stok Masuk",  lightClass: "bg-[#FFE4E9] text-[#E11D48]", darkClass: "bg-[#E11D48]/15 text-[#E11D48]" },
+  initial:  { label: "Stok Awal",   lightClass: "bg-[#FFE4E9] text-[#E11D48]", darkClass: "bg-[#E11D48]/15 text-[#E11D48]" },
   sale:     { label: "Penjualan",   lightClass: "bg-[#FCE4EC] text-[#BE123C]", darkClass: "bg-[#FB7185]/15 text-[#FB7185]" },
   repack:   { label: "Repack",      lightClass: "bg-[#FFD1DB] text-[#BE123C]", darkClass: "bg-[#FFB5C0]/15 text-[#FFB5C0]" },
   lost:     { label: "Hilang",      lightClass: "bg-[#FCE4EC] text-[#BE123C]", darkClass: "bg-[#BE123C]/20 text-[#FB7185]" },

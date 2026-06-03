@@ -90,6 +90,11 @@ export function POSPage() {
   const [catFilter, setCatFilter] = useState("all");
   const [cartOpen, setCartOpen] = useState(false);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
+  // Lock UI saat checkout sedang diproses ke BE. Mencegah kasir double-click
+  // / start transaksi berikutnya sebelum yang sekarang confirm tersimpan.
+  // Background: customer pernah ter-debit QRIS Rp 134rb tapi DB kosong karena
+  // FE fire-and-forget tanpa await.
+  const [checkoutProcessing, setCheckoutProcessing] = useState(false);
   const [cashRcv, setCashRcv] = useState("");
   const [proofImage, setProofImage] = useState("");
   // Split payment — muncul kalau user bayar cash tapi kurang dari total.
@@ -328,7 +333,10 @@ export function POSPage() {
     updateQty(itemId, delta);
   }, [cartItems, products, updateQty, t.insufficientStock]);
 
-  const doCheckout = () => {
+  const doCheckout = async () => {
+    if (checkoutProcessing) return;  // cegah double-submit
+    setCheckoutProcessing(true);
+
     let totalSavings = 0;
     const orderItems = cartItems.map(ci => {
       const disc = calcItemDiscount(ci);
@@ -371,24 +379,49 @@ export function POSPage() {
       ...((payment === "qris" || payment === "transfer") && proofImage ? { paymentProof: proofImage } : {}),
       ...(orderDiscountType ? { orderDiscountType, orderDiscountValue, orderDiscount: orderDiscAmount } : {}),
     };
-    cartItems.forEach(ci => {
-      const delta = ci.unitType === "box" ? ci.quantity * ci.qtyPerBox : ci.quantity;
-      adjustStock(ci.productId, -delta);
-      consumeFIFO(ci.productId, delta);
-    });
-    addOrder(order).then(saved => {
-      // Use backend-assigned ID for audit log so it matches the real order
+
+    try {
+      // AWAIT BE save dulu — jangan optimistic clear cart sebelum BE
+      // confirm. Kasus historis: customer bayar QRIS, BE error, cart
+      // ke-clear duluan → data hilang. Sekarang baru lanjut bersihin
+      // setelah dipastikan tersimpan di DB.
+      const saved = await addOrder(order);
+
+      // Hanya setelah BE confirm, lakukan side-effect:
+      // 1. Local stock decrement (BE sudah update, fetchProducts dipanggil
+      //    di store sebelum return — tapi adjustStock cepat untuk feedback
+      //    UI saat data baru belum sampai)
+      cartItems.forEach(ci => {
+        const delta = ci.unitType === "box" ? ci.quantity * ci.qtyPerBox : ci.quantity;
+        adjustStock(ci.productId, -delta);
+        consumeFIFO(ci.productId, delta);
+      });
+
+      // 2. Audit log dengan backend-assigned ID
       useAuditStore.getState().log("order_created", user.id, user.name, `${saved.id} · ${$(saved.total)}`);
+
+      // 3. Show modal sukses
       setLastOrder(saved);
-    });
-    clearCart();
-    setCashRcv("");
-    setProofImage("");
-    setSelectedBankId("");
-    setSplitMethod("");
-    setCheckoutOpen(false);
-    setCartOpen(false);
-    toast.success(t.orderSuccess as string);
+
+      // 4. Bersihkan state input
+      clearCart();
+      setCashRcv("");
+      setProofImage("");
+      setSelectedBankId("");
+      setSplitMethod("");
+      setCheckoutOpen(false);
+      setCartOpen(false);
+      toast.success(t.orderSuccess as string);
+    } catch (e: any) {
+      // BE gagal: cart tidak ke-clear (kasir bisa retry / cek koneksi).
+      // PENTING: jangan tampilkan toast sukses, jangan close modal.
+      toast.error(
+        `Gagal menyimpan transaksi: ${e?.message || "cek koneksi internet"}. Cart aman, coba lagi.`,
+        { duration: 6000 }
+      );
+    } finally {
+      setCheckoutProcessing(false);
+    }
   };
 
   // Shared cart content renderer
@@ -975,7 +1008,7 @@ export function POSPage() {
       </Modal>
 
       {/* Checkout modal */}
-      <Modal open={checkoutOpen} onClose={() => setCheckoutOpen(false)} title={t.checkout as string}>
+      <Modal open={checkoutOpen} onClose={() => { if (!checkoutProcessing) setCheckoutOpen(false); }} title={t.checkout as string}>
         <div className="flex flex-col gap-4">
           <div className={`rounded-[20px] p-6 text-center ${th.accBg}`}>
             <p className={`text-xs font-semibold ${th.acc}`}>{t.totalAmount}</p>
@@ -1107,8 +1140,11 @@ export function POSPage() {
             </div>
           )}
           <div className="flex gap-2">
-            <button onClick={() => setCheckoutOpen(false)} className={`flex-1 py-3 rounded-2xl text-sm font-bold border ${th.bdr} ${th.txm}`}>{t.cancel}</button>
+            <button onClick={() => setCheckoutOpen(false)}
+              disabled={checkoutProcessing}
+              className={`flex-1 py-3 rounded-2xl text-sm font-bold border ${th.bdr} ${th.txm} disabled:opacity-40`}>{t.cancel}</button>
             <button onClick={doCheckout} disabled={
+              checkoutProcessing ||
               (payment === "cash" && (() => {
                 const rcv = parseFloat(cashRcv) || 0;
                 if (!rcv) return true;
@@ -1118,7 +1154,13 @@ export function POSPage() {
               })()) ||
               (payment === "transfer" && bankAccounts.length > 0 && !selectedBankId)
             }
-              className="flex-1 py-3 rounded-2xl text-sm font-bold text-white bg-[#E11D48] disabled:opacity-40">{t.confirm}</button>
+              aria-busy={checkoutProcessing}
+              className="flex-1 py-3 rounded-2xl text-sm font-bold text-white bg-[#E11D48] disabled:opacity-40 inline-flex items-center justify-center gap-2">
+              {checkoutProcessing && (
+                <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" aria-hidden />
+              )}
+              {checkoutProcessing ? "Menyimpan..." : t.confirm}
+            </button>
           </div>
         </div>
       </Modal>

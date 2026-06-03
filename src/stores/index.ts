@@ -508,10 +508,11 @@ export const useOrderStore = create<OrderState>((set, get) => ({
       await useBatchStore.getState().fetchBatches();
       return saved;
     } catch (e: any) {
-      // Fallback: add locally
-      set(s => ({ orders: [order, ...s.orders] }));
-      toast.error(e.message || 'Failed to create order');
-      return order;
+      // JANGAN silent-fallback (anti-pattern di CLAUDE.md). Throw supaya
+      // caller (doCheckout) bisa block UI + show real error ke kasir.
+      // Dulu: local fallback bikin kasir kira sukses padahal DB kosong →
+      // customer bayar tapi data hilang (kasus QRIS Rp 134rb).
+      throw e instanceof Error ? e : new Error(e?.message || 'Failed to create order');
     }
   },
   cancelOrder: (id) => {
