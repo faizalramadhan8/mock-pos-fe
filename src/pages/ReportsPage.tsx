@@ -547,9 +547,14 @@ function ProfitLossView({ pl, th, lang }: { pl: ProfitLossRes | null; th: ThemeC
   const grossDisplay = useCountUp(pl?.gross_profit || 0);
   const expenseDisplay = useCountUp(pl?.expense_total || 0);
   const netDisplay = useCountUp(pl?.net_profit || 0);
-  const supplierPaidDisplay = useCountUp(pl?.supplier_paid || 0);
-  const cashOutDisplay = useCountUp(pl?.cash_out_total || 0);
-  const cashDiffDisplay = useCountUp(pl?.cash_diff || 0);
+  // Owner request: hapus "Bayar Supplier (Faktur lunas)" dari Arus Kas.
+  // Semua pembayaran ke supplier sekarang dicatat sebagai Pengeluaran (kategori
+  // "Bayar X"). Jadi cash_out = expense_total saja (tidak include supplier_paid
+  // supaya tidak double-count kalau owner pakai dua jalur).
+  const displayCashOut = pl?.expense_total || 0;
+  const displayCashDiff = (pl?.revenue || 0) - displayCashOut;
+  const cashOutDisplay = useCountUp(displayCashOut);
+  const cashDiffDisplay = useCountUp(displayCashDiff);
 
   if (!pl) {
     return (
@@ -713,42 +718,11 @@ function ProfitLossView({ pl, th, lang }: { pl: ProfitLossRes | null; th: ThemeC
           </p>
         </div>
 
-        {/* Uang Keluar group label */}
-        <div className={`px-4 py-2 border-t ${th.bdrSoft} ${th.elev}`}>
-          <p className={`text-xs font-bold uppercase tracking-wider ${th.txm}`}>
-            {lang === "id" ? "Uang Keluar" : "Cash Out"}
-          </p>
-        </div>
-
-        {/* Bayar Supplier (Faktur lunas) */}
-        <div className={`px-4 py-3 pl-8 flex items-baseline justify-between gap-3 border-t ${th.bdrSoft}`}>
-          <div className="min-w-0">
-            <p className={`text-sm ${th.tx}`}>
-              · {lang === "id" ? "Bayar Supplier (Faktur lunas)" : "Pay Supplier (Paid invoices)"}
-            </p>
-            <p className={`text-xs ${th.txf}`}>
-              {lang === "id" ? "Pembelian bahan yang sudah dibayar periode ini" : "Material purchases paid this period"}
-            </p>
-          </div>
-          <p className={`font-display font-bold text-sm ${th.txm}`}>
-            Rp {supplierPaidDisplay.toLocaleString("id-ID")}
-          </p>
-        </div>
-
-        {/* Pengeluaran Operasional */}
-        <div className={`px-4 py-3 pl-8 flex items-baseline justify-between gap-3 border-t ${th.bdrSoft}`}>
-          <p className={`text-sm ${th.tx}`}>
-            · {lang === "id" ? "Pengeluaran Operasional" : "Operating Expenses"}
-          </p>
-          <p className={`font-display font-bold text-sm ${th.txm}`}>
-            Rp {expenseDisplay.toLocaleString("id-ID")}
-          </p>
-        </div>
-
-        {/* Total Uang Keluar */}
+        {/* Uang Keluar — single row, gabung semua dari kategori Pengeluaran
+            (termasuk Bayar Supplier yang sekarang di-track sebagai kategori). */}
         <div className={`px-4 py-3 flex items-baseline justify-between gap-3 border-t ${th.bdrSoft}`}>
           <p className={`font-bold text-sm ${th.tx}`}>
-            {lang === "id" ? "Total Uang Keluar" : "Total Cash Out"}
+            {lang === "id" ? "Uang Keluar (Pengeluaran)" : "Cash Out (Expenses)"}
           </p>
           <p className={`font-display font-bold text-base ${th.txm}`}>
             Rp {cashOutDisplay.toLocaleString("id-ID")}
@@ -757,18 +731,18 @@ function ProfitLossView({ pl, th, lang }: { pl: ProfitLossRes | null; th: ThemeC
 
         {/* Selisih Kas */}
         <div className={`px-4 py-4 flex items-center justify-between gap-3 border-t-2 ${
-          (pl.cash_diff || 0) >= 0
+          displayCashDiff >= 0
             ? (th.dark ? "border-[#FB7185] bg-[#3A1F2A]/40" : "border-[#E11D48] bg-[#FFF4F6]")
             : (th.dark ? "border-[#BE123C] bg-[#3D1F2C]/40" : "border-[#BE123C] bg-[#FCE4EC]/40")
         }`}>
           <div className="flex items-center gap-2 min-w-0">
             {/* Trend icon: accessibility (color-not-only). */}
-            {(pl.cash_diff || 0) >= 0
+            {displayCashDiff >= 0
               ? <TrendingUp size={18} className={th.acc} aria-hidden />
               : <TrendingDown size={18} className={th.dark ? "text-[#FB7185]" : "text-[#BE123C]"} aria-hidden />}
             <div className="min-w-0">
               <p className={`font-black text-base uppercase tracking-wider ${
-                (pl.cash_diff || 0) >= 0 ? th.acc : (th.dark ? "text-[#FB7185]" : "text-[#BE123C]")
+                displayCashDiff >= 0 ? th.acc : (th.dark ? "text-[#FB7185]" : "text-[#BE123C]")
               }`}>
                 {lang === "id" ? "Selisih Kas" : "Cash Diff"}
               </p>
@@ -778,25 +752,15 @@ function ProfitLossView({ pl, th, lang }: { pl: ProfitLossRes | null; th: ThemeC
             </div>
           </div>
           <p className={`font-display font-black text-lg ${
-            (pl.cash_diff || 0) >= 0 ? th.acc : (th.dark ? "text-[#FB7185]" : "text-[#BE123C]")
+            displayCashDiff >= 0 ? th.acc : (th.dark ? "text-[#FB7185]" : "text-[#BE123C]")
           }`}>
             Rp {cashDiffDisplay.toLocaleString("id-ID")}
           </p>
         </div>
 
-        {/* Info faktur belum lunas (kewajiban yang masih jalan) */}
-        {pl.supplier_unpaid > 0 && (
-          <div className={`px-4 py-3 border-t ${th.bdrSoft} flex items-start gap-2 ${th.elev}`}>
-            <Info size={14} className={`mt-0.5 shrink-0 ${th.txm}`} aria-hidden />
-            <p className={`text-xs ${th.txm}`}>
-              <b className={th.tx}>{lang === "id" ? "Faktur tempo belum lunas:" : "Unpaid invoices (term):"}</b>{" "}
-              Rp {pl.supplier_unpaid.toLocaleString("id-ID")}{" "}
-              <span className={th.txf}>
-                — {lang === "id" ? "akan jadi uang keluar saat dibayar." : "will become cash out when paid."}
-              </span>
-            </p>
-          </div>
-        )}
+        {/* Info "Faktur tempo belum lunas" dihapus per owner request — bikin
+            ribet dibaca. Owner cek outstanding faktur langsung di Stok →
+            Catat Faktur Barang Masuk (filter status Belum Lunas). */}
       </div>
 
       {/* Glossary singkat — buka untuk owner yang gak tahu istilah */}
@@ -811,7 +775,7 @@ function ProfitLossView({ pl, th, lang }: { pl: ProfitLossRes | null; th: ThemeC
           <p><b className={th.tx}>{lang === "id" ? "Laba Kotor" : "Gross Profit"}:</b> {lang === "id" ? "Untung dari jual barang sebelum dikurangi biaya operasional." : "Profit from selling goods before operating expenses."}</p>
           <p><b className={th.tx}>{lang === "id" ? "Pengeluaran Operasional" : "Operating Expenses"}:</b> {lang === "id" ? "Biaya menjalankan toko: gaji, listrik, plastik, dll." : "Cost of running the store: salary, electricity, packaging, etc."}</p>
           <p><b className={th.tx}>{lang === "id" ? "Untung Bersih" : "Net Profit"}:</b> {lang === "id" ? "Hasil akhir = Pendapatan − Modal − Pengeluaran. Ini yang masuk kantong Anda." : "Bottom line = Revenue − COGS − Expenses."}</p>
-          <p><b className={th.tx}>{lang === "id" ? "Arus Kas / Selisih Kas" : "Cash Flow / Cash Diff"}:</b> {lang === "id" ? "Uang real yang masuk-keluar di periode (termasuk bayar supplier). Beda dengan Untung Bersih: barang yang dibeli tapi belum laku tetap ngurangi kas, tapi tidak ngurangi untung." : "Real cash in/out (includes supplier payments). Different from Net Profit: bought but unsold goods reduce cash but not profit."}</p>
+          <p><b className={th.tx}>{lang === "id" ? "Arus Kas / Selisih Kas" : "Cash Flow / Cash Diff"}:</b> {lang === "id" ? "Uang real yang masuk dari penjualan dikurangi semua pengeluaran (gaji, plastik, listrik, bayar supplier, dll). Beda dengan Untung Bersih: barang yang dibeli tapi belum laku tetap ngurangi kas, tapi tidak ngurangi untung." : "Real cash from sales minus all expenses (salary, packaging, utilities, supplier payments, etc.). Different from Net Profit: bought but unsold goods reduce cash but not profit."}</p>
         </div>
       </details>
     </div>
