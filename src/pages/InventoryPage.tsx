@@ -323,37 +323,49 @@ export function InventoryPage() {
     setEditProdOpen(true);
   };
 
-  const doEditProduct = () => {
+  const doEditProduct = async () => {
     if (!editProdId || !editProd.name || !editProd.nameId || !editProd.sku) return;
     const memberPriceVal = parseInt(editProd.memberPrice);
     // 0 (or invalid) signals BE to clear member_price; positive number sets it
     const memberPriceToSend = Number.isFinite(memberPriceVal) && memberPriceVal > 0 ? memberPriceVal : 0;
-    // If owner enters an "addStock" + new ED, we treat it as a new batch
-    // (not a stock override). Base stock += addStock, and a fresh batch row
-    // is created so FIFO picks up the new expiry date. This avoids the
-    // confusion of "which batch does the edited ED belong to?".
     const addQty = parseInt(editProd.addStock) || 0;
-    const baseStock = parseInt(editProd.stock) || 0;
-    const finalStock = baseStock + addQty;
-    updateProduct(editProdId, {
+    const purchasePrice = parseInt(editProd.purchasePrice) || 0;
+    // Update header product. KALAU ada addQty, SKIP field stock di update —
+    // biar stok di-increment via addMovement (yang juga insert audit trail +
+    // batch). Cegah double-count: dulu stok di-set langsung di sini lalu
+    // juga di-update lewat movement = 2x lipat.
+    const productPatch: Parameters<typeof updateProduct>[1] = {
       name: editProd.name, nameId: editProd.nameId, sku: editProd.sku,
       category: editProd.category,
       supplierId: editProd.supplier,
-      purchasePrice: parseInt(editProd.purchasePrice) || 0,
+      purchasePrice,
       sellingPrice: parseInt(editProd.sellingPrice) || 0,
       memberPrice: memberPriceToSend,
       qtyPerBox: parseInt(editProd.qtyPerBox) || 12,
-      stock: finalStock, unit: editProd.unit, image: editProd.image || "", minStock: parseInt(editProd.minStock) || 10,
-    });
-    if (editProd.expiryDate && addQty > 0) {
-      addBatch({
+      unit: editProd.unit, image: editProd.image || "", minStock: parseInt(editProd.minStock) || 10,
+    };
+    if (addQty === 0) {
+      // No new stock — keep current value (no change to stock field).
+      productPatch.stock = parseInt(editProd.stock) || 0;
+    }
+    await updateProduct(editProdId, productPatch);
+
+    // Tambah Stok Baru → buat stock_movement type='in' (reason='restock').
+    // BE atomic: increment products.stock + create stock_batches (kalau ED) +
+    // insert stock_movements. Hasilnya: audit trail komplit di "Pergerakan
+    // Terakhir" + ED ter-track untuk FIFO.
+    if (addQty > 0) {
+      await addMovement({
         id: genId(),
         productId: editProdId,
+        type: "in" as const,
         quantity: addQty,
-        expiryDate: editProd.expiryDate,
-        receivedAt: new Date().toISOString(),
-        note: "Tambahan dari Edit Produk",
-        batchNumber: genBatchNumber(),
+        unitType: "individual" as const,
+        unitPrice: purchasePrice,
+        note: "Tambah Stok Baru (Edit Produk)",
+        expiryDate: editProd.expiryDate || undefined,
+        createdAt: new Date().toISOString(),
+        createdBy: user.id,
       });
     }
     setEditProdOpen(false);
