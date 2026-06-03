@@ -7,6 +7,7 @@ import {
 } from "@/stores";
 import { useThemeClasses } from "@/hooks/useThemeClasses";
 import { formatCurrency as $, formatDate, formatTime, printBarcodeLabel } from "@/utils";
+import { getDateRange, type DateRange, type CustomRange } from "@/utils/dateRange";
 import { ArrowDownCircle, ArrowUpCircle, Printer } from "lucide-react";
 import { productApi, type ProductPriceHistoryRes } from "@/api/products";
 
@@ -55,15 +56,37 @@ export function ProductDetailModal({ productId, onClose }: ProductDetailModalPro
     [product, batches]
   );
 
-  // Semua movement untuk produk (sorted by date desc — newest first). Dipakai
-  // dua kali: untuk display awal (slice 5) dan saat user expand "Lihat semua".
-  const allProductMovements = useMemo(() =>
-    product
-      ? [...movements.filter(m => m.productId === product.id)]
-          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-      : [],
-    [product, movements]
+  // Filter periode untuk Pergerakan Terakhir — default "all" supaya owner
+  // lihat full history per produk. Reset saat ganti produk.
+  const [dateRange, setDateRange] = useState<DateRange>("all");
+  const [customRange, setCustomRange] = useState<CustomRange>({ from: "", to: "" });
+  useEffect(() => {
+    setDateRange("all");
+    setCustomRange({ from: "", to: "" });
+  }, [product?.id]);
+
+  const customError = dateRange === "custom" && (
+    !customRange.from || !customRange.to
+      ? "Pilih tanggal awal dan akhir."
+      : new Date(customRange.from) > new Date(customRange.to)
+        ? "Tanggal awal tidak boleh setelah tanggal akhir."
+        : ""
   );
+
+  // Semua movement untuk produk (sorted by date desc — newest first), lalu
+  // filter by date range. Dipakai untuk display + summary.
+  const allProductMovements = useMemo(() => {
+    if (!product) return [];
+    const list = [...movements.filter(m => m.productId === product.id)]
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    if (customError) return list;
+    const range = getDateRange(dateRange, customRange);
+    if (!range) return list;
+    return list.filter(m => {
+      const d = new Date(m.createdAt);
+      return d >= range.start && d <= range.end;
+    });
+  }, [product, movements, dateRange, customRange, customError]);
 
   // Toggle "Lihat semua" — default false, tampilkan 5 latest. Reset saat
   // produk berganti supaya tidak carry-over state ke produk lain.
@@ -75,7 +98,7 @@ export function ProductDetailModal({ productId, onClose }: ProductDetailModalPro
     [allProductMovements, showAllMovements]
   );
 
-  // Summary qty in vs out untuk audit selisih cepat.
+  // Summary qty in vs out untuk audit selisih cepat (filtered by range).
   const movementSummary = useMemo(() => {
     let totalIn = 0, totalOut = 0;
     for (const m of allProductMovements) {
@@ -314,7 +337,7 @@ export function ProductDetailModal({ productId, onClose }: ProductDetailModalPro
       </div>
 
       {/* Recent Movements — dengan toggle "Lihat semua" + summary in/out
-          untuk audit selisih per produk. */}
+          + filter periode untuk audit selisih per produk per range. */}
       <div className={`rounded-2xl border p-4 mb-3 ${th.bdr} ${th.card2}`}>
         <div className="flex items-center justify-between mb-2.5 gap-2 flex-wrap">
           <p className={`text-xs font-bold uppercase tracking-wider ${th.txf}`}>
@@ -329,8 +352,43 @@ export function ProductDetailModal({ productId, onClose }: ProductDetailModalPro
             </span>
           )}
         </div>
+
+        {/* Filter periode — sama pola dengan Laporan/Pengeluaran/Faktur. */}
+        <div className="flex flex-wrap items-center gap-2 mb-3">
+          <select value={dateRange} onChange={e => setDateRange(e.target.value as DateRange)}
+            className={`px-2.5 py-1.5 text-xs font-bold rounded-lg border ${th.inp}`}>
+            <option value="today">Hari Ini</option>
+            <option value="yesterday">Kemarin</option>
+            <option value="week">Minggu Ini</option>
+            <option value="month">Bulan Ini</option>
+            <option value="all">Semua</option>
+            <option value="custom">Pilih Tanggal</option>
+          </select>
+          {dateRange === "custom" && (
+            <>
+              <input type="date" value={customRange.from} max={customRange.to || undefined}
+                onChange={e => setCustomRange(r => ({ ...r, from: e.target.value }))}
+                aria-label="Tanggal awal"
+                className={`px-2.5 py-1.5 text-xs font-bold rounded-lg border ${th.inp}`} />
+              <span className={`text-xs ${th.txm}`}>s/d</span>
+              <input type="date" value={customRange.to} min={customRange.from || undefined}
+                onChange={e => setCustomRange(r => ({ ...r, to: e.target.value }))}
+                aria-label="Tanggal akhir"
+                className={`px-2.5 py-1.5 text-xs font-bold rounded-lg border ${th.inp}`} />
+            </>
+          )}
+        </div>
+        {customError && (
+          <p role="alert" className={`text-xs font-bold mb-2 ${th.dark ? "text-[#FB7185]" : "text-[#BE123C]"}`}>
+            {customError}
+          </p>
+        )}
         {recentMovements.length === 0 ? (
-          <p className={`text-xs ${th.txf}`}>{t.noRecentMovements}</p>
+          <p className={`text-xs ${th.txf}`}>
+            {dateRange === "all"
+              ? (t.noRecentMovements as string)
+              : "Tidak ada pergerakan di periode ini. Coba ubah filter."}
+          </p>
         ) : (
           <div className="space-y-2">
             {recentMovements.map(m => {
