@@ -1725,11 +1725,48 @@ export function InventoryPage() {
             { v: "sample", label: "Sample / promo", hint: "Diberikan ke customer / event" },
             { v: "other", label: "Lainnya", hint: "Isi catatan untuk detail" },
           ];
+          // Pergerakan terakhir untuk konteks audit. Bu Santi minta info
+          // tanggal barang masuk supaya gampang trace selisih: "barang ini
+          // terakhir masuk kapan, sudah berapa keluar, kenapa selisih".
+          const productMovements = movements.filter(m => m.productId === p.id)
+            .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+          const lastInMovement = productMovements.find(m => m.type === "in");
+          const totalIn = productMovements.filter(m => m.type === "in").reduce((s, m) => s + m.quantity, 0);
+          const totalOut = productMovements.filter(m => m.type === "out").reduce((s, m) => s + m.quantity, 0);
+
           return (
             <div className="flex flex-col gap-3">
               <div className={`rounded-xl border px-3 py-2.5 ${th.bdr} ${th.elev}`}>
                 <p className={`font-bold text-sm ${th.tx}`}>{p.nameId || p.name}</p>
                 <p className={`text-xs ${th.txm}`}>SKU {p.sku} · Stok saat ini: <b>{p.stock}</b> {p.unit}</p>
+              </div>
+
+              {/* Context audit: barang masuk + keluar history singkat. Bu Santi
+                  bisa cross-check sebelum decide adjustment + alasan. */}
+              <div className={`rounded-xl border px-3 py-2.5 ${th.bdr} ${th.card2}`}>
+                <div className="flex items-center justify-between mb-1.5">
+                  <p className={`text-xs font-bold uppercase tracking-wider ${th.txf}`}>
+                    Riwayat Pergerakan
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => { setAdjustOpen(false); setDetailProductId(p.id); }}
+                    className={`text-xs font-bold ${th.acc} underline`}>
+                    Lihat lengkap →
+                  </button>
+                </div>
+                {lastInMovement ? (
+                  <p className={`text-xs ${th.txm}`}>
+                    Terakhir masuk: <b className={th.tx}>{formatDate(lastInMovement.createdAt)}</b> · +{lastInMovement.quantity} {p.unit}
+                  </p>
+                ) : (
+                  <p className={`text-xs ${th.txf}`}>Belum ada riwayat barang masuk.</p>
+                )}
+                {(totalIn > 0 || totalOut > 0) && (
+                  <p className={`text-xs mt-1 ${th.txm}`}>
+                    Total: Masuk <b className={th.tx}>+{totalIn}</b> · Keluar <b className={th.tx}>−{totalOut}</b> · Sisa seharusnya <b className={th.tx}>{totalIn - totalOut}</b>
+                  </p>
+                )}
               </div>
 
               <div>
