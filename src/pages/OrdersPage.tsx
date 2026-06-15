@@ -9,7 +9,7 @@ import { useDebounce } from "@/hooks/useDebounce";
 import { usePageFetch } from "@/hooks/usePageFetch";
 import { formatCurrency as $, formatTime, formatDate, genId } from "@/utils";
 import { getDateRange, type DateRange, type CustomRange } from "@/utils/dateRange";
-import { FileText, Search, Users, Trash2, Plus, Receipt, Pencil } from "lucide-react";
+import { FileText, Search, Users, Trash2, Plus, Receipt, Pencil, Sparkles, MapPin } from "lucide-react";
 import type { Member } from "@/types";
 import toast from "react-hot-toast";
 
@@ -397,13 +397,15 @@ export function OrdersPage() {
                         <p className={`text-xs font-mono ${th.txf} truncate`}>
                           {[m.phone, m.memberNumber && `#${m.memberNumber}`].filter(Boolean).join(" · ")}
                         </p>
-                        {(m.points ?? 0) > 0 && (
-                          <p className={`text-xs font-bold ${th.acc}`}>
-                            ✨ {m.points!.toLocaleString("id-ID")} poin
-                          </p>
-                        )}
+                        <p className={`text-xs font-bold inline-flex items-center gap-1 mt-0.5 ${(m.points ?? 0) > 0 ? th.acc : th.txf}`}>
+                          <Sparkles size={10} strokeWidth={2.6} />
+                          {(m.points ?? 0).toLocaleString("id-ID")} poin
+                        </p>
                         {m.address && (
-                          <p className={`text-xs ${th.txf} truncate`}>📍 {m.address}</p>
+                          <p className={`text-xs ${th.txf} truncate inline-flex items-center gap-1`}>
+                            <MapPin size={10} strokeWidth={2.4} />
+                            {m.address}
+                          </p>
                         )}
                       </div>
                     </div>

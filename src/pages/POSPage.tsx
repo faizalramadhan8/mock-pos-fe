@@ -16,7 +16,7 @@ import Barcode from "react-barcode";
 import type { PaymentMethod, UnitType, DiscountType, Product, Order, Member } from "@/types";
 import toast from "react-hot-toast";
 import {
-  Search, ScanLine, ShoppingBag, Minus, Plus, Trash2, ImagePlus, X, UserPlus, Tag, Percent, Wallet, FileText, Printer, Barcode as BarcodeIcon, Clock, Send, AlertCircle, Eye, EyeOff, Gift, Sparkles,
+  Search, ScanLine, ShoppingBag, Minus, Plus, Trash2, ImagePlus, X, UserPlus, Tag, Percent, Wallet, FileText, Printer, Barcode as BarcodeIcon, Clock, Send, AlertCircle, Eye, EyeOff, Gift, Sparkles, TrendingDown,
 } from "lucide-react";
 
 export function POSPage() {
@@ -246,6 +246,48 @@ export function POSPage() {
     if (cents % (100_000 * 100) !== 0) return 0;
     return Math.floor(cents / (100_000 * 100)) * 1000;
   }, [cartTotal, activeMember]);
+
+  // Tier transition detection — kasir aware kalau harga grosir tier match
+  // setelah qty cross threshold. Pakai Ref untuk track best tier per cart
+  // line, fire toast hanya saat transisi (no spam saat data baru tersedia).
+  const prevTierRef = useRef<Map<string, string>>(new Map());
+  useEffect(() => {
+    if (!activeMember) {
+      prevTierRef.current = new Map();
+      return;
+    }
+    const next = new Map<string, string>();
+    cartItems.forEach(ci => {
+      const product = products.find(p => p.id === ci.productId);
+      if (!product) return;
+      const qtySatuan = ci.unitType === "box" ? ci.quantity * ci.qtyPerBox : ci.quantity;
+      const matching = (product.priceTiers || []).filter(t => {
+        if (qtySatuan < t.minQty) return false;
+        if (t.target === "all_members") return true;
+        return (t.members || []).some(m => m.id === activeMember.id);
+      });
+      if (matching.length === 0) return;
+      const best = matching.reduce((a, b) => a.price <= b.price ? a : b);
+      next.set(ci.id, best.id);
+      const prevId = prevTierRef.current.get(ci.id);
+      // Fire toast saat tier match TRANSISI ke tier baru (atau dari no-tier).
+      // Skip kalau prev === current (no change). Skip juga kalau prev undefined
+      // (first render dengan sudah ada match — cegah noise saat reload page).
+      if (prevId !== undefined && prevId !== best.id) {
+        const normalLineTotal = product.sellingPrice * (ci.unitType === "box" ? ci.qtyPerBox : 1) * ci.quantity;
+        const tierLineTotal = best.price * (ci.unitType === "box" ? ci.qtyPerBox : 1) * ci.quantity;
+        const savePerLine = Math.round(normalLineTotal - tierLineTotal);
+        toast.success(
+          `Harga grosir aktif: ${ci.name} — hemat Rp ${savePerLine.toLocaleString("id-ID")}`,
+          {
+            icon: <TrendingDown size={16} strokeWidth={2.6} className="text-[#E11D48]" />,
+            duration: 3500,
+          }
+        );
+      }
+    });
+    prevTierRef.current = next;
+  }, [cartItems, products, activeMember]);
 
   const filtered = useMemo(() => products.filter(p => {
     const name = (lang === "id" ? p.nameId : p.name).toLowerCase();
@@ -645,6 +687,33 @@ export function POSPage() {
                 )}
                 {ci.discountType && <span className="text-xs font-bold px-1.5 py-0.5 rounded-md bg-[#E11D48]/15 text-[#E11D48]">-{ci.discountType === "percent" ? `${ci.discountValue}%` : $(ci.discountValue || 0)}</span>}
               </div>
+              {/* Hint tier — tampilkan kalau ada tier berikutnya yang belum
+                  match. Bantu kasir suggest "tambah 1 lagi lebih hemat" ke
+                  customer. Hanya muncul kalau ada member + bukan tebus poin. */}
+              {activeMember && !isRedeemed && product && (() => {
+                const qtySatuan = ci.unitType === "box" ? ci.quantity * ci.qtyPerBox : ci.quantity;
+                const eligibleTiers = (product.priceTiers || []).filter(t => {
+                  if (t.target === "all_members") return true;
+                  return (t.members || []).some(m => m.id === activeMember.id);
+                });
+                const nextTier = eligibleTiers
+                  .filter(t => t.minQty > qtySatuan)
+                  .sort((a, b) => a.minQty - b.minQty)[0];
+                if (!nextTier) return null;
+                const need = nextTier.minQty - qtySatuan;
+                const tierTotal = Math.round(nextTier.price * nextTier.minQty);
+                return (
+                  <div
+                    role="status"
+                    aria-live="polite"
+                    className="mt-1.5 px-2 py-1 rounded-lg bg-[#FFE4E9] dark:bg-[#E11D48]/15 inline-flex items-center gap-1.5">
+                    <TrendingDown size={11} strokeWidth={2.6} className="text-[#9F1239] dark:text-[#FB7185] shrink-0" />
+                    <span className="text-xs font-semibold text-[#9F1239] dark:text-[#FB7185]">
+                      Tambah {need} lagi → {$(tierTotal)} total (beli {nextTier.minQty})
+                    </span>
+                  </div>
+                );
+              })()}
               {/* Quantity stepper + line total — enlarged for 50+ users */}
               <div className="flex items-center justify-between mt-3 gap-3">
                 <div className="flex items-center gap-2">
