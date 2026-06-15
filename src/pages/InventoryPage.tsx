@@ -6,6 +6,7 @@ import { ProductDetailModal } from "@/components/ProductDetailModal";
 import { SupplierDetailModal } from "@/components/SupplierDetailModal";
 import { PurchaseInvoiceTab } from "@/components/PurchaseInvoiceTab";
 import { RedeemableCatalog } from "@/components/RedeemableCatalog";
+import { PriceTierEditor } from "@/components/PriceTierEditor";
 import { SearchableSelect } from "@/components/SearchableSelect";
 import { useThemeClasses } from "@/hooks/useThemeClasses";
 import { useDebounce } from "@/hooks/useDebounce";
@@ -1705,6 +1706,12 @@ export function InventoryPage() {
               </div>
             );
           })()}
+
+          {/* Harga Khusus Member — tiered pricing (qty-based + member targeting).
+              Tier hanya berlaku untuk member; walk-in customer pakai sellingPrice. */}
+          {editProdId && (
+            <PriceTierEditor productId={editProdId} />
+          )}
 
           <div className="flex gap-2 mt-1">
             <button onClick={() => setEditProdOpen(false)} className={`flex-1 py-3 rounded-2xl text-sm font-bold border ${th.bdr} ${th.txm}`}>{t.cancel}</button>

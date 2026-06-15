@@ -16,6 +16,19 @@ const mapUser = (u: any): User => ({
   dateOfBirth: u.date_of_birth, isActive: u.is_active !== false,
 });
 
+const mapPriceTier = (t: any) => ({
+  id: t.id,
+  productId: t.product_id,
+  minQty: t.min_qty,
+  price: t.price,
+  target: (t.target_type || 'all_members') as 'all_members' | 'member_specific',
+  members: Array.isArray(t.members)
+    ? t.members.map((m: any) => ({ id: m.id, name: m.name, phone: m.phone }))
+    : [],
+  note: t.note || undefined,
+  createdAt: t.created_at,
+});
+
 const mapProduct = (p: any): Product => ({
   id: p.id, sku: p.sku, barcode: p.barcode || '', name: p.name, nameId: p.name_id || '',
   category: p.category_id,
@@ -25,6 +38,7 @@ const mapProduct = (p: any): Product => ({
   qtyPerBox: p.qty_per_box || 1, stock: p.stock, unit: p.unit,
   image: p.image || '', minStock: p.min_stock || 0, isActive: p.is_active !== false,
   isRedeemable: !!p.is_redeemable,
+  priceTiers: Array.isArray(p.price_tiers) ? p.price_tiers.map(mapPriceTier) : [],
   createdAt: p.created_at,
 });
 
@@ -386,16 +400,50 @@ interface CartState {
   count: () => number;
 }
 
-// Helper: compute unit price for an item given member status and product.
-// Returns { unitPrice, regularPrice } where regularPrice is the non-member
-// price snapshot (for showing savings).
-function computePrices(product: Product, unitType: UnitType, isMember: boolean) {
-  const boxMultiplier = unitType === "box" ? product.qtyPerBox : 1;
-  const regular = product.sellingPrice * boxMultiplier;
+// computeBestUnitPrice — pricing logic dengan tier-aware lookup.
+//
+// Walk-in non-member: SELALU sellingPrice (no tier, no member_price).
+// Member:
+//   1. Cari tier yang qty match + target match (all_members / member_specific).
+//   2. Kalau ada tier match → pakai MIN(tier.price) — tier WIN over member_price.
+//   3. Kalau tidak match → member_price (kalau ada) atau sellingPrice.
+//
+// regularPrice = sellingPrice * boxMul, untuk display "harga normal" + savings.
+function computeBestUnitPrice(
+  product: Product,
+  unitType: UnitType,
+  member: ActiveMember | null,
+  qty: number
+): { unitPrice: number; regularPrice: number } {
+  const boxMul = unitType === "box" ? product.qtyPerBox : 1;
+  const regular = product.sellingPrice * boxMul;
+
+  if (!member) return { unitPrice: regular, regularPrice: regular };
+
+  // Qty satuan untuk tier compare — kalau cart unit_type=box, hitung total
+  // satuan terjual (qty × qtyPerBox).
+  const qtySatuan = unitType === "box" ? qty * product.qtyPerBox : qty;
+
+  const matchingTiers = (product.priceTiers || []).filter(t => {
+    if (qtySatuan < t.minQty) return false;
+    if (t.target === "all_members") return true;
+    if (t.target === "member_specific") {
+      return (t.members || []).some(m => m.id === member.id);
+    }
+    return false;
+  });
+
+  if (matchingTiers.length > 0) {
+    const bestTier = Math.min(...matchingTiers.map(t => t.price));
+    return { unitPrice: bestTier * boxMul, regularPrice: regular };
+  }
+
   const hasMemberPrice = typeof product.memberPrice === "number" && product.memberPrice > 0;
-  const memberTotal = hasMemberPrice ? (product.memberPrice as number) * boxMultiplier : null;
-  const unitPrice = isMember && memberTotal !== null && memberTotal < regular ? memberTotal : regular;
-  return { unitPrice, regularPrice: regular };
+  if (hasMemberPrice) {
+    const memberTotal = (product.memberPrice as number) * boxMul;
+    return { unitPrice: Math.min(memberTotal, regular), regularPrice: regular };
+  }
+  return { unitPrice: regular, regularPrice: regular };
 }
 
 export const useCartStore = create<CartState>()(
@@ -412,7 +460,6 @@ export const useCartStore = create<CartState>()(
       setCustomerPhone: (p) => set({ customerPhone: p }),
       setPayment: (p) => set({ payment: p }),
       setMember: (m) => {
-        const isMember = m !== null;
         // Recompute existing cart items based on new member status.
         // When switching from non-member → member, clear the customer name/phone
         // (they're non-member fields; member info lives on `member`). When
@@ -426,7 +473,7 @@ export const useCartStore = create<CartState>()(
           items: s.items.map(i => {
             const product = products.find(p => p.id === i.productId);
             const base = product
-              ? { ...i, ...computePrices(product, i.unitType, isMember) }
+              ? { ...i, ...computeBestUnitPrice(product, i.unitType, m, i.quantity) }
               : i;
             return m ? base : { ...base, redeemWithPoints: false };
           }),
@@ -436,9 +483,17 @@ export const useCartStore = create<CartState>()(
         set(s => {
           const existing = s.items.find(i => i.productId === product.id && i.unitType === unitType);
           if (existing) {
-            return { items: s.items.map(i => i.productId === product.id && i.unitType === unitType ? { ...i, quantity: i.quantity + 1 } : i) };
+            // Recompute price karena qty naik — tier bisa kick-in / lepas.
+            return {
+              items: s.items.map(i => {
+                if (i.productId !== product.id || i.unitType !== unitType) return i;
+                const nextQty = i.quantity + 1;
+                const { unitPrice, regularPrice } = computeBestUnitPrice(product, unitType, s.member, nextQty);
+                return { ...i, quantity: nextQty, unitPrice, regularPrice };
+              }),
+            };
           }
-          const { unitPrice, regularPrice } = computePrices(product, unitType, s.member !== null);
+          const { unitPrice, regularPrice } = computeBestUnitPrice(product, unitType, s.member, 1);
           const item: CartItem = {
             id: genId(), productId: product.id,
             name: lang === "id" ? product.nameId : product.name,
@@ -450,9 +505,23 @@ export const useCartStore = create<CartState>()(
           return { items: [...s.items, item] };
         });
       },
-      updateQty: (id, delta) => set(s => ({
-        items: s.items.map(i => i.id === id ? { ...i, quantity: i.quantity + delta } : i).filter(i => i.quantity > 0),
-      })),
+      updateQty: (id, delta) => {
+        const products = useProductStore.getState().products;
+        set(s => ({
+          items: s.items
+            .map(i => {
+              if (i.id !== id) return i;
+              const nextQty = i.quantity + delta;
+              if (nextQty <= 0) return { ...i, quantity: 0 };
+              // Recompute price — tier breakpoint mungkin di-cross.
+              const product = products.find(p => p.id === i.productId);
+              if (!product) return { ...i, quantity: nextQty };
+              const { unitPrice, regularPrice } = computeBestUnitPrice(product, i.unitType, s.member, nextQty);
+              return { ...i, quantity: nextQty, unitPrice, regularPrice };
+            })
+            .filter(i => i.quantity > 0),
+        }));
+      },
       removeItem: (id) => set(s => ({ items: s.items.filter(i => i.id !== id) })),
       setItemDiscount: (id, type, value) => set(s => ({
         items: s.items.map(i => i.id === id ? { ...i, discountType: type || undefined, discountValue: type ? value : undefined } : i),

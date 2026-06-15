@@ -63,6 +63,28 @@ export interface Product {
   isActive: boolean;
   /** Eligible untuk tebus pakai member.points. Admin tandai via Katalog Tebus. */
   isRedeemable?: boolean;
+  /**
+   * Tiered pricing untuk member. Walk-in non-member SELALU pakai sellingPrice
+   * (tier tidak berlaku). Member yang qty match tier dapat tier.price; member
+   * yang tidak match tier pakai memberPrice (kalau ada) atau sellingPrice.
+   */
+  priceTiers?: ProductPriceTier[];
+  createdAt: string;
+}
+
+export type PriceTierTarget = "all_members" | "member_specific";
+
+export interface ProductPriceTier {
+  id: string;
+  productId: string;
+  /** Minimum qty SATUAN (bukan dus). FE/BE convert dulu kalau unit_type=box. */
+  minQty: number;
+  /** Harga per satuan (sama dengan sellingPrice/memberPrice baseline). */
+  price: number;
+  target: PriceTierTarget;
+  /** Whitelist member kalau target='member_specific'. Kosong utk 'all_members'. */
+  members?: { id: string; name: string; phone: string }[];
+  note?: string;
   createdAt: string;
 }
 

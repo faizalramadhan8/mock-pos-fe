@@ -20,6 +20,24 @@ export interface ProductRes {
   min_stock: number;
   is_active: boolean;
   is_redeemable?: boolean;
+  price_tiers?: ProductPriceTierRes[];
+  created_at: string;
+}
+
+export interface ProductPriceTierMemberRefRes {
+  id: string;
+  name: string;
+  phone: string;
+}
+
+export interface ProductPriceTierRes {
+  id: string;
+  product_id: string;
+  min_qty: number;
+  price: number;
+  target_type: 'all_members' | 'member_specific';
+  members?: ProductPriceTierMemberRefRes[];
+  note?: string;
   created_at: string;
 }
 
@@ -116,6 +134,29 @@ export const productApi = {
 
   setRedeemable: (id: string, redeemable: boolean) =>
     api.patch<ProductRes>(`/products/${id}/redeemable`, { is_redeemable: redeemable }),
+
+  // Price tiers — admin curate per produk.
+  listTiers: (productId: string) =>
+    api.get<ProductPriceTierRes[]>(`/products/${productId}/tiers`),
+
+  createTier: (productId: string, data: {
+    min_qty: number;
+    price: number;
+    target_type: 'all_members' | 'member_specific';
+    member_ids?: string[];
+    note?: string;
+  }) => api.post<ProductPriceTierRes>(`/products/${productId}/tiers`, data),
+
+  updateTier: (productId: string, tierId: string, data: {
+    min_qty: number;
+    price: number;
+    target_type: 'all_members' | 'member_specific';
+    member_ids?: string[];
+    note?: string;
+  }) => api.put<ProductPriceTierRes>(`/products/${productId}/tiers/${tierId}`, data),
+
+  deleteTier: (productId: string, tierId: string) =>
+    api.del(`/products/${productId}/tiers/${tierId}`),
 
   delete: (id: string) => api.del(`/products/${id}`),
 
