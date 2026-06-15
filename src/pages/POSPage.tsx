@@ -622,13 +622,25 @@ export function POSPage() {
                 <span className={`text-xs font-semibold px-1.5 py-0.5 rounded-md ${th.accBg} ${th.acc}`}>
                   {ci.unitType === "box" ? `${t.box}(${ci.qtyPerBox})` : t.individual}
                 </span>
-                {ci.regularPrice && ci.regularPrice > ci.unitPrice ? (
-                  <>
-                    <span className={`text-xs line-through ${th.txf}`}>{$(ci.regularPrice)}</span>
-                    <span className={`text-xs font-bold ${th.acc}`}>{$(ci.unitPrice)}</span>
-                    <span className="text-xs font-bold px-1.5 py-0.5 rounded bg-[#FFE4E9] text-[#9F1239]">Member</span>
-                  </>
-                ) : (
+                {ci.regularPrice && ci.regularPrice > ci.unitPrice ? (() => {
+                  // Tentukan sumber diskon untuk badge yang akurat — tier
+                  // (volume/specific-member) atau member_price baseline.
+                  const qtySatuan = ci.unitType === "box" ? ci.quantity * ci.qtyPerBox : ci.quantity;
+                  const tierMatched = !!product?.priceTiers?.some(t => {
+                    if (qtySatuan < t.minQty) return false;
+                    if (t.target === "all_members") return true;
+                    return (t.members || []).some(m => m.id === activeMember?.id);
+                  });
+                  return (
+                    <>
+                      <span className={`text-xs line-through ${th.txf}`}>{$(ci.regularPrice)}</span>
+                      <span className={`text-xs font-bold ${th.acc}`}>{$(ci.unitPrice)}</span>
+                      <span className="text-xs font-bold px-1.5 py-0.5 rounded bg-[#FFE4E9] text-[#9F1239]">
+                        {tierMatched ? "Grosir" : "Member"}
+                      </span>
+                    </>
+                  );
+                })() : (
                   <span className={`text-xs ${th.txm}`}>{$(ci.unitPrice)}</span>
                 )}
                 {ci.discountType && <span className="text-xs font-bold px-1.5 py-0.5 rounded-md bg-[#E11D48]/15 text-[#E11D48]">-{ci.discountType === "percent" ? `${ci.discountValue}%` : $(ci.discountValue || 0)}</span>}

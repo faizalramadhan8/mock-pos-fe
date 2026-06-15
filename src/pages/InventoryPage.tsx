@@ -6,7 +6,7 @@ import { ProductDetailModal } from "@/components/ProductDetailModal";
 import { SupplierDetailModal } from "@/components/SupplierDetailModal";
 import { PurchaseInvoiceTab } from "@/components/PurchaseInvoiceTab";
 import { RedeemableCatalog } from "@/components/RedeemableCatalog";
-import { PriceTierEditor } from "@/components/PriceTierEditor";
+import { PriceTierCatalog } from "@/components/PriceTierCatalog";
 import { SearchableSelect } from "@/components/SearchableSelect";
 import { useThemeClasses } from "@/hooks/useThemeClasses";
 import { useDebounce } from "@/hooks/useDebounce";
@@ -19,10 +19,10 @@ import toast from "react-hot-toast";
 import {
   Package, Plus, ChevronDown, ArrowDownCircle, ArrowUpCircle, Barcode,
   LayoutGrid, AlertTriangle, Truck, Check, Receipt, Pencil, Download, Search, Printer, Trash2,
-  Sliders, Gift,
+  Sliders, Gift, Tag,
 } from "lucide-react";
 
-type InventoryTab = "overview" | "stockIn" | "stockOut" | "expiry" | "invoices" | "suppliers" | "redeem";
+type InventoryTab = "overview" | "stockIn" | "stockOut" | "expiry" | "invoices" | "suppliers" | "redeem" | "memberPricing";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function getDateLabel(dateStr: string, t: Record<string, any>): string {
@@ -163,6 +163,7 @@ export function InventoryPage() {
     { id: "invoices", label: lang === "id" ? "Catat Faktur Barang Masuk" : "Stock-In Invoices", icon: <Receipt size={14} /> },
     { id: "suppliers", label: t.invSuppliers as string, icon: <Truck size={14} /> },
     { id: "redeem", label: lang === "id" ? "Katalog Tebus Poin" : "Redeemable Catalog", icon: <Gift size={14} /> },
+    { id: "memberPricing", label: lang === "id" ? "Harga Khusus Member" : "Member Pricing", icon: <Tag size={14} /> },
   ];
 
   // Overview stats
@@ -1173,6 +1174,11 @@ export function InventoryPage() {
         <RedeemableCatalog canWrite={canWrite} />
       )}
 
+      {/* ======= MEMBER PRICING TAB ======= */}
+      {activeTab === "memberPricing" && (
+        <PriceTierCatalog canWrite={canWrite} />
+      )}
+
 
       {/* ======= MODALS ======= */}
 
@@ -1706,12 +1712,6 @@ export function InventoryPage() {
               </div>
             );
           })()}
-
-          {/* Harga Khusus Member — tiered pricing (qty-based + member targeting).
-              Tier hanya berlaku untuk member; walk-in customer pakai sellingPrice. */}
-          {editProdId && (
-            <PriceTierEditor productId={editProdId} />
-          )}
 
           <div className="flex gap-2 mt-1">
             <button onClick={() => setEditProdOpen(false)} className={`flex-1 py-3 rounded-2xl text-sm font-bold border ${th.bdr} ${th.txm}`}>{t.cancel}</button>

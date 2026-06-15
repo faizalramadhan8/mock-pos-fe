@@ -4,6 +4,13 @@ import { useThemeClasses } from "@/hooks/useThemeClasses";
 
 const FOCUSABLE = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
 
+// Module-level stack: tracks open modals in mount order. Escape key hanya
+// menutup modal paling atas (top of stack), bukan semua sekaligus. Penting
+// untuk nested modal (mis. Katalog Harga Khusus → klik produk → tier editor
+// → klik Tambah Tier → form modal). Tanpa stack, Escape tutup dua-duanya.
+type StackEntry = { close: () => void };
+const modalStack: StackEntry[] = [];
+
 interface ModalProps {
   open: boolean;
   onClose: () => void;
@@ -39,8 +46,19 @@ export function Modal({ open, onClose, title, children, size = "md" }: ModalProp
       if (focusable?.length) focusable[0].focus();
     });
 
+    // Register in modal stack — paling akhir mount = paling atas.
+    const entry: StackEntry = { close: () => onCloseRef.current() };
+    modalStack.push(entry);
+
     const handle = (e: KeyboardEvent) => {
-      if (e.key === "Escape") { onCloseRef.current(); return; }
+      if (e.key === "Escape") {
+        // Hanya modal paling atas yang respond ke Escape; nested modal di
+        // bawahnya tetap open. Tab trap tetap berlaku per-modal.
+        if (modalStack[modalStack.length - 1] === entry) {
+          onCloseRef.current();
+        }
+        return;
+      }
       if (e.key === "Tab") {
         const focusable = modalRef.current?.querySelectorAll<HTMLElement>(FOCUSABLE);
         if (!focusable?.length) return;
@@ -53,6 +71,8 @@ export function Modal({ open, onClose, title, children, size = "md" }: ModalProp
     window.addEventListener("keydown", handle);
     return () => {
       window.removeEventListener("keydown", handle);
+      const idx = modalStack.indexOf(entry);
+      if (idx >= 0) modalStack.splice(idx, 1);
       previousFocusRef.current?.focus();
     };
   }, [open]);
