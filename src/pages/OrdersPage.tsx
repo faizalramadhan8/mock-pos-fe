@@ -7,9 +7,9 @@ import { Modal } from "@/components/Modal";
 import { useThemeClasses } from "@/hooks/useThemeClasses";
 import { useDebounce } from "@/hooks/useDebounce";
 import { usePageFetch } from "@/hooks/usePageFetch";
-import { formatCurrency as $, formatTime, formatDate, genId } from "@/utils";
+import { formatCurrency as $, formatTime, formatDate, genId, normalizePhone } from "@/utils";
 import { getDateRange, type DateRange, type CustomRange } from "@/utils/dateRange";
-import { FileText, Search, Users, Trash2, Plus, Receipt, Pencil, Sparkles, MapPin } from "lucide-react";
+import { FileText, Search, Users, Trash2, Plus, Receipt, Pencil, Sparkles, MapPin, AlertCircle } from "lucide-react";
 import type { Member } from "@/types";
 import toast from "react-hot-toast";
 
@@ -440,53 +440,84 @@ export function OrdersPage() {
       <OrderDetailModal orderId={detailOrderId} onClose={() => setDetailOrderId(null)} />
       <MemberStatsModal member={statsMember} onClose={() => setStatsMember(null)} />
 
-      {/* Add Member modal */}
+      {/* Add Member modal — dengan duplicate-phone detection (post 14 Jun
+          2026 cleanup: 11 dup pairs ke-merge, FE validation cegah terulang). */}
       <Modal open={addMemberOpen} onClose={() => setAddMemberOpen(false)} title="Tambah Member">
-        <div className="flex flex-col gap-3">
-          <div>
-            <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>Nama</p>
-            <input value={newMember.name} onChange={e => setNewMember({ ...newMember, name: e.target.value })}
-              className={`w-full px-3.5 py-2.5 text-sm rounded-xl border ${th.inp}`}
-              placeholder="Nama lengkap" autoFocus />
-          </div>
-          <div>
-            <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>Nomor HP</p>
-            <input type="tel" inputMode="tel" value={newMember.phone}
-              onChange={e => setNewMember({ ...newMember, phone: e.target.value })}
-              className={`w-full px-3.5 py-2.5 text-sm rounded-xl border ${th.inp}`}
-              placeholder="08xxxxxxxxxx" />
-          </div>
-          <p className={`text-xs ${th.txf}`}>
-            Nomor anggota dan alamat bisa diisi nanti lewat tombol Edit.
-          </p>
-          <div className="flex gap-2 mt-2">
-            <button onClick={() => setAddMemberOpen(false)}
-              className={`flex-1 py-2.5 rounded-xl text-sm font-bold border ${th.bdr} ${th.txm}`}>
-              Batal
-            </button>
-            <button
-              onClick={() => {
-                if (!newMember.name.trim() || !newMember.phone.trim()) return;
-                addMemberAction({
-                  id: genId(),
-                  name: newMember.name.trim(),
-                  phone: newMember.phone.trim(),
-                  address: newMember.address.trim() || undefined,
-                  memberNumber: newMember.memberNumber.trim() || undefined,
-                  points: 0,
-                  createdAt: new Date().toISOString(),
-                });
-                setAddMemberOpen(false);
-                setNewMember(emptyMemberForm);
-                toast.success("Member berhasil ditambah");
-              }}
-              disabled={!newMember.name.trim() || !newMember.phone.trim()}
-              className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white bg-[#E11D48] disabled:opacity-40"
-            >
-              Simpan
-            </button>
-          </div>
-        </div>
+        {(() => {
+          const targetPhone = normalizePhone(newMember.phone);
+          const duplicate = targetPhone.length >= 8
+            ? members.find(m => normalizePhone(m.phone) === targetPhone)
+            : null;
+          return (
+            <div className="flex flex-col gap-3">
+              <div>
+                <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>Nama</p>
+                <input value={newMember.name} onChange={e => setNewMember({ ...newMember, name: e.target.value })}
+                  className={`w-full px-3.5 py-2.5 text-sm rounded-xl border ${th.inp}`}
+                  placeholder="Nama lengkap" autoFocus />
+              </div>
+              <div>
+                <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>Nomor HP</p>
+                <input type="tel" inputMode="tel" value={newMember.phone}
+                  onChange={e => setNewMember({ ...newMember, phone: e.target.value })}
+                  aria-invalid={!!duplicate}
+                  aria-describedby={duplicate ? "ordersmember-phone-dup-warning" : undefined}
+                  className={`w-full px-3.5 py-2.5 text-sm rounded-xl border ${duplicate ? "border-[#BE123C] bg-[#FCE4EC] dark:bg-[#BE123C]/15" : th.inp}`}
+                  placeholder="08xxxxxxxxxx" />
+              </div>
+              {/* Duplicate warning inline — Forms #8 error-clarity (cause + fix). */}
+              {duplicate && (
+                <div
+                  id="ordersmember-phone-dup-warning"
+                  role="alert"
+                  className="rounded-xl border border-[#BE123C]/30 bg-[#FCE4EC] dark:bg-[#BE123C]/15 p-2.5 flex items-start gap-2">
+                  <AlertCircle size={14} strokeWidth={2.4} className="text-[#BE123C] dark:text-[#FB7185] shrink-0 mt-0.5" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-bold text-[#BE123C] dark:text-[#FB7185]">
+                      Nomor sudah terdaftar
+                    </p>
+                    <p className={`text-xs mt-0.5 ${th.txm}`}>
+                      Atas nama <strong className={th.tx}>{duplicate.name}</strong>
+                      {duplicate.phone && duplicate.phone !== newMember.phone && (
+                        <> (tersimpan: {duplicate.phone})</>
+                      )}. Cari nama tsb di daftar untuk edit, jangan tambah baru.
+                    </p>
+                  </div>
+                </div>
+              )}
+              <p className={`text-xs ${th.txf}`}>
+                Nomor anggota dan alamat bisa diisi nanti lewat tombol Edit.
+              </p>
+              <div className="flex gap-2 mt-2">
+                <button onClick={() => setAddMemberOpen(false)}
+                  className={`flex-1 py-2.5 rounded-xl text-sm font-bold border ${th.bdr} ${th.txm}`}>
+                  Batal
+                </button>
+                <button
+                  onClick={() => {
+                    if (!newMember.name.trim() || !newMember.phone.trim() || duplicate) return;
+                    addMemberAction({
+                      id: genId(),
+                      name: newMember.name.trim(),
+                      phone: newMember.phone.trim(),
+                      address: newMember.address.trim() || undefined,
+                      memberNumber: newMember.memberNumber.trim() || undefined,
+                      points: 0,
+                      createdAt: new Date().toISOString(),
+                    });
+                    setAddMemberOpen(false);
+                    setNewMember(emptyMemberForm);
+                    toast.success("Member berhasil ditambah");
+                  }}
+                  disabled={!newMember.name.trim() || !newMember.phone.trim() || !!duplicate}
+                  className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white bg-[#E11D48] disabled:opacity-40"
+                >
+                  Simpan
+                </button>
+              </div>
+            </div>
+          );
+        })()}
       </Modal>
 
       {/* Edit Member modal */}

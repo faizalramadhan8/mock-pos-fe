@@ -16,6 +16,22 @@ export function formatTime(d: string, lang: "en" | "id" = "en") {
 }
 export function genId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
 
+/**
+ * Normalize phone number untuk comparison (cek duplikat).
+ * Hilangkan semua non-digit, ganti awalan "62" → "0" supaya:
+ *   "+62812-345-6789"  → "0812345 6789" → "081234567890"
+ *   "0812 3456 7890"   → "081234567890"
+ *   "62812345 67890"   → "081234567890"
+ * Empty input → empty string. Dipakai di duplicate-member detection
+ * (FE) dan akan dipakai BE saat add UNIQUE INDEX di migration berikut.
+ */
+export function normalizePhone(p: string): string {
+  if (!p) return "";
+  const clean = p.replace(/\D/g, "");
+  if (clean.startsWith("62") && clean.length > 2) return "0" + clean.slice(2);
+  return clean;
+}
+
 function escapeHtml(str: string): string {
   return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }

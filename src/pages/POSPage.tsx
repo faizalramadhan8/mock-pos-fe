@@ -9,7 +9,7 @@ import { useThemeClasses } from "@/hooks/useThemeClasses";
 import { useDebounce } from "@/hooks/useDebounce";
 import { useBarcodeScanner } from "@/hooks/useBarcodeScanner";
 import { usePageFetch } from "@/hooks/usePageFetch";
-import { formatCurrency as $, printReceipt, compressImage, genId, formatTime, printBarcodeLabel, printBarcodeLabels } from "@/utils";
+import { formatCurrency as $, printReceipt, compressImage, genId, formatTime, printBarcodeLabel, printBarcodeLabels, normalizePhone } from "@/utils";
 import { calcItemDiscount } from "@/utils/calc";
 import { orderApi } from "@/api";
 import Barcode from "react-barcode";
@@ -611,25 +611,76 @@ export function POSPage() {
       ))}
 
       {/* Add Member mini-modal */}
-      {showAddMember && (
-        <div className={`rounded-[18px] border p-4 ${th.card2} ${th.bdr}`}>
-          <div className="flex items-center justify-between mb-3">
-            <p className={`text-sm font-extrabold ${th.tx}`}>{t.addMember}</p>
-            <button onClick={() => setShowAddMember(false)} aria-label="Close" className={th.txm}><X size={14} /></button>
+      {showAddMember && (() => {
+        // Deteksi duplikat by phone (normalized) — cegah member dobel.
+        // Setelah 14 Jun 2026 cleanup, ada 11 pasang dup yang ke-merge.
+        // Validation ini cegah terulang. Hanya cek kalau >= 8 digit (avoid
+        // false positive saat user baru ngetik).
+        const targetPhone = normalizePhone(newMemberPhone);
+        const duplicate = targetPhone.length >= 8
+          ? members.find(m => normalizePhone(m.phone) === targetPhone)
+          : null;
+        return (
+          <div className={`rounded-[18px] border p-4 ${th.card2} ${th.bdr}`}>
+            <div className="flex items-center justify-between mb-3">
+              <p className={`text-sm font-extrabold ${th.tx}`}>{t.addMember}</p>
+              <button onClick={() => setShowAddMember(false)} aria-label="Close" className={th.txm}><X size={14} /></button>
+            </div>
+            {/* Add Member (kasir flow) — keep it minimal: nama + no HP saja.
+                Alamat & nomor anggota hanya muncul di modal Edit Member
+                (halaman Orders → Members) sehingga UI kasir tidak crowded. */}
+            <div className="flex flex-col gap-2">
+              <input value={newMemberName} onChange={e => setNewMemberName(e.target.value)}
+                placeholder={t.memberName as string} className={`w-full px-3 py-2.5 text-sm rounded-xl border ${th.inp}`} />
+              <input value={newMemberPhone} onChange={e => setNewMemberPhone(e.target.value)}
+                placeholder={t.memberPhone as string} type="tel" inputMode="tel"
+                aria-invalid={!!duplicate}
+                aria-describedby={duplicate ? "newmember-phone-dup-warning" : undefined}
+                className={`w-full px-3 py-2.5 text-sm rounded-xl border ${duplicate ? "border-[#BE123C] bg-[#FCE4EC] dark:bg-[#BE123C]/15" : th.inp}`} />
+              {/* Duplicate warning — inline pink banner dengan action button
+                  untuk langsung pilih member existing tanpa harus close modal
+                  + scroll list. Per Forms #8 error-clarity: state cause + how
+                  to fix. */}
+              {duplicate && (
+                <div
+                  id="newmember-phone-dup-warning"
+                  role="alert"
+                  className="rounded-xl border border-[#BE123C]/30 bg-[#FCE4EC] dark:bg-[#BE123C]/15 p-2.5 flex items-start gap-2">
+                  <AlertCircle size={14} strokeWidth={2.4} className="text-[#BE123C] dark:text-[#FB7185] shrink-0 mt-0.5" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-bold text-[#BE123C] dark:text-[#FB7185]">
+                      Nomor sudah terdaftar
+                    </p>
+                    <p className={`text-xs mt-0.5 ${th.txm}`}>
+                      Atas nama <strong className={th.tx}>{duplicate.name}</strong>
+                      {duplicate.phone && duplicate.phone !== newMemberPhone && (
+                        <> (tersimpan: {duplicate.phone})</>
+                      )}
+                    </p>
+                    <button
+                      onClick={() => {
+                        setMember({ id: duplicate.id, name: duplicate.name, phone: duplicate.phone, points: duplicate.points || 0 });
+                        setCustomer(duplicate.name + (duplicate.phone ? ` (${duplicate.phone})` : ""));
+                        setMemberQuery("");
+                        setNewMemberName("");
+                        setNewMemberPhone("");
+                        setNewMemberAddress("");
+                        setNewMemberNumber("");
+                        setShowAddMember(false);
+                        setShowMemberDropdown(false);
+                      }}
+                      className="mt-1.5 text-xs font-bold inline-flex items-center gap-1 px-2 py-1 rounded-md bg-[#E11D48] text-white">
+                      Gunakan member ini
+                    </button>
+                  </div>
+                </div>
+              )}
+              <button onClick={handleAddNewMember} disabled={!newMemberName.trim() || !!duplicate}
+                className="w-full py-2.5 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48] disabled:opacity-40">{t.save}</button>
+            </div>
           </div>
-          {/* Add Member (kasir flow) — keep it minimal: nama + no HP saja.
-              Alamat & nomor anggota hanya muncul di modal Edit Member
-              (halaman Orders → Members) sehingga UI kasir tidak crowded. */}
-          <div className="flex flex-col gap-2">
-            <input value={newMemberName} onChange={e => setNewMemberName(e.target.value)}
-              placeholder={t.memberName as string} className={`w-full px-3 py-2.5 text-sm rounded-xl border ${th.inp}`} />
-            <input value={newMemberPhone} onChange={e => setNewMemberPhone(e.target.value)}
-              placeholder={t.memberPhone as string} type="tel" inputMode="tel" className={`w-full px-3 py-2.5 text-sm rounded-xl border ${th.inp}`} />
-            <button onClick={handleAddNewMember} disabled={!newMemberName.trim()}
-              className="w-full py-2.5 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48] disabled:opacity-40">{t.save}</button>
-          </div>
-        </div>
-      )}
+        );
+      })()}
 
       {cartItems.length === 0 ? (
         <div className={`text-center py-6 ${th.txm}`}>
@@ -972,11 +1023,17 @@ export function POSPage() {
     <div className="lg:flex lg:gap-5">
       {/* Left: products */}
       <div className="flex-1 min-w-0">
-        {/* Search + Close Register */}
-        <div className="flex gap-2 mb-4">
-        <div className="relative flex-1">
-          <Search size={16} className={`absolute left-3.5 top-1/2 -translate-y-1/2 ${th.txf}`} />
-          <input ref={searchRef} value={query} onChange={e => setQuery(e.target.value)} placeholder={`${t.search}  ( / )`}
+        {/* Search + action buttons.
+            Mobile: search full-width di row 1, action buttons wrap ke row 2.
+            Tablet+ (sm:): semua dalam 1 row. Cegah field pencarian sempit
+            di HP 375px (sebelumnya typing area cuma ~47px karena 4 button
+            ambil tempat). */}
+        <div className="flex flex-wrap gap-2 mb-4">
+        <div className="relative w-full sm:flex-1 sm:w-auto">
+          <Search size={18} className={`absolute left-3.5 top-1/2 -translate-y-1/2 ${th.txf} pointer-events-none`} />
+          <input ref={searchRef} value={query} onChange={e => setQuery(e.target.value)} placeholder={t.search as string}
+            inputMode="search"
+            autoComplete="off"
             onKeyDown={e => {
               if (e.key === "Enter" && query.trim()) {
                 const product = products.find(p => p.sku.toUpperCase() === query.trim().toUpperCase() && p.isActive);
@@ -987,8 +1044,8 @@ export function POSPage() {
                 }
               }
             }}
-            className={`w-full pl-10 pr-12 py-3 text-sm rounded-2xl border focus:outline-none focus:ring-2 focus:ring-[#E11D48]/20 font-medium ${th.inp}`} />
-          <ScanLine size={16} className={`absolute right-3.5 top-1/2 -translate-y-1/2 ${th.txf}`} />
+            className={`w-full pl-11 pr-11 py-3.5 sm:py-3 text-base sm:text-sm rounded-2xl border focus:outline-none focus:ring-2 focus:ring-[#E11D48]/20 font-medium ${th.inp}`} />
+          <ScanLine size={18} className={`absolute right-3.5 top-1/2 -translate-y-1/2 ${th.txf} pointer-events-none`} />
         </div>
         <button onClick={() => setOrderHistoryOpen(true)} aria-label={t.orderHistory as string}
           className={`shrink-0 flex items-center justify-center w-11 py-3 rounded-2xl text-xs font-bold border ${th.bdr} ${th.txm}`}>
