@@ -109,6 +109,18 @@ export function ProductDetailModal({ productId, onClose }: ProductDetailModalPro
     return { totalIn, totalOut, count: allProductMovements.length };
   }, [allProductMovements]);
 
+  // Cari movement IN terakhir di SELURUH history produk (bukan filtered) —
+  // dipakai untuk display "Terakhir masuk: <tanggal>" di card Stok.
+  // Bu Santi non-teknis: bingung kalau lihat "Masuk +0" tanpa konteks
+  // kapan stok terakhir di-restock.
+  const lastInMovement = useMemo(() => {
+    if (!product) return null;
+    const ins = movements
+      .filter(m => m.productId === product.id && m.type === "in")
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    return ins[0] || null;
+  }, [product, movements]);
+
   // Price history — load when modal opens for a product. Fail silent: empty
   // history just hides the section, the rest of the modal still renders.
   const [priceFilter, setPriceFilter] = useState<"all" | "regular" | "member" | "purchase">("all");
@@ -299,6 +311,24 @@ export function ProductDetailModal({ productId, onClose }: ProductDetailModalPro
           </div>
         </div>
         <p className={`text-xs mt-1.5 ${th.txf}`}>{t.minStockLabel}: {product.minStock} {product.unit}</p>
+        {/* Tanggal terakhir masuk — explicit untuk Bu Santi yg sering tanya
+            "kapan barang ini masuk". Kalau belum ada catatan IN, kasih hint
+            cara mencatat supaya history mulai terisi. */}
+        <div className={`mt-2 pt-2 border-t ${th.bdrSoft} flex items-center justify-between gap-2 flex-wrap`}>
+          {lastInMovement ? (
+            <>
+              <p className={`text-xs ${th.txm}`}>
+                <span className={th.txf}>Terakhir masuk:</span>{" "}
+                <span className={`font-bold ${th.tx}`}>{formatDate(lastInMovement.createdAt)}</span>
+                {" "}<span className={th.txf}>· +{lastInMovement.quantity} {product.unit}</span>
+              </p>
+            </>
+          ) : (
+            <p className={`text-xs ${th.txf} italic`}>
+              Belum ada catatan barang masuk untuk produk ini.
+            </p>
+          )}
+        </div>
       </div>
 
       {/* Batches */}
@@ -349,7 +379,9 @@ export function ProductDetailModal({ productId, onClose }: ProductDetailModalPro
           </p>
           {movementSummary.count > 0 && (
             <span className={`text-xs ${th.txm}`}>
-              Masuk +{movementSummary.totalIn} · Keluar −{movementSummary.totalOut}
+              <span className={`font-bold ${th.acc}`}>+{movementSummary.totalIn} masuk</span>
+              <span className={`mx-1.5 ${th.txf}`}>·</span>
+              <span className={`font-bold text-[#BE123C] dark:text-[#FB7185]`}>−{movementSummary.totalOut} keluar</span>
             </span>
           )}
         </div>

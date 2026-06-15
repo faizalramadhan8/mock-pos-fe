@@ -13,8 +13,9 @@ import { useDebounce } from "@/hooks/useDebounce";
 import { usePageFetch } from "@/hooks/usePageFetch";
 import { formatCurrency as $, formatTime, formatDate, genId, genBatchNumber, calcDueDate, printBarcodeLabel, printBarcodeLabels } from "@/utils";
 import { exportProducts } from "@/utils/export";
+import { getDateRange, type DateRange, type CustomRange } from "@/utils/dateRange";
 import { productApi } from "@/api";
-import type { UnitType, StockType, StockMovement, PaymentTerms, PaymentStatus, UnitOfMeasure } from "@/types";
+import type { UnitType, StockMovement, PaymentTerms, PaymentStatus, UnitOfMeasure } from "@/types";
 import toast from "react-hot-toast";
 import {
   Package, Plus, ChevronDown, ArrowDownCircle, ArrowUpCircle, Barcode,
@@ -95,7 +96,6 @@ export function InventoryPage() {
   const [detailProductId, setDetailProductId] = useState<string | null>(null);
   const [detailSupplierId, setDetailSupplierId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<InventoryTab>("overview");
-  const [stockModal, setStockModal] = useState<StockType | null>(null);
   const [form, setForm] = useState({
     prod: "", qty: "", unit: "individual" as UnitType, price: "", note: "", expiryDate: "",
     supplierId: "", paymentTerms: "COD" as PaymentTerms, paymentStatus: "unpaid" as PaymentStatus,
@@ -377,54 +377,6 @@ export function InventoryPage() {
     toast.success(t.productUpdated as string);
   };
 
-  const doStock = () => {
-    const prod = products.find(p => p.id === form.prod);
-    if (!prod || !form.qty || !stockModal) return;
-    const qty = parseInt(form.qty);
-    const total = form.unit === "box" ? qty * prod.qtyPerBox : qty;
-    if (stockModal === "out" && total > prod.stock) {
-      toast.error(t.insufficientStock as string);
-      return;
-    }
-    adjustStock(prod.id, stockModal === "in" ? total : -total);
-
-    // Convention: stored unitPrice is ALWAYS per-individual unit, quantity
-    // is ALWAYS individual count. Display calculates `unitPrice \u00d7 quantity`.
-    // Kalau user pilih unit "box" dan isi harga per-dus, dibagi qtyPerBox
-    // dulu sebelum disimpan supaya total tidak inflated.
-    const defaultPriceIndividual = stockModal === "in" ? prod.purchasePrice : prod.sellingPrice;
-    const inputPrice = form.price ? parseInt(form.price) : 0;
-    const qtyPerBox = Math.max(1, prod.qtyPerBox);
-    const unitPriceIndividual = inputPrice > 0
-      ? (form.unit === "box" ? Math.round(inputPrice / qtyPerBox) : inputPrice)
-      : defaultPriceIndividual;
-
-    if (stockModal === "in") {
-      addBatch({
-        id: genId(), productId: prod.id, quantity: total,
-        expiryDate: form.expiryDate || "", receivedAt: new Date().toISOString(),
-        note: form.note || "\u2014", batchNumber: genBatchNumber(),
-      });
-    } else {
-      consumeFIFO(prod.id, total);
-    }
-
-    const now = new Date().toISOString();
-    addMovement({
-      id: genId(), productId: prod.id, type: stockModal, quantity: total, unitType: form.unit,
-      unitPrice: unitPriceIndividual,
-      note: form.note || "\u2014", createdAt: now, createdBy: user.id,
-      expiryDate: stockModal === "in" ? form.expiryDate || undefined : undefined,
-      supplierId: stockModal === "in" && form.supplierId ? form.supplierId : undefined,
-      paymentTerms: stockModal === "in" && form.supplierId ? form.paymentTerms : undefined,
-      dueDate: stockModal === "in" && form.supplierId ? calcDueDate(now, form.paymentTerms) : undefined,
-      paymentStatus: stockModal === "in" && form.supplierId ? form.paymentStatus : undefined,
-    });
-    setStockModal(null);
-    setForm({ prod: "", qty: "", unit: "individual", price: "", note: "", expiryDate: "", supplierId: "", paymentTerms: "COD", paymentStatus: "unpaid" });
-    toast.success(t.stockRecorded as string);
-  };
-
   const doAddSupplier = () => {
     if (!supForm.name.trim()) return;
     addSupplier({
@@ -510,25 +462,82 @@ export function InventoryPage() {
   const [showAllIn, setShowAllIn] = useState(false);
   const [showAllOut, setShowAllOut] = useState(false);
 
-  // Filter produk untuk tab Barang Masuk/Keluar — supaya owner bisa audit
-  // selisih per produk (mis. "winchiz 2 kg keluar berapa kali bulan ini?").
+  // Filter untuk tab Barang Masuk/Keluar — audit view (no modal,
+  // semua input via Faktur / Edit Produk / Sesuaikan Stok).
   const [movementProductFilter, setMovementProductFilter] = useState("");
+  const [movementDateRange, setMovementDateRange] = useState<DateRange>("month");
+  const [movementCustomRange, setMovementCustomRange] = useState<CustomRange>({ from: "", to: "" });
+  const [stockInSupplierFilter, setStockInSupplierFilter] = useState<string>(""); // "" = semua, "__none__" = tanpa pemasok
+  const [stockOutReasonFilter, setStockOutReasonFilter] = useState<string>(""); // "" = semua
+
+  const dateBounds = useMemo(() => {
+    return getDateRange(movementDateRange, movementCustomRange);
+  }, [movementDateRange, movementCustomRange]);
+
+  const applyDateFilter = (list: StockMovement[]) => {
+    if (!dateBounds) return list;
+    return list.filter(m => {
+      const d = new Date(m.createdAt);
+      return d >= dateBounds.start && d <= dateBounds.end;
+    });
+  };
 
   const filterByProduct = (list: StockMovement[]) => {
     if (!movementProductFilter) return list;
     return list.filter(m => m.productId === movementProductFilter);
   };
 
-  const stockInMovements = useMemo(
-    () => filterByProduct(movements.filter(m => m.type === "in")),
+  const stockInMovements = useMemo(() => {
+    let list = movements.filter(m => m.type === "in");
+    list = filterByProduct(list);
+    list = applyDateFilter(list);
+    if (stockInSupplierFilter === "__none__") {
+      list = list.filter(m => !m.supplierId);
+    } else if (stockInSupplierFilter) {
+      list = list.filter(m => m.supplierId === stockInSupplierFilter);
+    }
+    return list;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [movements, movementProductFilter]
-  );
-  const stockOutMovements = useMemo(
-    () => filterByProduct(movements.filter(m => m.type === "out")),
+  }, [movements, movementProductFilter, dateBounds, stockInSupplierFilter]);
+
+  const stockOutMovements = useMemo(() => {
+    let list = movements.filter(m => m.type === "out");
+    list = filterByProduct(list);
+    list = applyDateFilter(list);
+    if (stockOutReasonFilter) {
+      list = list.filter(m => (m.reason || "") === stockOutReasonFilter);
+    }
+    return list;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [movements, movementProductFilter]
-  );
+  }, [movements, movementProductFilter, dateBounds, stockOutReasonFilter]);
+
+  // Breakdown by reason untuk tab Barang Keluar — visual bar chart proporsi.
+  const stockOutBreakdown = useMemo(() => {
+    // Hitung dari OUT yang sudah di-filter date/product (tapi belum reason),
+    // supaya bar tetap reflect periode tapi tidak self-filter saat user pilih reason.
+    let baseList = movements.filter(m => m.type === "out");
+    baseList = filterByProduct(baseList);
+    baseList = applyDateFilter(baseList);
+
+    const totals: Record<string, number> = {};
+    let grand = 0;
+    for (const m of baseList) {
+      const r = m.reason || "other";
+      totals[r] = (totals[r] || 0) + m.quantity;
+      grand += m.quantity;
+    }
+    if (grand === 0) return { total: 0, items: [] };
+    const REASON_LABELS: Record<string, string> = {
+      sale: "Penjualan", repack: "Repack", lost: "Hilang", damaged: "Rusak",
+      opname: "Opname", sample: "Sample", cancel: "Batal", refund: "Refund",
+      other: "Lainnya",
+    };
+    const items = Object.entries(totals)
+      .map(([key, qty]) => ({ key, label: REASON_LABELS[key] || key, qty, pct: qty / grand * 100 }))
+      .sort((a, b) => b.qty - a.qty);
+    return { total: grand, items };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [movements, movementProductFilter, dateBounds]);
 
   // Summary qty untuk produk yang sedang di-filter — info cepat di header tab.
   const movementSummary = useMemo(() => {
@@ -907,55 +916,77 @@ export function InventoryPage() {
       {/* ======= STOCK IN / FAKTUR MASUK TAB ======= */}
       {activeTab === "stockIn" && (
         <>
-          {canWrite && (
-            <button onClick={() => { setStockModal("in"); setForm({ prod: "", qty: "", unit: "individual", price: "", note: "", expiryDate: "", supplierId: "", paymentTerms: "COD", paymentStatus: "unpaid" }); }}
-              className="w-full py-3.5 rounded-2xl text-sm font-black text-white bg-gradient-to-br from-[#FB7185] to-[#E11D48] shadow-[0_4px_14px_-4px_rgba(225,29,72,0.45)] flex items-center justify-center gap-2">
-              <ArrowDownCircle size={16} strokeWidth={3} /> Barang Masuk
-            </button>
-          )}
-          {/* Summary ringkas: total barang masuk + total faktur belum lunas */}
-          {(() => {
-            const unpaidCount = unpaidInvoices.length;
-            const unpaidTotal = unpaidInvoices.reduce((s, m) => s + m.unitPrice * m.quantity, 0);
-            return (
-              <div className="grid grid-cols-2 gap-3">
-                <div className={`rounded-[18px] border p-4 ${th.card} ${th.bdr}`}>
-                  <p className={`text-xs font-semibold uppercase tracking-wider ${th.txm}`}>Total Barang Masuk</p>
-                  <p className={`font-display text-2xl font-black mt-1 leading-none ${th.tx}`} style={{ fontVariationSettings: '"wght" 900' }}>
-                    +{totalInCount}
-                  </p>
-                  <p className={`text-xs mt-1 ${th.txf}`}>item sepanjang waktu</p>
-                </div>
-                <div className={`rounded-[18px] border p-4 ${th.card} ${th.bdr}`}>
-                  <p className={`text-xs font-semibold uppercase tracking-wider ${th.txm}`}>Faktur Belum Lunas</p>
-                  <p className={`font-display text-2xl font-black mt-1 leading-none ${unpaidCount > 0 ? "text-[#BE123C]" : th.tx}`} style={{ fontVariationSettings: '"wght" 900' }}>
-                    {$(unpaidTotal)}
-                  </p>
-                  <p className={`text-xs mt-1 ${th.txf}`}>{unpaidCount} faktur</p>
-                </div>
+          {/* Info: barang masuk auto-tercatat dari Edit Produk/Sesuaikan Stok */}
+          <div className={`rounded-[18px] border p-3.5 ${th.card2} ${th.bdr}`}>
+            <p className={`text-xs ${th.txm}`}>
+              <strong className={th.tx}>Audit barang masuk.</strong> Catat barang masuk lewat:
+            </p>
+            <ul className={`text-xs mt-1 space-y-0.5 ${th.txm}`}>
+              <li>• <strong className={th.tx}>Edit Produk → Tambah Stok Baru</strong> (cepat, dengan ED)</li>
+              <li>• <strong className={th.tx}>Sesuaikan Stok</strong> (koreksi opname / repack)</li>
+            </ul>
+            {canWrite && (
+              <button
+                onClick={() => setActiveTab("invoices")}
+                className={`mt-2.5 text-xs font-bold inline-flex items-center gap-1 ${th.acc} underline`}>
+                <Receipt size={11} strokeWidth={2.8} /> Catat juga faktur pembelian dari pemasok →
+              </button>
+            )}
+          </div>
+
+          {/* Filter toolbar */}
+          <div className={`rounded-[18px] border p-3.5 ${th.card} ${th.bdr} space-y-2`}>
+            <div className="flex flex-wrap items-center gap-2">
+              <select value={movementDateRange} onChange={e => setMovementDateRange(e.target.value as DateRange)}
+                className={`px-2.5 py-1.5 text-xs font-bold rounded-lg border ${th.inp}`}>
+                <option value="today">Hari Ini</option>
+                <option value="yesterday">Kemarin</option>
+                <option value="week">Minggu Ini</option>
+                <option value="month">Bulan Ini</option>
+                <option value="all">Semua</option>
+                <option value="custom">Pilih Tanggal</option>
+              </select>
+              <select value={stockInSupplierFilter} onChange={e => setStockInSupplierFilter(e.target.value)}
+                className={`px-2.5 py-1.5 text-xs font-bold rounded-lg border ${th.inp}`}>
+                <option value="">Semua Pemasok</option>
+                <option value="__none__">— Tanpa pemasok</option>
+                {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+            </div>
+            {movementDateRange === "custom" && (
+              <div className="flex items-center gap-2">
+                <input type="date" value={movementCustomRange.from} max={movementCustomRange.to || undefined}
+                  onChange={e => setMovementCustomRange(r => ({ ...r, from: e.target.value }))}
+                  className={`px-2.5 py-1.5 text-xs font-bold rounded-lg border ${th.inp}`} />
+                <span className={`text-xs ${th.txm}`}>s/d</span>
+                <input type="date" value={movementCustomRange.to} min={movementCustomRange.from || undefined}
+                  onChange={e => setMovementCustomRange(r => ({ ...r, to: e.target.value }))}
+                  className={`px-2.5 py-1.5 text-xs font-bold rounded-lg border ${th.inp}`} />
               </div>
-            );
-          })()}
-          {/* Filter produk — biar Bu Santi bisa audit per produk specific.
-              Default kosong = tampilkan semua. */}
-          <div className={`rounded-[18px] border p-3.5 ${th.card} ${th.bdr}`}>
-            <p className={`text-xs font-bold ${th.txm} mb-1.5`}>{lang === "id" ? "Filter Produk" : "Filter Product"}</p>
+            )}
             <SearchableSelect
               value={movementProductFilter}
               onChange={setMovementProductFilter}
               options={products.map(p => ({ id: p.id, label: `${lang === "id" ? p.nameId : p.name} (${p.sku})` }))}
-              placeholder={lang === "id" ? "Pilih produk untuk filter…" : "Pick product to filter…"}
+              placeholder={lang === "id" ? "Filter produk (opsional)…" : "Filter product (optional)…"}
             />
-            {movementSummary && (
-              <p className={`text-xs mt-2 ${th.txm}`}>
-                <b className={th.tx}>{movementSummary.productName}</b> · Masuk +{movementSummary.inQty} ·
-                {" "}<button onClick={() => setMovementProductFilter("")} className={`${th.acc} font-bold underline`}>Reset</button>
-              </p>
-            )}
           </div>
+
+          {/* Summary box */}
+          <div className={`rounded-[18px] border p-3.5 ${th.card} ${th.bdr}`}>
+            <p className={`text-xs font-semibold uppercase tracking-wider ${th.txm}`}>Total Periode</p>
+            <p className={`font-display text-2xl font-black mt-1 leading-none ${th.acc}`} style={{ fontVariationSettings: '"wght" 900' }}>
+              +{stockInMovements.reduce((s, m) => s + m.quantity, 0)}
+            </p>
+            <p className={`text-xs mt-1 ${th.txf}`}>
+              {stockInMovements.length} catatan
+              {movementSummary && <> · <strong className={th.tx}>{movementSummary.productName}</strong></>}
+            </p>
+          </div>
+
           <div className={`rounded-[22px] border overflow-hidden ${th.card} ${th.bdr}`}>
             <div className={`px-5 py-3.5 border-b ${th.bdr}`}>
-              <p className={`text-sm font-extrabold tracking-tight ${th.tx}`}>Riwayat Faktur Masuk</p>
+              <p className={`text-sm font-extrabold tracking-tight ${th.tx}`}>Riwayat Barang Masuk</p>
             </div>
             {renderMovementList(stockInMovements, showAllIn, setShowAllIn, stockInMovements.length)}
           </div>
@@ -965,34 +996,105 @@ export function InventoryPage() {
       {/* ======= STOCK OUT TAB ======= */}
       {activeTab === "stockOut" && (
         <>
-          {canWrite && (
-            <button onClick={() => { setStockModal("out"); setForm({ prod: "", qty: "", unit: "individual", price: "", note: "", expiryDate: "", supplierId: "", paymentTerms: "COD", paymentStatus: "unpaid" }); }}
-              className="w-full py-3 rounded-2xl text-sm font-bold text-white bg-[#C4504A] flex items-center justify-center gap-2">
-              <ArrowUpCircle size={16} /> {t.stockOut}
-            </button>
-          )}
-          <div className={`rounded-[18px] border p-3.5 ${th.card} ${th.bdr}`}>
-            <p className={`text-xs font-semibold uppercase tracking-wider ${th.txm}`}>{t.totalOut}</p>
-            <p className="text-xl font-black mt-1 text-[#C4504A]">-{totalOutCount}</p>
+          {/* Info: barang keluar auto dari Penjualan & Sesuaikan Stok */}
+          <div className={`rounded-[18px] border p-3.5 ${th.card2} ${th.bdr}`}>
+            <p className={`text-xs ${th.txm}`}>
+              <strong className={th.tx}>Audit barang keluar.</strong> Tercatat otomatis dari:
+            </p>
+            <ul className={`text-xs mt-1 space-y-0.5 ${th.txm}`}>
+              <li>• <strong className={th.tx}>Penjualan POS</strong> (Reason: Penjualan)</li>
+              <li>• <strong className={th.tx}>Sesuaikan Stok</strong> (Repack, Hilang, Rusak, Opname, Sample, dll)</li>
+            </ul>
           </div>
-          {/* Filter produk — sama dengan tab stockIn, state di-share supaya
-              konsisten saat owner switch tab. */}
-          <div className={`rounded-[18px] border p-3.5 ${th.card} ${th.bdr}`}>
-            <p className={`text-xs font-bold ${th.txm} mb-1.5`}>{lang === "id" ? "Filter Produk" : "Filter Product"}</p>
+
+          {/* Filter toolbar */}
+          <div className={`rounded-[18px] border p-3.5 ${th.card} ${th.bdr} space-y-2`}>
+            <div className="flex flex-wrap items-center gap-2">
+              <select value={movementDateRange} onChange={e => setMovementDateRange(e.target.value as DateRange)}
+                className={`px-2.5 py-1.5 text-xs font-bold rounded-lg border ${th.inp}`}>
+                <option value="today">Hari Ini</option>
+                <option value="yesterday">Kemarin</option>
+                <option value="week">Minggu Ini</option>
+                <option value="month">Bulan Ini</option>
+                <option value="all">Semua</option>
+                <option value="custom">Pilih Tanggal</option>
+              </select>
+              <select value={stockOutReasonFilter} onChange={e => setStockOutReasonFilter(e.target.value)}
+                className={`px-2.5 py-1.5 text-xs font-bold rounded-lg border ${th.inp}`}>
+                <option value="">Semua Alasan</option>
+                <option value="sale">Penjualan</option>
+                <option value="repack">Repack</option>
+                <option value="lost">Hilang</option>
+                <option value="damaged">Rusak</option>
+                <option value="opname">Opname</option>
+                <option value="sample">Sample</option>
+                <option value="cancel">Batal</option>
+                <option value="refund">Refund</option>
+                <option value="other">Lainnya</option>
+              </select>
+            </div>
+            {movementDateRange === "custom" && (
+              <div className="flex items-center gap-2">
+                <input type="date" value={movementCustomRange.from} max={movementCustomRange.to || undefined}
+                  onChange={e => setMovementCustomRange(r => ({ ...r, from: e.target.value }))}
+                  className={`px-2.5 py-1.5 text-xs font-bold rounded-lg border ${th.inp}`} />
+                <span className={`text-xs ${th.txm}`}>s/d</span>
+                <input type="date" value={movementCustomRange.to} min={movementCustomRange.from || undefined}
+                  onChange={e => setMovementCustomRange(r => ({ ...r, to: e.target.value }))}
+                  className={`px-2.5 py-1.5 text-xs font-bold rounded-lg border ${th.inp}`} />
+              </div>
+            )}
             <SearchableSelect
               value={movementProductFilter}
               onChange={setMovementProductFilter}
               options={products.map(p => ({ id: p.id, label: `${lang === "id" ? p.nameId : p.name} (${p.sku})` }))}
-              placeholder={lang === "id" ? "Pilih produk untuk filter…" : "Pick product to filter…"}
+              placeholder={lang === "id" ? "Filter produk (opsional)…" : "Filter product (optional)…"}
             />
-            {movementSummary && (
-              <p className={`text-xs mt-2 ${th.txm}`}>
-                <b className={th.tx}>{movementSummary.productName}</b> · Keluar −{movementSummary.outQty} ·
-                {" "}<button onClick={() => setMovementProductFilter("")} className={`${th.acc} font-bold underline`}>Reset</button>
-              </p>
+          </div>
+
+          {/* Summary + breakdown chart */}
+          <div className={`rounded-[18px] border p-3.5 ${th.card} ${th.bdr}`}>
+            <p className={`text-xs font-semibold uppercase tracking-wider ${th.txm}`}>Total Periode</p>
+            <p className="font-display text-2xl font-black mt-1 leading-none text-[#BE123C] dark:text-[#FB7185]" style={{ fontVariationSettings: '"wght" 900' }}>
+              −{stockOutMovements.reduce((s, m) => s + m.quantity, 0)}
+            </p>
+            <p className={`text-xs mt-1 ${th.txf}`}>
+              {stockOutMovements.length} catatan
+              {movementSummary && <> · <strong className={th.tx}>{movementSummary.productName}</strong></>}
+            </p>
+            {/* Breakdown bar — proporsi reason */}
+            {stockOutBreakdown.total > 0 && (
+              <div className="mt-3">
+                <div className={`flex h-2 rounded-full overflow-hidden ${th.elev}`}>
+                  {stockOutBreakdown.items.map((it, idx) => (
+                    <div key={it.key}
+                      title={`${it.label}: ${it.qty} (${it.pct.toFixed(0)}%)`}
+                      style={{ width: `${it.pct}%` }}
+                      className={`h-full ${
+                        it.key === "sale" ? "bg-[#E11D48]" :
+                        it.key === "repack" ? "bg-[#FB7185]" :
+                        it.key === "lost" ? "bg-[#BE123C]" :
+                        it.key === "damaged" ? "bg-[#9F1239]" :
+                        it.key === "opname" ? "bg-[#FFB5C0]" :
+                        idx % 2 === 0 ? "bg-[#FFD1DB]" : "bg-[#C4504A]"
+                      }`} />
+                  ))}
+                </div>
+                <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1.5">
+                  {stockOutBreakdown.items.map(it => (
+                    <span key={it.key} className={`text-xs ${th.txm}`}>
+                      <strong className={th.tx}>{it.label}</strong> {it.pct.toFixed(0)}%
+                    </span>
+                  ))}
+                </div>
+              </div>
             )}
           </div>
+
           <div className={`rounded-[22px] border overflow-hidden ${th.card} ${th.bdr}`}>
+            <div className={`px-5 py-3.5 border-b ${th.bdr}`}>
+              <p className={`text-sm font-extrabold tracking-tight ${th.tx}`}>Riwayat Barang Keluar</p>
+            </div>
             {renderMovementList(stockOutMovements, showAllOut, setShowAllOut, stockOutMovements.length)}
           </div>
         </>
@@ -1182,155 +1284,6 @@ export function InventoryPage() {
 
       {/* ======= MODALS ======= */}
 
-      {/* Stock In/Out modal */}
-      <Modal open={!!stockModal} onClose={() => setStockModal(null)} title={(stockModal === "in" ? t.stockIn : t.stockOut) as string}>
-        <div className="flex flex-col gap-3.5">
-          <div className="relative">
-            <SearchableSelect
-              value={form.prod}
-              onChange={(prodId) => {
-                if (stockModal === "out") {
-                  const sp = products.find(p => p.id === prodId);
-                  setForm({ ...form, prod: prodId, price: sp ? String(form.unit === "box" ? sp.sellingPrice * sp.qtyPerBox : sp.sellingPrice) : "" });
-                } else {
-                  setForm({ ...form, prod: prodId });
-                }
-              }}
-              placeholder={t.selectProduct as string}
-              options={products.map(p => ({
-                id: p.id,
-                label: lang === "id" ? p.nameId : p.name,
-                subtitle: `SKU ${p.sku} · Stok ${p.stock}`,
-              }))}
-            />
-          </div>
-
-          {/* Supplier & Payment (stock-in only) */}
-          {stockModal === "in" && (
-            <>
-              <div className="relative">
-                <select value={form.supplierId} onChange={e => setForm({ ...form, supplierId: e.target.value })}
-                  className={`w-full px-4 py-3 text-sm rounded-2xl border appearance-none ${th.inp}`}>
-                  <option value="">{t.selectSupplier}</option>
-                  {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                </select>
-                <ChevronDown size={14} className={`absolute right-4 top-1/2 -translate-y-1/2 ${th.txf}`} />
-              </div>
-              {form.supplierId && (
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>{t.paymentTerms}</p>
-                    <div className="grid grid-cols-2 gap-1.5">
-                      {PAYMENT_TERMS_OPTIONS.map(pt => (
-                        <button key={pt} onClick={() => setForm({ ...form, paymentTerms: pt })}
-                          className={`py-2 rounded-xl text-xs font-bold ${
-                            form.paymentTerms === pt ? "text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48]" : `border ${th.bdr} ${th.txm}`
-                          }`}>{PAYMENT_TERMS_LABELS[pt]}</button>
-                      ))}
-                    </div>
-                  </div>
-                  <div>
-                    <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>{t.paymentStatus}</p>
-                    <div className="grid grid-cols-2 gap-1.5">
-                      {(["unpaid", "paid"] as PaymentStatus[]).map(ps => (
-                        <button key={ps} onClick={() => setForm({ ...form, paymentStatus: ps })}
-                          className={`py-2 rounded-xl text-xs font-bold ${
-                            form.paymentStatus === ps
-                              ? (ps === "paid" ? "text-white bg-[#E11D48]" : "text-white bg-[#E11D48]")
-                              : `border ${th.bdr} ${th.txm}`
-                          }`}>{ps === "paid" ? t.paid : t.unpaid}</button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
-            </>
-          )}
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>{t.unitType}</p>
-              <div className="grid grid-cols-2 gap-1.5">
-                {(["individual", "box"] as UnitType[]).map(ut => (
-                  <button key={ut} onClick={() => {
-                    if (stockModal === "out" && form.prod) {
-                      const sp = products.find(p => p.id === form.prod);
-                      setForm({ ...form, unit: ut, price: sp ? String(ut === "box" ? sp.sellingPrice * sp.qtyPerBox : sp.sellingPrice) : "" });
-                    } else {
-                      setForm({ ...form, unit: ut });
-                    }
-                  }}
-                    className={`py-2.5 rounded-xl text-xs font-bold ${
-                      form.unit === ut ? "text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48]" : `border ${th.bdr} ${th.txm}`
-                    }`}>{ut === "individual" ? t.individual : (form.prod ? `${t.box} (${products.find(p => p.id === form.prod)?.qtyPerBox || "?"})` : t.box)}</button>
-                ))}
-              </div>
-              {form.unit === "box" && form.prod && (() => {
-                const sp = products.find(p => p.id === form.prod);
-                return sp ? <p className={`text-xs mt-1.5 font-medium ${th.acc}`}>{t.boxEquals} = {sp.qtyPerBox} {sp.unit}</p> : null;
-              })()}
-            </div>
-            <div>
-              <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>{t.quantity}</p>
-              <input type="number" value={form.qty} onChange={e => setForm({ ...form, qty: e.target.value })}
-                className={inp} min="1" />
-            </div>
-          </div>
-          <div>
-            <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>
-              {t.price} <span className={th.txm}>· per {form.unit === "box" ? "dus" : "satuan"}</span>
-            </p>
-            <input type="number" value={form.price} onChange={e => setForm({ ...form, price: e.target.value })}
-              placeholder={form.prod ? (() => {
-                const p = products.find(pr => pr.id === form.prod);
-                if (!p) return "";
-                const val = stockModal === "in"
-                  ? (form.unit === "box" ? p.purchasePrice * p.qtyPerBox : p.purchasePrice)
-                  : (form.unit === "box" ? p.sellingPrice * p.qtyPerBox : p.sellingPrice);
-                return $(val);
-              })() : ""}
-              className={inp} min="0" />
-            {form.prod && form.qty && form.price && (() => {
-              const p = products.find(pr => pr.id === form.prod);
-              if (!p) return null;
-              const qtyN = parseInt(form.qty) || 0;
-              const priceN = parseInt(form.price) || 0;
-              const grandTotal = qtyN * priceN;
-              return (
-                <p className={`text-xs mt-1 ${th.txm}`}>
-                  Total: <span className={`font-bold ${th.acc}`}>{$(grandTotal)}</span>
-                  {form.unit === "box" && p.qtyPerBox > 1 && (
-                    <span> ({qtyN} dus × {$(priceN)})</span>
-                  )}
-                </p>
-              );
-            })()}
-          </div>
-          {stockModal === "in" && (
-            <div>
-              <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>{t.expiryDate}</p>
-              <input type="date" value={form.expiryDate} onChange={e => setForm({ ...form, expiryDate: e.target.value })}
-                className={inp} />
-            </div>
-          )}
-          <div>
-            <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>{t.note}</p>
-            <textarea value={form.note} onChange={e => setForm({ ...form, note: e.target.value })} rows={2}
-              className={`w-full px-4 py-2.5 text-sm rounded-xl border resize-none ${th.inp}`} />
-          </div>
-          {form.prod && (
-            <button onClick={() => { const p = products.find(pr => pr.id === form.prod); if (p) printBarcodeLabel(p, lang, { width: labelWidth, height: labelHeight }); }}
-              className={`w-full py-2.5 rounded-2xl text-xs font-bold border flex items-center justify-center gap-2 ${th.bdr} ${th.txm}`}>
-              <Barcode size={14} /> {t.printLabel}
-            </button>
-          )}
-          <div className="flex gap-2">
-            <button onClick={() => setStockModal(null)} className={`flex-1 py-3 rounded-2xl text-sm font-bold border ${th.bdr} ${th.txm}`}>{t.cancel}</button>
-            <button onClick={doStock} disabled={!form.prod || !form.qty}
-              className={`flex-1 py-3 rounded-2xl text-sm font-bold text-white disabled:opacity-40 ${stockModal === "in" ? "bg-[#E11D48]" : "bg-[#C4504A]"}`}>{t.confirm}</button>
-          </div>
-        </div>
-      </Modal>
 
       {/* Add Product modal */}
       <Modal open={addProdOpen} onClose={() => setAddProdOpen(false)} title={t.addProduct as string}>
