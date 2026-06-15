@@ -6,6 +6,18 @@ export interface MemberRes {
   phone: string;
   address?: string;
   member_number?: string;
+  points: number;
+  created_at: string;
+}
+
+export interface MemberPointMovementRes {
+  id: string;
+  order_id?: string;
+  type: 'earn' | 'redeem-item' | 'expire-reset' | 'adjust';
+  points: number;
+  balance_after: number;
+  note?: string;
+  created_by?: string;
   created_at: string;
 }
 
@@ -95,6 +107,9 @@ export const memberApi = {
     api.put<MemberRes>(`/members/${id}`, data),
 
   delete: (id: string) => api.del(`/members/${id}`),
+
+  getPointMovements: (id: string, limit = 100) =>
+    api.get<MemberPointMovementRes[]>(`/members/${id}/point-movements?limit=${limit}`),
 };
 
 export const cashSessionApi = {

@@ -5,6 +5,7 @@ import { Modal } from "@/components/Modal";
 import { ProductDetailModal } from "@/components/ProductDetailModal";
 import { SupplierDetailModal } from "@/components/SupplierDetailModal";
 import { PurchaseInvoiceTab } from "@/components/PurchaseInvoiceTab";
+import { RedeemableCatalog } from "@/components/RedeemableCatalog";
 import { SearchableSelect } from "@/components/SearchableSelect";
 import { useThemeClasses } from "@/hooks/useThemeClasses";
 import { useDebounce } from "@/hooks/useDebounce";
@@ -17,10 +18,10 @@ import toast from "react-hot-toast";
 import {
   Package, Plus, ChevronDown, ArrowDownCircle, ArrowUpCircle, Barcode,
   LayoutGrid, AlertTriangle, Truck, Check, Receipt, Pencil, Download, Search, Printer, Trash2,
-  Sliders,
+  Sliders, Gift,
 } from "lucide-react";
 
-type InventoryTab = "overview" | "stockIn" | "stockOut" | "expiry" | "invoices" | "suppliers";
+type InventoryTab = "overview" | "stockIn" | "stockOut" | "expiry" | "invoices" | "suppliers" | "redeem";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function getDateLabel(dateStr: string, t: Record<string, any>): string {
@@ -160,6 +161,7 @@ export function InventoryPage() {
     { id: "expiry", label: t.invExpiry as string, icon: <AlertTriangle size={14} /> },
     { id: "invoices", label: lang === "id" ? "Catat Faktur Barang Masuk" : "Stock-In Invoices", icon: <Receipt size={14} /> },
     { id: "suppliers", label: t.invSuppliers as string, icon: <Truck size={14} /> },
+    { id: "redeem", label: lang === "id" ? "Katalog Tebus Poin" : "Redeemable Catalog", icon: <Gift size={14} /> },
   ];
 
   // Overview stats
@@ -1163,6 +1165,11 @@ export function InventoryPage() {
             </div>
           )}
         </>
+      )}
+
+      {/* ======= REDEEMABLE CATALOG TAB ======= */}
+      {activeTab === "redeem" && (
+        <RedeemableCatalog canWrite={canWrite} />
       )}
 
 

@@ -3,7 +3,8 @@ import { Modal } from "./Modal";
 import { useThemeClasses } from "@/hooks/useThemeClasses";
 import { formatCurrency as $ } from "@/utils";
 import { memberApi } from "@/api/support";
-import type { MemberStatsRes } from "@/api/support";
+import type { MemberStatsRes, MemberPointMovementRes } from "@/api/support";
+import { useMemberStore } from "@/stores";
 
 interface Props {
   member: { id: string; name: string; phone: string } | null;
@@ -35,6 +36,8 @@ export function MemberStatsModal({ member, onClose }: Props) {
   const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState<MemberStatsRes | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [pointMovements, setPointMovements] = useState<MemberPointMovementRes[]>([]);
+  const memberLive = useMemberStore(s => s.members.find(m => m.id === member?.id));
 
   // Range derived from period selection
   useEffect(() => {
@@ -59,6 +62,10 @@ export function MemberStatsModal({ member, onClose }: Props) {
       })
       .catch(e => { if (!cancelled) setError(e.message || "Gagal memuat statistik"); })
       .finally(() => { if (!cancelled) setLoading(false); });
+    // Fetch poin riwayat (independen, tidak block UI utama).
+    memberApi.getPointMovements(member.id, 50)
+      .then(res => { if (!cancelled && res.body) setPointMovements(res.body); })
+      .catch(() => { /* silent: panel opsional */ });
     return () => { cancelled = true; };
   }, [member, from, to, period]);
 
@@ -199,6 +206,49 @@ export function MemberStatsModal({ member, onClose }: Props) {
           )}
         </>
       )}
+
+      {/* Poin loyalty — saldo & riwayat. Tampil dibawah stats periodik
+          karena terkait poin lifetime (tidak filter by date). */}
+      <div className={`rounded-2xl p-3 border mt-3 ${th.bdr} ${th.card2}`}>
+        <div className="flex items-center justify-between mb-2">
+          <p className={`text-xs font-bold ${th.txm}`}>✨ Poin Loyalty</p>
+          <p className={`text-base font-black ${th.acc}`}>
+            {(memberLive?.points ?? 0).toLocaleString("id-ID")}
+          </p>
+        </div>
+        {pointMovements.length === 0 ? (
+          <p className={`text-xs text-center py-3 ${th.txm}`}>Belum ada aktivitas poin</p>
+        ) : (
+          <div className="space-y-1.5 max-h-48 overflow-y-auto">
+            {pointMovements.map(mv => {
+              const typeLabel: Record<string, string> = {
+                "earn": "Dapat poin",
+                "redeem-item": "Tebus barang",
+                "expire-reset": "Reset tahunan",
+                "adjust": "Penyesuaian",
+              };
+              const isPositive = mv.points > 0;
+              return (
+                <div key={mv.id} className="flex justify-between items-start gap-2 py-1">
+                  <div className="min-w-0 flex-1">
+                    <p className={`text-xs font-bold ${th.tx}`}>{typeLabel[mv.type] || mv.type}</p>
+                    {mv.note && <p className={`text-xs ${th.txf} truncate`}>{mv.note}</p>}
+                    <p className={`text-xs ${th.txf}`}>
+                      {new Date(mv.created_at).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" })}
+                    </p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className={`text-xs font-black ${isPositive ? "text-[#9F1239] dark:text-[#FB7185]" : "text-[#E11D48]"}`}>
+                      {isPositive ? "+" : ""}{mv.points.toLocaleString("id-ID")}
+                    </p>
+                    <p className={`text-xs ${th.txf}`}>= {mv.balance_after.toLocaleString("id-ID")}</p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
     </Modal>
   );
 }

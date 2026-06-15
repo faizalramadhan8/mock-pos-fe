@@ -24,6 +24,7 @@ const mapProduct = (p: any): Product => ({
   memberPrice: typeof p.member_price === 'number' ? p.member_price : undefined,
   qtyPerBox: p.qty_per_box || 1, stock: p.stock, unit: p.unit,
   image: p.image || '', minStock: p.min_stock || 0, isActive: p.is_active !== false,
+  isRedeemable: !!p.is_redeemable,
   createdAt: p.created_at,
 });
 
@@ -43,6 +44,7 @@ const mapOrderItem = (i: any): OrderItem => ({
   regularPrice: typeof i.regular_price === 'number' ? i.regular_price : undefined,
   discountType: i.discount_type, discountValue: i.discount_value,
   discountAmount: i.discount_amount,
+  redeemedWithPoints: !!i.redeemed_with_points,
 });
 
 const mapOrder = (o: any): Order => ({
@@ -54,6 +56,8 @@ const mapOrder = (o: any): Order => ({
   memberId: o.member_id || undefined,
   member: o.member ? { id: o.member.id, name: o.member.name, phone: o.member.phone } : undefined,
   memberSavings: o.member_savings || 0,
+  pointsUsed: o.points_used || 0,
+  pointsEarned: o.points_earned || 0,
   createdAt: o.created_at, createdBy: o.created_by,
   paymentProof: o.payment_proof, orderDiscountType: o.order_discount_type,
   orderDiscountValue: o.order_discount_value, orderDiscount: o.order_discount,
@@ -77,6 +81,7 @@ const mapBatch = (b: any): StockBatch => ({
 const mapMember = (m: any): Member => ({
   id: m.id, name: m.name, phone: m.phone,
   address: m.address || '', memberNumber: m.member_number || '',
+  points: typeof m.points === 'number' ? m.points : 0,
   createdAt: m.created_at,
 });
 
@@ -277,6 +282,7 @@ interface ProductState {
   updateProduct: (id: string, data: Partial<Omit<Product, "id" | "createdAt">>) => Promise<void>;
   adjustStock: (id: string, delta: number) => void;
   toggleActive: (id: string) => Promise<void>;
+  setRedeemable: (id: string, redeemable: boolean) => Promise<void>;
   deleteProduct: (id: string) => Promise<void>;
 }
 export const useProductStore = create<ProductState>((set, get) => ({
@@ -338,6 +344,12 @@ export const useProductStore = create<ProductState>((set, get) => ({
       set(s => ({ products: s.products.map(p => p.id === id ? { ...p, isActive: !p.isActive } : p) }));
     } catch (e: any) { toast.error(e.message); }
   },
+  setRedeemable: async (id, redeemable) => {
+    try {
+      await productApi.setRedeemable(id, redeemable);
+      set(s => ({ products: s.products.map(p => p.id === id ? { ...p, isRedeemable: redeemable } : p) }));
+    } catch (e: any) { toast.error(e.message || "Gagal update katalog tebus"); throw e; }
+  },
   deleteProduct: async (id) => {
     try {
       await productApi.delete(id);
@@ -349,7 +361,7 @@ export const useProductStore = create<ProductState>((set, get) => ({
 }));
 
 // ─── Cart (persisted, client-only — UNCHANGED) ───
-interface ActiveMember { id: string; name: string; phone: string; }
+interface ActiveMember { id: string; name: string; phone: string; points?: number; }
 
 interface CartState {
   items: CartItem[];
@@ -368,6 +380,7 @@ interface CartState {
   removeItem: (id: string) => void;
   setItemDiscount: (id: string, type: DiscountType | null, value: number) => void;
   setOrderDiscount: (type: DiscountType | null, value: number) => void;
+  toggleRedeemPoints: (id: string) => void;
   clearCart: () => void;
   total: () => number;
   count: () => number;
@@ -403,7 +416,8 @@ export const useCartStore = create<CartState>()(
         // Recompute existing cart items based on new member status.
         // When switching from non-member → member, clear the customer name/phone
         // (they're non-member fields; member info lives on `member`). When
-        // clearing member, preserve any free-text note in `customer`.
+        // clearing member, preserve any free-text note in `customer` dan
+        // bersihkan flag tebus (poin hanya valid kalau member terpilih).
         const products = useProductStore.getState().products;
         set(s => ({
           member: m,
@@ -411,9 +425,10 @@ export const useCartStore = create<CartState>()(
           customerPhone: m ? "" : s.customerPhone,
           items: s.items.map(i => {
             const product = products.find(p => p.id === i.productId);
-            if (!product) return i;
-            const { unitPrice, regularPrice } = computePrices(product, i.unitType, isMember);
-            return { ...i, unitPrice, regularPrice };
+            const base = product
+              ? { ...i, ...computePrices(product, i.unitType, isMember) }
+              : i;
+            return m ? base : { ...base, redeemWithPoints: false };
           }),
         }));
       },
@@ -443,6 +458,9 @@ export const useCartStore = create<CartState>()(
         items: s.items.map(i => i.id === id ? { ...i, discountType: type || undefined, discountValue: type ? value : undefined } : i),
       })),
       setOrderDiscount: (type, value) => set({ orderDiscountType: type, orderDiscountValue: type ? value : 0 }),
+      toggleRedeemPoints: (id) => set(s => ({
+        items: s.items.map(i => i.id === id ? { ...i, redeemWithPoints: !i.redeemWithPoints } : i),
+      })),
       clearCart: () => set({ items: [], customer: "", customerPhone: "", payment: "cash", member: null, orderDiscountType: null, orderDiscountValue: 0 }),
       total: () => get().items.reduce((s, i) => s + i.unitPrice * i.quantity, 0),
       count: () => get().items.reduce((s, i) => s + i.quantity, 0),
@@ -489,6 +507,7 @@ export const useOrderStore = create<OrderState>((set, get) => ({
           regular_price: i.regularPrice,
           discount_type: i.discountType, discount_value: i.discountValue,
           discount_amount: i.discountAmount,
+          ...(i.redeemedWithPoints ? { redeem_with_points: true } : {}),
         })),
         subtotal: order.subtotal, ppn_rate: order.ppnRate, ppn: order.ppn, total: order.total,
         payment: order.payment,
@@ -551,6 +570,7 @@ export const useOrderStore = create<OrderState>((set, get) => ({
           regular_price: i.regularPrice,
           discount_type: i.discountType, discount_value: i.discountValue,
           discount_amount: i.discountAmount,
+          ...(i.redeemedWithPoints ? { redeem_with_points: true } : {}),
         })),
         subtotal: order.subtotal, ppn_rate: order.ppnRate, ppn: order.ppn, total: order.total,
         customer: order.customer, customer_phone: order.customerPhone || "",

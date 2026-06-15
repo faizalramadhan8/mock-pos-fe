@@ -397,6 +397,11 @@ export function OrdersPage() {
                         <p className={`text-xs font-mono ${th.txf} truncate`}>
                           {[m.phone, m.memberNumber && `#${m.memberNumber}`].filter(Boolean).join(" · ")}
                         </p>
+                        {(m.points ?? 0) > 0 && (
+                          <p className={`text-xs font-bold ${th.acc}`}>
+                            ✨ {m.points!.toLocaleString("id-ID")} poin
+                          </p>
+                        )}
                         {m.address && (
                           <p className={`text-xs ${th.txf} truncate`}>📍 {m.address}</p>
                         )}
@@ -466,6 +471,7 @@ export function OrdersPage() {
                   phone: newMember.phone.trim(),
                   address: newMember.address.trim() || undefined,
                   memberNumber: newMember.memberNumber.trim() || undefined,
+                  points: 0,
                   createdAt: new Date().toISOString(),
                 });
                 setAddMemberOpen(false);

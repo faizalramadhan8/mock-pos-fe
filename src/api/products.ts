@@ -19,6 +19,7 @@ export interface ProductRes {
   image?: string;
   min_stock: number;
   is_active: boolean;
+  is_redeemable?: boolean;
   created_at: string;
 }
 
@@ -112,6 +113,9 @@ export const productApi = {
     api.patch<ProductRes>(`/products/${id}/stock`, { delta }),
 
   toggleActive: (id: string) => api.patch<ProductRes>(`/products/${id}/toggle-active`),
+
+  setRedeemable: (id: string, redeemable: boolean) =>
+    api.patch<ProductRes>(`/products/${id}/redeemable`, { is_redeemable: redeemable }),
 
   delete: (id: string) => api.del(`/products/${id}`),
 

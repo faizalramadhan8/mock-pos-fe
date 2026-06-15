@@ -12,6 +12,7 @@ export interface OrderItemRes {
   discount_type?: string;
   discount_value?: number;
   discount_amount?: number;
+  redeemed_with_points?: boolean;
 }
 
 export interface OrderPaymentRes {
@@ -39,6 +40,8 @@ export interface OrderRes {
   order_discount_type?: string;
   order_discount_value?: number;
   order_discount?: number;
+  points_used?: number;
+  points_earned?: number;
   created_by: string;
   created_at: string;
 }
@@ -140,6 +143,7 @@ export const orderApi = {
       discount_type?: string;
       discount_value?: number;
       discount_amount?: number;
+      redeem_with_points?: boolean;
     }[];
     subtotal: number;
     ppn_rate: number;
@@ -166,6 +170,7 @@ export const orderApi = {
       product_id: string; name: string; quantity: number; unit_type?: string;
       unit_price: number; regular_price?: number;
       discount_type?: string; discount_value?: number; discount_amount?: number;
+      redeem_with_points?: boolean;
     }[];
     subtotal: number;
     ppn_rate: number;

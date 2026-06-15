@@ -16,18 +16,21 @@ import Barcode from "react-barcode";
 import type { PaymentMethod, UnitType, DiscountType, Product, Order, Member } from "@/types";
 import toast from "react-hot-toast";
 import {
-  Search, ScanLine, ShoppingBag, Minus, Plus, Trash2, ImagePlus, X, UserPlus, Tag, Percent, Wallet, FileText, Printer, Barcode as BarcodeIcon, Clock, Send, AlertCircle, Eye, EyeOff,
+  Search, ScanLine, ShoppingBag, Minus, Plus, Trash2, ImagePlus, X, UserPlus, Tag, Percent, Wallet, FileText, Printer, Barcode as BarcodeIcon, Clock, Send, AlertCircle, Eye, EyeOff, Gift, Sparkles,
 } from "lucide-react";
 
 export function POSPage() {
   // Auto-refresh data setiap kali kasir buka POS atau balik dari aplikasi
-  // lain (WA, kalkulator). TTL 10s default — cegah spam network.
+  // lain (WA, kalkulator). TTL 10s default — cegah spam network. Plus
+  // polling 30s — sale dari device lain (HP Bu Santi / laptop admin)
+  // tidak terdeteksi visibilitychange kalau tab kasir aktif terus, jadi
+  // background polling supaya stok tetap fresh.
   usePageFetch([
     { key: "products", fetch: () => useProductStore.getState().fetchProducts() },
     { key: "orders",   fetch: () => useOrderStore.getState().fetchOrders() },
     { key: "members",  fetch: () => useMemberStore.getState().fetchMembers() },
     { key: "settings", fetch: () => useSettingsStore.getState().fetchSettings() },
-  ]);
+  ], { pollMs: 30_000 });
   const th = useThemeClasses();
   const { t, lang } = useLangStore();
   const categories = useCategoryStore(s => s.categories);
@@ -56,6 +59,7 @@ export function POSPage() {
   const addMember = useMemberStore(s => s.addMember);
   const setItemDiscount = useCartStore(s => s.setItemDiscount);
   const setOrderDiscount = useCartStore(s => s.setOrderDiscount);
+  const toggleRedeemPoints = useCartStore(s => s.toggleRedeemPoints);
   const orderDiscountType = useCartStore(s => s.orderDiscountType);
   const orderDiscountValue = useCartStore(s => s.orderDiscountValue);
 
@@ -181,6 +185,7 @@ export function POSPage() {
       phone: newMemberPhone.trim(),
       address: newMemberAddress.trim() || undefined,
       memberNumber: newMemberNumber.trim() || undefined,
+      points: 0,
       createdAt: new Date().toISOString(),
     };
     addMember(member);
@@ -195,9 +200,27 @@ export function POSPage() {
     toast.success(t.memberAdded as string);
   };
 
-  // Discount-aware calculations
-  const itemDiscountsTotal = useMemo(() => cartItems.reduce((s, i) => s + calcItemDiscount(i), 0), [cartItems]);
-  const cartSubtotal = useMemo(() => cartItems.reduce((s, i) => s + i.unitPrice * i.quantity, 0), [cartItems]);
+  // Loyalty points — split items into cash vs redeem. Cash items kena
+  // diskon + PPN. Redeem items dibayar full pakai poin (1 poin = Rp 1),
+  // tidak kena diskon/PPN dan tidak masuk hitungan earn poin baru.
+  // Saldo poin diambil live dari members store (lebih fresh dari cart
+  // snapshot — penting setelah BE polling 30s update saldo).
+  const memberPoints = useMemo(() => {
+    if (!activeMember) return 0;
+    const live = members.find(m => m.id === activeMember.id);
+    return live?.points ?? activeMember.points ?? 0;
+  }, [activeMember, members]);
+  const cashItems = useMemo(() => cartItems.filter(i => !i.redeemWithPoints), [cartItems]);
+  const redeemItems = useMemo(() => cartItems.filter(i => !!i.redeemWithPoints), [cartItems]);
+  const pointsToRedeem = useMemo(
+    () => redeemItems.reduce((s, i) => s + i.unitPrice * i.quantity, 0),
+    [redeemItems]
+  );
+  const pointsBalanceAfter = memberPoints - pointsToRedeem;
+
+  // Discount-aware calculations (operate on CASH items only).
+  const itemDiscountsTotal = useMemo(() => cashItems.reduce((s, i) => s + calcItemDiscount(i), 0), [cashItems]);
+  const cartSubtotal = useMemo(() => cashItems.reduce((s, i) => s + i.unitPrice * i.quantity, 0), [cashItems]);
   const memberSavings = useMemo(() =>
     activeMember
       ? cartItems.reduce((s, i) =>
@@ -212,9 +235,17 @@ export function POSPage() {
   }, [orderDiscountType, orderDiscountValue, cartSubtotalAfterItemDisc]);
   const discountedSubtotal = cartSubtotalAfterItemDisc - orderDiscAmount;
   const ppnAmount = useMemo(() => Math.round(discountedSubtotal * ppnRate / 100), [discountedSubtotal, ppnRate]);
-  const cartTotal = discountedSubtotal + ppnAmount;
+  const cartTotal = discountedSubtotal + ppnAmount; // CASH actual yang customer bayar
   const totalDiscount = itemDiscountsTotal + orderDiscAmount;
   const cartCount = useMemo(() => cartItems.reduce((s, i) => s + i.quantity, 0), [cartItems]);
+  // Preview earn: 1.000 poin per kelipatan tepat Rp 100.000 di cartTotal (cash).
+  const pointsEarnedPreview = useMemo(() => {
+    if (!activeMember) return 0;
+    if (cartTotal < 100_000) return 0;
+    const cents = Math.round(cartTotal * 100);
+    if (cents % (100_000 * 100) !== 0) return 0;
+    return Math.floor(cents / (100_000 * 100)) * 1000;
+  }, [cartTotal, activeMember]);
 
   const filtered = useMemo(() => products.filter(p => {
     const name = (lang === "id" ? p.nameId : p.name).toLowerCase();
@@ -348,6 +379,7 @@ export function POSPage() {
         unitType: ci.unitType, unitPrice: ci.unitPrice,
         ...(ci.regularPrice !== undefined ? { regularPrice: ci.regularPrice } : {}),
         ...(ci.discountType ? { discountType: ci.discountType, discountValue: ci.discountValue, discountAmount: disc } : {}),
+        ...(ci.redeemWithPoints ? { redeemedWithPoints: true } : {}),
       };
     });
     // Compute payments split — if cash primary + rcv < total, split into
@@ -438,6 +470,15 @@ export function POSPage() {
               {activeMember.name} <span className={`text-xs font-semibold ${th.txm}`}>· Member</span>
             </p>
             <p className={`text-xs ${th.txm} truncate`}>{activeMember.phone}</p>
+            <p className={`text-xs font-bold mt-0.5 ${th.acc} flex items-center gap-1`}>
+              <Sparkles size={11} strokeWidth={2.8} />
+              Poin: {memberPoints.toLocaleString("id-ID")}
+              {pointsToRedeem > 0 && (
+                <span className={`font-normal ${th.txm}`}>
+                  · sisa setelah tebus {pointsBalanceAfter.toLocaleString("id-ID")}
+                </span>
+              )}
+            </p>
           </div>
           <button onClick={() => setMember(null)}
             className={`shrink-0 text-xs font-bold px-2.5 py-1 rounded-lg border ${th.bdr} ${th.txm}`}>
@@ -459,13 +500,18 @@ export function POSPage() {
           {showMemberDropdown && (
             <div className={`absolute top-full left-0 right-0 z-20 mt-1 rounded-xl border shadow-lg overflow-hidden ${th.card} ${th.bdr}`}>
               {filteredMembers.length > 0 && filteredMembers.map(m => (
-                <button key={m.id} onClick={() => { setMember({ id: m.id, name: m.name, phone: m.phone }); setMemberQuery(""); setShowMemberDropdown(false); setCustomer(""); setCustomerPhone(""); }}
+                <button key={m.id} onClick={() => { setMember({ id: m.id, name: m.name, phone: m.phone, points: m.points || 0 }); setMemberQuery(""); setShowMemberDropdown(false); setCustomer(""); setCustomerPhone(""); }}
                   className={`w-full text-left px-4 py-2.5 flex items-center justify-between hover:opacity-70 border-b last:border-0 ${th.bdrSoft}`}>
                   <div className="min-w-0">
                     <p className={`text-sm font-bold truncate ${th.tx}`}>{m.name}</p>
                     <p className={`text-xs ${th.txm} truncate`}>
                       {[m.phone, m.memberNumber && `#${m.memberNumber}`].filter(Boolean).join(" · ")}
                     </p>
+                    {(m.points ?? 0) > 0 && (
+                      <p className={`text-xs font-bold ${th.acc}`}>
+                        ✨ {(m.points || 0).toLocaleString("id-ID")} poin
+                      </p>
+                    )}
                   </div>
                 </button>
               ))}
@@ -551,9 +597,24 @@ export function POSPage() {
       ) : cartItems.map(ci => {
         const itemGross = ci.unitPrice * ci.quantity;
         const itemDisc = calcItemDiscount(ci);
+        const isRedeemed = !!ci.redeemWithPoints;
+        // Cek apakah item ini bisa di-tebus: produk eligible (admin tandai
+        // di Katalog Tebus), member terpilih, saldo cukup setelah dipotong
+        // cart redeem lain (excluding item ini sendiri).
+        const product = products.find(p => p.id === ci.productId);
+        const isRedeemableProduct = !!product?.isRedeemable;
+        const otherRedeemTotal = pointsToRedeem - (isRedeemed ? itemGross : 0);
+        const canRedeem = !!activeMember && isRedeemableProduct && memberPoints - otherRedeemTotal >= itemGross;
         return (
-          <div key={ci.id} className={`p-3.5 rounded-[18px] border ${th.card2} ${th.bdr}`}>
+          <div key={ci.id} className={`p-3.5 rounded-[18px] border ${th.card2} ${th.bdr} ${isRedeemed ? "ring-2 ring-[#E11D48]/40" : ""}`}>
             <div className="flex-1 min-w-0">
+              {isRedeemed && (
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-[#E11D48] text-white flex items-center gap-1">
+                    <Gift size={11} strokeWidth={2.8} /> Tebus dengan poin
+                  </span>
+                </div>
+              )}
               <p className={`font-display text-lg font-black truncate ${th.tx}`} style={{ fontVariationSettings: '"wght" 800' }}>
                 {ci.name}
               </p>
@@ -594,7 +655,14 @@ export function POSPage() {
                   </button>
                 </div>
                 <div className="flex items-center gap-2">
-                  {itemDisc > 0 ? (
+                  {isRedeemed ? (
+                    <div className="text-right leading-tight">
+                      <div className={`text-xs line-through ${th.txf}`}>{$(itemGross)}</div>
+                      <div className="font-display text-lg font-black text-[#E11D48] flex items-center gap-1" style={{ fontVariationSettings: '"opsz" 72, "wght" 800' }}>
+                        −{itemGross.toLocaleString("id-ID")} poin
+                      </div>
+                    </div>
+                  ) : itemDisc > 0 ? (
                     <div className="text-right leading-tight">
                       <div className={`text-xs line-through ${th.txf}`}>{$(itemGross)}</div>
                       <div className={`font-display text-lg font-black ${th.tx}`} style={{ fontVariationSettings: '"opsz" 72, "wght" 800' }}>{$(itemGross - itemDisc)}</div>
@@ -604,10 +672,37 @@ export function POSPage() {
                       {$(itemGross)}
                     </span>
                   )}
+                  {/* Tebus poin: hanya tampil kalau ada member terpilih DAN
+                      produk eligible (di Katalog Tebus). Disabled kalau saldo
+                      tidak cukup (kecuali sudah aktif — supaya bisa di-untoggle). */}
+                  {activeMember && (isRedeemableProduct || isRedeemed) && (
+                    <button
+                      onClick={() => toggleRedeemPoints(ci.id)}
+                      disabled={!isRedeemed && !canRedeem}
+                      aria-label={isRedeemed ? "Batal tebus" : "Tebus dengan poin"}
+                      title={
+                        isRedeemed
+                          ? "Batal tebus"
+                          : !isRedeemableProduct
+                          ? "Produk tidak di katalog tebus"
+                          : canRedeem
+                          ? `Tebus dengan ${itemGross.toLocaleString("id-ID")} poin`
+                          : "Saldo poin tidak cukup"
+                      }
+                      className={`w-10 h-10 rounded-xl flex items-center justify-center active:scale-90 transition-transform disabled:opacity-30 ${
+                        isRedeemed
+                          ? "bg-[#E11D48] text-white"
+                          : `${th.elev} ${th.txm}`
+                      }`}
+                    >
+                      <Gift size={16} strokeWidth={2.4} />
+                    </button>
+                  )}
                   <button
                     onClick={() => { setDiscountItemId(discountItemId === ci.id ? null : ci.id); setDiscountMode(ci.discountType || "percent"); setDiscountInput(ci.discountValue ? String(ci.discountValue) : ""); }}
+                    disabled={isRedeemed}
                     aria-label="Diskon item"
-                    className={`w-10 h-10 rounded-xl flex items-center justify-center active:scale-90 transition-transform ${
+                    className={`w-10 h-10 rounded-xl flex items-center justify-center active:scale-90 transition-transform disabled:opacity-30 ${
                       ci.discountType
                         ? "bg-[#FFEDD5] text-[#BE123C] dark:bg-[#E11D48]/20 dark:text-[#FB7185]"
                         : `${th.elev} ${th.txm}`
@@ -658,10 +753,29 @@ export function POSPage() {
           {ppnRate > 0 && (
             <div className="flex justify-between text-sm mt-1"><span className={th.txm}>{t.ppn} ({ppnRate}%)</span><span className={`font-semibold ${th.tx}`}>{$(ppnAmount)}</span></div>
           )}
+          {pointsToRedeem > 0 && (
+            <div className="flex justify-between text-sm mt-1">
+              <span className="text-[#E11D48] flex items-center gap-1"><Gift size={11} strokeWidth={2.8} /> Tebus pakai poin</span>
+              <span className="font-semibold text-[#E11D48]">−{pointsToRedeem.toLocaleString("id-ID")} poin</span>
+            </div>
+          )}
           <div className={`flex justify-between text-base pt-3 mt-3 border-t ${th.bdr}`}>
             <span className={`font-extrabold ${th.tx}`}>{t.total}</span>
             <span className={`font-black text-xl ${th.acc}`}>{$(cartTotal)}</span>
           </div>
+          {activeMember && pointsEarnedPreview > 0 && (
+            <div className="flex justify-between text-xs mt-1.5 px-2 py-1.5 rounded-lg bg-[#FFE4E9] dark:bg-[#E11D48]/15">
+              <span className="font-semibold text-[#9F1239] dark:text-[#FB7185] flex items-center gap-1">
+                <Sparkles size={10} strokeWidth={2.8} /> Akan dapat poin
+              </span>
+              <span className="font-bold text-[#9F1239] dark:text-[#FB7185]">+{pointsEarnedPreview.toLocaleString("id-ID")}</span>
+            </div>
+          )}
+          {activeMember && pointsEarnedPreview === 0 && cartTotal > 0 && (
+            <p className={`text-xs mt-1.5 ${th.txf} text-center`}>
+              Cash {$(cartTotal)} bukan kelipatan tepat Rp 100.000 → 0 poin
+            </p>
+          )}
           {/* Order discount toggle */}
           {!showOrderDiscount && !orderDiscountType ? (
             <button onClick={() => { setShowOrderDiscount(true); setOrderDiscMode("percent"); setOrderDiscInput(""); }}
@@ -1180,8 +1294,15 @@ export function POSPage() {
               {lastOrder.items.map((item, i) => (
                 <div key={i} className={`py-1.5 ${i > 0 ? `border-t ${th.bdr}` : ""}`}>
                   <div className="flex justify-between">
-                    <span className={`text-sm ${th.tx}`}>{item.name} ×{item.quantity}</span>
-                    <span className={`text-sm font-bold ${th.tx}`}>{$(item.unitPrice * item.quantity)}</span>
+                    <span className={`text-sm ${th.tx} flex items-center gap-1`}>
+                      {item.redeemedWithPoints && <Gift size={10} strokeWidth={2.8} className="text-[#E11D48]" />}
+                      {item.name} ×{item.quantity}
+                    </span>
+                    <span className={`text-sm font-bold ${item.redeemedWithPoints ? "text-[#E11D48]" : th.tx}`}>
+                      {item.redeemedWithPoints
+                        ? `−${(item.unitPrice * item.quantity).toLocaleString("id-ID")} poin`
+                        : $(item.unitPrice * item.quantity)}
+                    </span>
                   </div>
                   {(item.discountAmount || 0) > 0 && (
                     <div className="flex justify-between">
@@ -1221,10 +1342,24 @@ export function POSPage() {
                   )}
                 </>) : null;
               })()}
+              {(lastOrder.pointsUsed ?? 0) > 0 && (
+                <div className="flex justify-between text-sm mt-1">
+                  <span className="text-[#E11D48] flex items-center gap-1"><Gift size={11} strokeWidth={2.8} /> Poin dipakai</span>
+                  <span className="font-bold text-[#E11D48]">−{(lastOrder.pointsUsed || 0).toLocaleString("id-ID")}</span>
+                </div>
+              )}
               <div className={`flex justify-between pt-2 mt-2 border-t ${th.bdr}`}>
                 <span className={`font-extrabold ${th.tx}`}>{t.total}</span>
                 <span className={`font-black text-lg ${th.acc}`}>{$(lastOrder.total)}</span>
               </div>
+              {lastOrder.member && (lastOrder.pointsEarned ?? 0) > 0 && (
+                <div className="flex justify-between text-xs mt-2 px-2 py-1.5 rounded-lg bg-[#FFE4E9] dark:bg-[#E11D48]/15">
+                  <span className="font-semibold text-[#9F1239] dark:text-[#FB7185] flex items-center gap-1">
+                    <Sparkles size={10} strokeWidth={2.8} /> Poin diperoleh
+                  </span>
+                  <span className="font-bold text-[#9F1239] dark:text-[#FB7185]">+{(lastOrder.pointsEarned || 0).toLocaleString("id-ID")}</span>
+                </div>
+              )}
             </div>
             <div className="flex justify-center">
               <Barcode value={lastOrder.id} format="CODE128" width={1.5} height={40} displayValue={true}
@@ -1350,6 +1485,7 @@ export function POSPage() {
                     unitType: ci.unitType, unitPrice: ci.unitPrice,
                     ...(ci.regularPrice !== undefined ? { regularPrice: ci.regularPrice } : {}),
                     ...(ci.discountType ? { discountType: ci.discountType, discountValue: ci.discountValue, discountAmount: disc } : {}),
+                    ...(ci.redeemWithPoints ? { redeemedWithPoints: true } : {}),
                   };
                 });
                 const pendingOrder: Order = {

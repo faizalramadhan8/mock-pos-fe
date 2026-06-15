@@ -61,6 +61,8 @@ export interface Product {
   image: string;
   minStock: number;
   isActive: boolean;
+  /** Eligible untuk tebus pakai member.points. Admin tandai via Katalog Tebus. */
+  isRedeemable?: boolean;
   createdAt: string;
 }
 
@@ -78,6 +80,12 @@ export interface CartItem {
   unit: string;
   discountType?: DiscountType;
   discountValue?: number;
+  /**
+   * Tebus barang: kalau true, item ini dibayar dari member.points
+   * (1 poin = Rp 1). Harga item × qty dipotong dari saldo poin, dan
+   * tidak masuk hitungan cash actual untuk earn poin baru.
+   */
+  redeemWithPoints?: boolean;
 }
 
 export interface OrderPaymentSplit {
@@ -101,6 +109,9 @@ export interface Order {
   memberId?: string;
   member?: { id: string; name: string; phone: string };
   memberSavings?: number;
+  /** Loyalty points: nilai yang ditebus & yang didapat dari order ini. */
+  pointsUsed?: number;
+  pointsEarned?: number;
   createdAt: string;
   createdBy: string;
   paymentProof?: string;
@@ -120,6 +131,7 @@ export interface OrderItem {
   discountType?: DiscountType;
   discountValue?: number;
   discountAmount?: number;
+  redeemedWithPoints?: boolean;
 }
 
 export interface MemberStats {
@@ -217,6 +229,26 @@ export interface Member {
   phone: string;
   address?: string;
   memberNumber?: string;
+  /**
+   * Loyalty point balance (1 point = Rp 1). Earned per kelipatan tepat
+   * Rp 100.000 cash actual (= 1.000 poin per kelipatan). Bisa ditebus
+   * per-item di cart. Reset 0 setiap 1 Januari.
+   */
+  points: number;
+  createdAt: string;
+}
+
+export type MemberPointMovementType = "earn" | "redeem-item" | "expire-reset" | "adjust";
+
+export interface MemberPointMovement {
+  id: string;
+  orderId?: string;
+  type: MemberPointMovementType;
+  /** signed: + earn, - redeem/expire */
+  points: number;
+  balanceAfter: number;
+  note?: string;
+  createdBy?: string;
   createdAt: string;
 }
 

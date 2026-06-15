@@ -100,14 +100,23 @@ export function printReceipt(order: Order, opts?: { cashierName?: string }) {
 
   // Subtotal pakai harga normal (regular_price kalau ada, fallback unit_price).
   // memberSavings = total selisih (regular - member) × qty. Subtotal − Hemat
-  // Member = total. Konsisten dengan format struk WA.
+  // Member = total. Konsisten dengan format struk WA. Item yang ditebus
+  // (redeemedWithPoints) di-exclude dari subtotal & savings supaya match
+  // dengan total cash di BE — mereka muncul sebagai "Poin Dipakai" terpisah.
   let subtotal = 0;
   let memberSavings = 0;
+  let pointsUsedFromItems = 0;
   for (const i of order.items) {
+    if (i.redeemedWithPoints) {
+      pointsUsedFromItems += i.unitPrice * i.quantity;
+      continue;
+    }
     const regular = i.regularPrice && i.regularPrice > i.unitPrice ? i.regularPrice : i.unitPrice;
     subtotal += regular * i.quantity;
     memberSavings += (regular - i.unitPrice) * i.quantity;
   }
+  const pointsUsed = order.pointsUsed || pointsUsedFromItems;
+  const pointsEarned = order.pointsEarned || 0;
   const fmt = (n: number) => "Rp " + Math.round(n).toLocaleString("id-ID");
   const barcodeSvg = generateBarcodeSvg(order.id, { width: 1.0, height: 30, fontSize: 8 });
 
@@ -147,12 +156,18 @@ export function printReceipt(order: Order, opts?: { cashierName?: string }) {
   <div class="ln"></div>
   ${order.items.map(i => {
     const lineTotal = i.quantity * i.unitPrice;
-    return `<div class="r item"><span class="l">${escapeHtml(i.name)} ×${i.quantity}</span><span class="v">${fmt(lineTotal)}</span></div>`;
+    const valueStr = i.redeemedWithPoints
+      ? `&minus;${Math.round(lineTotal).toLocaleString("id-ID")} poin`
+      : fmt(lineTotal);
+    const prefix = i.redeemedWithPoints ? "🎁 " : "";
+    return `<div class="r item"><span class="l">${prefix}${escapeHtml(i.name)} ×${i.quantity}</span><span class="v">${valueStr}</span></div>`;
   }).join("")}
   <div class="ln"></div>
   <div class="r"><span class="l">Subtotal</span><span class="v">${fmt(subtotal)}</span></div>
   ${memberSavings > 0 ? `<div class="r"><span class="l">Hemat Member</span><span class="v">-${fmt(memberSavings)}</span></div>` : ""}
+  ${pointsUsed > 0 ? `<div class="r"><span class="l">Poin Dipakai</span><span class="v">-${Math.round(pointsUsed).toLocaleString("id-ID")} poin</span></div>` : ""}
   <div class="r total"><span class="l">Total</span><span class="v">${fmt(order.total)}</span></div>
+  ${pointsEarned > 0 ? `<div class="r" style="margin-top:1mm"><span class="l">Poin Diperoleh</span><span class="v">+${pointsEarned.toLocaleString("id-ID")} poin</span></div>` : ""}
   ${barcodeSvg ? `<div class="bc">${barcodeSvg}</div>` : ""}
   <div class="ln"></div>
   <p class="c" style="font-style:italic">Barang yang sudah dibeli tidak dapat ditukar atau dikembalikan.</p>

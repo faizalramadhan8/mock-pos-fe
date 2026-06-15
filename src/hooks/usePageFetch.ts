@@ -17,6 +17,8 @@ interface Options {
   ttlMs?: number;
   /** Refetch saat tab kembali visible (kasir balik dari WA/aplikasi lain). Default true. */
   refetchOnFocus?: boolean;
+  /** Background polling interval. Skip kalau tab hidden. Default off. */
+  pollMs?: number;
 }
 
 // Run sebuah fetch dengan TTL guard. Return Promise yang resolve void (silent —
@@ -49,7 +51,7 @@ async function runWithTTL(spec: FetchSpec, ttlMs: number, force = false): Promis
  * ]);
  */
 export function usePageFetch(specs: FetchSpec[], opts: Options = {}) {
-  const { ttlMs = DEFAULT_TTL_MS, refetchOnFocus = true } = opts;
+  const { ttlMs = DEFAULT_TTL_MS, refetchOnFocus = true, pollMs } = opts;
   // Stable ref: spec list bisa di-recreate per-render, tapi key+fetch tetap.
   // Ambil yang terkini setiap callback fire.
   const specsRef = useRef(specs);
@@ -61,19 +63,36 @@ export function usePageFetch(specs: FetchSpec[], opts: Options = {}) {
       void runWithTTL(s, ttlMs);
     }
 
-    if (!refetchOnFocus) return;
+    const cleanups: Array<() => void> = [];
 
-    // On focus: window visible lagi → refetch (TTL tetap berlaku, jadi
-    // rapid tab switch tidak spam network).
-    const onVisibility = () => {
-      if (document.visibilityState !== "visible") return;
-      for (const s of specsRef.current) {
-        void runWithTTL(s, ttlMs);
-      }
-    };
-    document.addEventListener("visibilitychange", onVisibility);
-    return () => document.removeEventListener("visibilitychange", onVisibility);
-  }, [ttlMs, refetchOnFocus]);
+    if (refetchOnFocus) {
+      // On focus: window visible lagi → refetch (TTL tetap berlaku, jadi
+      // rapid tab switch tidak spam network).
+      const onVisibility = () => {
+        if (document.visibilityState !== "visible") return;
+        for (const s of specsRef.current) {
+          void runWithTTL(s, ttlMs);
+        }
+      };
+      document.addEventListener("visibilitychange", onVisibility);
+      cleanups.push(() => document.removeEventListener("visibilitychange", onVisibility));
+    }
+
+    if (pollMs && pollMs > 0) {
+      // Background polling — penting untuk halaman multi-device aktif
+      // bersamaan (POS kasir + admin laptop). Skip kalau tab hidden supaya
+      // tidak buang bandwidth saat user pindah aplikasi lain.
+      const id = setInterval(() => {
+        if (document.visibilityState !== "visible") return;
+        for (const s of specsRef.current) {
+          void runWithTTL(s, ttlMs);
+        }
+      }, pollMs);
+      cleanups.push(() => clearInterval(id));
+    }
+
+    return () => { for (const fn of cleanups) fn(); };
+  }, [ttlMs, refetchOnFocus, pollMs]);
 }
 
 /** Force-refresh helper: ignore TTL, dipakai setelah user-triggered mutation. */
