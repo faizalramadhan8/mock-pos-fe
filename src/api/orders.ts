@@ -158,6 +158,8 @@ export const orderApi = {
     order_discount_type?: string;
     order_discount_value?: number;
     order_discount?: number;
+    /** Idempotency key — UUID per checkout attempt. BE cache 5 menit. */
+    client_request_id?: string;
   }) => api.post<OrderRes>('/orders/', data),
 
   cancel: (id: string) => api.patch<OrderRes>(`/orders/${id}/cancel`),

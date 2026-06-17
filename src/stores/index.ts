@@ -578,6 +578,7 @@ export const useOrderStore = create<OrderState>((set, get) => ({
           discount_amount: i.discountAmount,
           ...(i.redeemedWithPoints ? { redeem_with_points: true } : {}),
         })),
+        ...(order.clientRequestId ? { client_request_id: order.clientRequestId } : {}),
         subtotal: order.subtotal, ppn_rate: order.ppnRate, ppn: order.ppn, total: order.total,
         payment: order.payment,
         ...(order.payments && order.payments.length > 0 ? {

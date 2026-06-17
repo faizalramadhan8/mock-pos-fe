@@ -47,6 +47,8 @@ export function PriceTierCatalog({ canWrite }: Props) {
 
   const eligibleForPicker = useMemo(() => {
     const q = pickerQuery.trim().toLowerCase();
+    // No slice cap — modal punya max-h-[60vh] overflow-y-auto. Slice 30
+    // sebelumnya bikin user kira "cuma huruf A" karena alphabetical sort.
     return products
       .filter(p => p.isActive && (p.priceTiers || []).length === 0)
       .filter(p =>
@@ -54,8 +56,7 @@ export function PriceTierCatalog({ canWrite }: Props) {
         (lang === "id" ? p.nameId : p.name).toLowerCase().includes(q) ||
         p.sku.toLowerCase().includes(q)
       )
-      .sort((a, b) => a.name.localeCompare(b.name))
-      .slice(0, 30);
+      .sort((a, b) => a.name.localeCompare(b.name));
   }, [products, pickerQuery, lang]);
 
   const withTiersCount = useMemo(

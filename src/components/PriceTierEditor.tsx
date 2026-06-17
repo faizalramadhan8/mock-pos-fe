@@ -119,14 +119,18 @@ export function PriceTierEditor({ productId }: Props) {
 
   const filteredMembers = useMemo(() => {
     const q = memberQuery.trim().toLowerCase();
-    if (!q) return members.slice(0, 20);
-    return members
-      .filter(m =>
-        m.name.toLowerCase().includes(q) ||
-        m.phone.toLowerCase().includes(q) ||
-        (m.memberNumber || "").toLowerCase().includes(q)
-      )
-      .slice(0, 20);
+    // No slice cap saat search aktif — semua match muncul. Saat search kosong,
+    // tampil semua sorted alphabetically. Container scroll natural via
+    // `max-h-48 overflow-y-auto` di list bawah. Sebelumnya slice(0, 20) bikin
+    // user kira "cuma huruf A doang" karena tanpa search list cuma 20 row
+    // pertama alphabetical.
+    const sorted = [...members].sort((a, b) => a.name.localeCompare(b.name));
+    if (!q) return sorted;
+    return sorted.filter(m =>
+      m.name.toLowerCase().includes(q) ||
+      m.phone.toLowerCase().includes(q) ||
+      (m.memberNumber || "").toLowerCase().includes(q)
+    );
   }, [members, memberQuery]);
 
   const save = async () => {

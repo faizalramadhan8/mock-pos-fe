@@ -99,6 +99,11 @@ export function POSPage() {
   // Background: customer pernah ter-debit QRIS Rp 134rb tapi DB kosong karena
   // FE fire-and-forget tanpa await.
   const [checkoutProcessing, setCheckoutProcessing] = useState(false);
+  // Idempotency key — stable per attempt. Generate sekali di doCheckout,
+  // re-use untuk retry (network slow, kasir double-click). Clear setelah
+  // success. Cegah BE dobel record saat sinyal lambat → kasir reload + klik
+  // ulang (insiden 16 Jun 2026 — 1 QRIS bayar 1x ter-record 2 order).
+  const clientRequestIdRef = useRef<string | null>(null);
   const [cashRcv, setCashRcv] = useState("");
   const [proofImage, setProofImage] = useState("");
   // Split payment — muncul kalau user bayar cash tapi kurang dari total.
@@ -410,6 +415,16 @@ export function POSPage() {
     if (checkoutProcessing) return;  // cegah double-submit
     setCheckoutProcessing(true);
 
+    // Generate idempotency key once per attempt; reuse on retry. BE Redis
+    // cache 5 menit → submit ulang dengan key sama → return order existing
+    // (no double charge / double stock decrement).
+    if (!clientRequestIdRef.current) {
+      clientRequestIdRef.current = (typeof crypto !== "undefined" && "randomUUID" in crypto)
+        ? crypto.randomUUID()
+        : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+    }
+    const clientRequestId = clientRequestIdRef.current;
+
     let totalSavings = 0;
     const orderItems = cartItems.map(ci => {
       const disc = calcItemDiscount(ci);
@@ -452,6 +467,7 @@ export function POSPage() {
       createdAt: new Date().toISOString(), createdBy: user.id,
       ...((payment === "qris" || payment === "transfer") && proofImage ? { paymentProof: proofImage } : {}),
       ...(orderDiscountType ? { orderDiscountType, orderDiscountValue, orderDiscount: orderDiscAmount } : {}),
+      clientRequestId,
     };
 
     try {
@@ -485,9 +501,16 @@ export function POSPage() {
       setSplitMethod("");
       setCheckoutOpen(false);
       setCartOpen(false);
+      // Reset idempotency key — next checkout pakai key baru. Hanya reset
+      // pada SUCCESS; kalau gagal (catch), keep key supaya retry merujuk ke
+      // attempt yang sama (BE Redis dedupe).
+      clientRequestIdRef.current = null;
       toast.success(t.orderSuccess as string);
     } catch (e: any) {
       // BE gagal: cart tidak ke-clear (kasir bisa retry / cek koneksi).
+      // Idempotency key di-keep — kalau actually BE save sukses tapi response
+      // gak nyampe, retry akan kena Redis cache & return order yg sama (no
+      // double charge). Insiden 16 Jun 2026 cegah.
       // PENTING: jangan tampilkan toast sukses, jangan close modal.
       toast.error(
         `Gagal menyimpan transaksi: ${e?.message || "cek koneksi internet"}. Cart aman, coba lagi.`,

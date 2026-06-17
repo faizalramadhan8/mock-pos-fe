@@ -134,6 +134,9 @@ export interface Order {
   /** Loyalty points: nilai yang ditebus & yang didapat dari order ini. */
   pointsUsed?: number;
   pointsEarned?: number;
+  /** Idempotency key — UUID per checkout attempt. Hanya ada saat Create.
+   *  BE Redis cache 5 menit; submit ulang dengan key sama → return existing. */
+  clientRequestId?: string;
   createdAt: string;
   createdBy: string;
   paymentProof?: string;

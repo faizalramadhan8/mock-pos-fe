@@ -35,6 +35,10 @@ export function RedeemableCatalog({ canWrite }: Props) {
   );
   const eligible = useMemo(() => {
     const q = pickerQuery.trim().toLowerCase();
+    // No slice cap — semua produk eligible tampil. Container modal punya
+    // `max-h-[60vh] overflow-y-auto` jadi scroll natural. Sebelumnya
+    // slice(0, 30) bikin user kira "cuma produk huruf A yang muncul"
+    // karena sort alphabetical + cap di 30 row pertama.
     return products
       .filter(p => p.isActive && !p.isRedeemable)
       .filter(p =>
@@ -42,8 +46,7 @@ export function RedeemableCatalog({ canWrite }: Props) {
         (lang === "id" ? p.nameId : p.name).toLowerCase().includes(q) ||
         p.sku.toLowerCase().includes(q)
       )
-      .sort((a, b) => a.name.localeCompare(b.name))
-      .slice(0, 30);
+      .sort((a, b) => a.name.localeCompare(b.name));
   }, [products, pickerQuery, lang]);
 
   const addToCatalog = async (id: string) => {
