@@ -243,13 +243,14 @@ export function POSPage() {
   const cartTotal = discountedSubtotal + ppnAmount; // CASH actual yang customer bayar
   const totalDiscount = itemDiscountsTotal + orderDiscAmount;
   const cartCount = useMemo(() => cartItems.reduce((s, i) => s + i.quantity, 0), [cartItems]);
-  // Preview earn: 1.000 poin per kelipatan tepat Rp 100.000 di cartTotal (cash).
+  // Preview earn: 500 poin per kelipatan Rp 100.000 di cartTotal (cash).
+  // FLOOR rule (19 Jun 2026): 100rb=500, 144rb=500, 200rb=1000, 300rb=1500.
+  // Rate diturunkan dari 1000 → 500 + switch STRICT → FLOOR.
   const pointsEarnedPreview = useMemo(() => {
     if (!activeMember) return 0;
     if (cartTotal < 100_000) return 0;
     const cents = Math.round(cartTotal * 100);
-    if (cents % (100_000 * 100) !== 0) return 0;
-    return Math.floor(cents / (100_000 * 100)) * 1000;
+    return Math.floor(cents / (100_000 * 100)) * 500;
   }, [cartTotal, activeMember]);
 
   // Tier transition detection — kasir aware kalau harga grosir tier match
@@ -926,9 +927,9 @@ export function POSPage() {
               <span className="font-bold text-[#9F1239] dark:text-[#FB7185]">+{pointsEarnedPreview.toLocaleString("id-ID")}</span>
             </div>
           )}
-          {activeMember && pointsEarnedPreview === 0 && cartTotal > 0 && (
+          {activeMember && pointsEarnedPreview === 0 && cartTotal > 0 && cartTotal < 100_000 && (
             <p className={`text-xs mt-1.5 ${th.txf} text-center`}>
-              Cash {$(cartTotal)} bukan kelipatan tepat Rp 100.000 → 0 poin
+              Tambah {$(100_000 - cartTotal)} lagi untuk dapat 500 poin
             </p>
           )}
           {/* Order discount toggle */}
