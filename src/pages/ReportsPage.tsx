@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useLangStore, useOrderStore, useProductStore } from "@/stores";
+import { useLangStore, useOrderStore, useProductStore, useExpenseStore, usePurchaseInvoiceStore } from "@/stores";
 import { useThemeClasses } from "@/hooks/useThemeClasses";
 import { usePageFetch } from "@/hooks/usePageFetch";
 import { useCountUp } from "@/hooks/useCountUp";
@@ -9,10 +9,11 @@ import { getDateRange, type DateRange, type CustomRange } from "@/utils/dateRang
 import { orderApi, type OrderAggregateResponse } from "@/api/orders";
 import { expenseApi, type ProfitLossRes } from "@/api/expenses";
 import { BakeryLogo } from "@/components/icons";
-import { Package, Users, Wallet, ChevronDown, ChevronUp, TrendingUp, TrendingDown, Minus, Download, Info } from "lucide-react";
+import { Package, Users, Wallet, BookOpen, ChevronDown, ChevronUp, TrendingUp, TrendingDown, Minus, Download, Info } from "lucide-react";
+import { CashflowTab } from "@/components/CashflowTab";
 import toast from "react-hot-toast";
 
-type ReportTab = "products" | "members" | "profit-loss";
+type ReportTab = "cashflow" | "products" | "members" | "profit-loss";
 
 // YYYY-MM-DD in local time (WIB) — BE aggregate expects calendar-date strings.
 function toYMD(d: Date): string {
@@ -29,13 +30,17 @@ function toYMD(d: Date): string {
 export function ReportsPage() {
   usePageFetch([
     { key: "orders", fetch: () => useOrderStore.getState().fetchOrders() },
+    // Cashflow tab butuh expenses + invoices untuk aggregate ledger.
+    // Refunds di-skip — belum ada bulk fetch endpoint (rare di flow Bu Santi).
+    { key: "expenses", fetch: () => useExpenseStore.getState().fetchExpenses() },
+    { key: "purchase-invoices", fetch: () => usePurchaseInvoiceStore.getState().fetchInvoices() },
   ]);
   const th = useThemeClasses();
   const { lang } = useLangStore();
   const orders = useOrderStore(s => s.orders);
   const products = useProductStore(s => s.products);
 
-  const [tab, setTab] = useState<ReportTab>("products");
+  const [tab, setTab] = useState<ReportTab>("cashflow");
   const [dateRange, setDateRange] = useState<DateRange>("month");
   const [customRange, setCustomRange] = useState<CustomRange>({ from: "", to: "" });
   const [expandedMember, setExpandedMember] = useState<string | null>(null);
@@ -279,46 +284,52 @@ export function ReportsPage() {
         </div>
       </div>
 
-      {/* Date range row */}
-      <div className="flex flex-wrap items-end gap-2">
-        <div className="flex-1 min-w-[160px]">
-          <label className={`text-xs font-bold ${th.txm} block mb-1`}>
-            {lang === "id" ? "Periode" : "Period"}
-          </label>
-          <select value={dateRange} onChange={e => setDateRange(e.target.value as DateRange)}
-            className={`w-full px-4 py-3 text-sm font-bold rounded-2xl border appearance-none cursor-pointer ${th.inp}`}>
-            {(["today", "yesterday", "week", "month", "all", "custom"] as DateRange[]).map(r => (
-              <option key={r} value={r}>{dateRangeLabel(r)}</option>
-            ))}
-          </select>
-        </div>
-        {dateRange === "custom" && (
-          <>
-            <div className="flex-1 min-w-[140px]">
-              <label className={`text-xs font-bold ${th.txm} block mb-1`}>{lang === "id" ? "Dari" : "From"}</label>
-              <input type="date" value={customRange.from} max={customRange.to || undefined}
-                onChange={e => setCustomRange(r => ({ ...r, from: e.target.value }))}
-                className={`w-full px-3 py-2.5 text-sm font-bold rounded-2xl border ${th.inp}`} />
+      {/* Date range row — disembunyikan untuk Arus Kas tab karena pakai
+          month picker internal sendiri (cash basis = monthly accounting). */}
+      {tab !== "cashflow" && (
+        <>
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="flex-1 min-w-[160px]">
+              <label className={`text-xs font-bold ${th.txm} block mb-1`}>
+                {lang === "id" ? "Periode" : "Period"}
+              </label>
+              <select value={dateRange} onChange={e => setDateRange(e.target.value as DateRange)}
+                className={`w-full px-4 py-3 text-sm font-bold rounded-2xl border appearance-none cursor-pointer ${th.inp}`}>
+                {(["today", "yesterday", "week", "month", "all", "custom"] as DateRange[]).map(r => (
+                  <option key={r} value={r}>{dateRangeLabel(r)}</option>
+                ))}
+              </select>
             </div>
-            <div className="flex-1 min-w-[140px]">
-              <label className={`text-xs font-bold ${th.txm} block mb-1`}>{lang === "id" ? "Sampai" : "To"}</label>
-              <input type="date" value={customRange.to} min={customRange.from || undefined}
-                onChange={e => setCustomRange(r => ({ ...r, to: e.target.value }))}
-                className={`w-full px-3 py-2.5 text-sm font-bold rounded-2xl border ${th.inp}`} />
-            </div>
-          </>
-        )}
-      </div>
-      {customError && (
-        <p role="alert" className={`text-xs font-bold ${th.dark ? "text-[#FB7185]" : "text-[#BE123C]"} -mt-2`}>
-          {customError}
-        </p>
+            {dateRange === "custom" && (
+              <>
+                <div className="flex-1 min-w-[140px]">
+                  <label className={`text-xs font-bold ${th.txm} block mb-1`}>{lang === "id" ? "Dari" : "From"}</label>
+                  <input type="date" value={customRange.from} max={customRange.to || undefined}
+                    onChange={e => setCustomRange(r => ({ ...r, from: e.target.value }))}
+                    className={`w-full px-3 py-2.5 text-sm font-bold rounded-2xl border ${th.inp}`} />
+                </div>
+                <div className="flex-1 min-w-[140px]">
+                  <label className={`text-xs font-bold ${th.txm} block mb-1`}>{lang === "id" ? "Sampai" : "To"}</label>
+                  <input type="date" value={customRange.to} min={customRange.from || undefined}
+                    onChange={e => setCustomRange(r => ({ ...r, to: e.target.value }))}
+                    className={`w-full px-3 py-2.5 text-sm font-bold rounded-2xl border ${th.inp}`} />
+                </div>
+              </>
+            )}
+          </div>
+          {customError && (
+            <p role="alert" className={`text-xs font-bold ${th.dark ? "text-[#FB7185]" : "text-[#BE123C]"} -mt-2`}>
+              {customError}
+            </p>
+          )}
+        </>
       )}
 
       {/* Tab switch — role=tablist + touch target ≥44px */}
       <div role="tablist" aria-label={lang === "id" ? "Pilih laporan" : "Report category"}
         className="flex gap-2 overflow-x-auto scrollbar-hide">
         {([
+          { id: "cashflow" as ReportTab, label: lang === "id" ? "Arus Kas" : "Cash Flow", icon: <BookOpen size={16} /> },
           { id: "products" as ReportTab, label: lang === "id" ? "Top Produk" : "Top Products", icon: <Package size={16} /> },
           { id: "members" as ReportTab, label: lang === "id" ? "Member" : "Members", icon: <Users size={16} /> },
           { id: "profit-loss" as ReportTab, label: lang === "id" ? "Laba Rugi" : "Profit/Loss", icon: <Wallet size={16} /> },
@@ -335,7 +346,7 @@ export function ReportsPage() {
 
       {/* Empty state — pakai BakeryLogo besar supaya warm (toko kue), bukan
           generic icon. */}
-      {!hasData && !customError && (
+      {tab !== "cashflow" && !hasData && !customError && (
         <div className={`rounded-3xl border bg-bakery-stripe p-10 text-center ${th.bdr} ${th.card2}`}>
           <div className="mx-auto mb-4 opacity-70" style={{ width: 80 }}>
             <BakeryLogo size={80} />
@@ -348,6 +359,10 @@ export function ReportsPage() {
           </p>
         </div>
       )}
+
+      {/* Arus Kas — self-contained tab dengan month picker sendiri (override
+          dateRange parent supaya konsisten dengan cash basis monthly accounting). */}
+      {tab === "cashflow" && <CashflowTab />}
 
       {/* Top Produk */}
       {tab === "products" && hasData && !customError && (

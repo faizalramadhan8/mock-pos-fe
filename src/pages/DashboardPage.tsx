@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { useAuthStore, useLangStore, useOrderStore, useProductStore, useBatchStore } from "@/stores";
+import { useAuthStore, useLangStore, useOrderStore, useProductStore, useBatchStore, useExpenseStore, usePurchaseInvoiceStore } from "@/stores";
 import { ProductDetailModal } from "@/components/ProductDetailModal";
 import { useThemeClasses } from "@/hooks/useThemeClasses";
 import { usePageFetch } from "@/hooks/usePageFetch";
@@ -48,6 +48,8 @@ export function DashboardPage() {
     { key: "orders",   fetch: () => useOrderStore.getState().fetchOrders() },
     { key: "products", fetch: () => useProductStore.getState().fetchProducts() },
     { key: "batches",  fetch: () => useBatchStore.getState().fetchBatches() },
+    { key: "expenses", fetch: () => useExpenseStore.getState().fetchExpenses() },
+    { key: "purchase-invoices", fetch: () => usePurchaseInvoiceStore.getState().fetchInvoices() },
   ]);
   const th = useThemeClasses();
   const { t, lang } = useLangStore();
@@ -57,6 +59,8 @@ export function DashboardPage() {
   const products = useProductStore(s => s.products);
   const getExpiringBatches = useBatchStore(s => s.getExpiringBatches);
   const batches = useBatchStore(s => s.batches);
+  const expenses = useExpenseStore(s => s.expenses);
+  const invoices = usePurchaseInvoiceStore(s => s.invoices);
 
   const [range, setRange] = useState<Range>("today");
   const [customFrom, setCustomFrom] = useState<string>(() => new Date().toISOString().slice(0, 10));
@@ -99,7 +103,33 @@ export function DashboardPage() {
   const prevRevenue = useMemo(() => prevRangedOrders.reduce((s, o) => s + o.total, 0), [prevRangedOrders]);
   const revenueDeltaPct = prevRevenue > 0 ? ((rangeRevenue - prevRevenue) / prevRevenue) * 100 : (rangeRevenue > 0 ? 100 : 0);
 
-  // (Pengeluaran/Untung Bersih daily fetch removed — cards dihapus dari Beranda)
+  // Cash basis: Selisih = Pendapatan − Pengeluaran. Pengeluaran terdiri dari
+  // expense entries (listrik, plastik, dll) + faktur supplier lunas (cash keluar
+  // saat paidAt). Modal Barang Terjual (COGS) tetap di-track sebagai INFO,
+  // bukan masuk hitungan selisih (Bu Santi: "laba kotor tidak perlu" 19 Jun 2026).
+  const rangeExpenses = useMemo(() => {
+    const w = getRangeWindow(range, customFrom, customTo);
+    return expenses
+      .filter(e => {
+        const d = new Date(e.expense_date);
+        return d >= w.from && d < w.to;
+      })
+      .reduce((s, e) => s + e.amount, 0);
+  }, [expenses, range, customFrom, customTo]);
+
+  const rangeInvoicesPaid = useMemo(() => {
+    const w = getRangeWindow(range, customFrom, customTo);
+    return invoices
+      .filter(i => {
+        if (!i.paidAt) return false;
+        const d = new Date(i.paidAt);
+        return d >= w.from && d < w.to;
+      })
+      .reduce((s, i) => s + i.totalAmount, 0);
+  }, [invoices, range, customFrom, customTo]);
+
+  const rangeTotalOut = rangeExpenses + rangeInvoicesPaid;
+  const rangeSelisih = rangeRevenue - rangeTotalOut;
 
   const rangeLabel: Record<Range, string> = {
     today: "Hari Ini", yesterday: "Kemarin", week: "Minggu Ini", month: "Bulan Ini", custom: "Custom",
@@ -344,29 +374,36 @@ export function DashboardPage() {
         </div>
       )}
 
-      {/* ─── LAPORAN KEUANGAN (Owner/Admin) ─── follows unified range */}
+      {/* ─── RINGKASAN KEUANGAN (Owner/Admin) — cash basis (19 Jun 2026) ─── */}
+      {/* Bu Santi minta hapus konsep Laba Kotor (accrual) — pakai cash basis:
+          Pendapatan − Pengeluaran = Selisih. Modal Barang Terjual tetap di
+          tampil sebagai INFO TAMBAHAN (bukan masuk hitungan), supaya owner
+          tahu margin barang tanpa confused dengan cash position. Detail
+          lengkap pakai tab Arus Kas di Laporan. */}
       {isOwner && (
         <div className={`rounded-[22px] border p-5 ${th.card} ${th.bdr}`}>
           <p className={`text-sm font-bold uppercase tracking-wider mb-4 ${th.txm}`}>
-            Laporan Keuangan · {rangeLabel[range]}
+            Ringkasan Keuangan · {rangeLabel[range]}
           </p>
           <div className={`rounded-2xl border overflow-hidden ${th.bdr}`}>
             <div className={`flex items-baseline justify-between px-5 py-4 border-b ${th.bdrSoft} ${th.card2}`}>
               <div>
-                <p className={`text-sm font-semibold uppercase tracking-wider ${th.txm}`}>Harga Jual</p>
-                <p className={`text-sm mt-1 ${th.txf}`}>{rangedOrders.length} transaksi · {finReport.itemsCount} item</p>
+                <p className={`text-sm font-semibold uppercase tracking-wider ${th.txm}`}>Pendapatan (Omzet)</p>
+                <p className={`text-sm mt-1 ${th.txf}`}>{rangedOrders.length} transaksi</p>
               </div>
-              <p className={`font-display text-2xl font-black ${th.tx}`} style={{ fontVariationSettings: '"wght" 900' }}>
-                {$(finReport.gross)}
+              <p className={`font-display text-2xl font-black ${th.acc}`} style={{ fontVariationSettings: '"wght" 900' }}>
+                +{$(rangeRevenue)}
               </p>
             </div>
             <div className={`flex items-baseline justify-between px-5 py-4 border-b ${th.bdrSoft} ${th.card2}`}>
               <div>
-                <p className={`text-sm font-semibold uppercase tracking-wider ${th.txm}`}>Modal (Harga Beli)</p>
-                <p className={`text-sm mt-1 ${th.txf}`}>Total harga beli barang terjual</p>
+                <p className={`text-sm font-semibold uppercase tracking-wider ${th.txm}`}>Pengeluaran</p>
+                <p className={`text-sm mt-1 ${th.txf}`}>
+                  Operasional {$(rangeExpenses)} + Faktur lunas {$(rangeInvoicesPaid)}
+                </p>
               </div>
-              <p className={`font-display text-2xl font-black ${th.tx}`} style={{ fontVariationSettings: '"wght" 900' }}>
-                − {$(finReport.cogs)}
+              <p className={`font-display text-2xl font-black text-[#BE123C] dark:text-[#FB7185]`} style={{ fontVariationSettings: '"wght" 900' }}>
+                −{$(rangeTotalOut)}
               </p>
             </div>
             <div className="relative flex items-baseline justify-between px-5 py-5 bg-gradient-to-br from-[#FFE4E9] to-[#FFD1DB] dark:from-[#E11D48]/15 dark:to-[#9F1239]/20">
@@ -376,15 +413,23 @@ export function DashboardPage() {
                 style={{ background: "radial-gradient(circle, #FFB5C0 0%, transparent 70%)" }}
               />
               <div className="relative">
-                <p className={`text-sm font-semibold uppercase tracking-wider ${th.acc}`}>Gain</p>
-                <p className={`text-sm mt-1 ${th.txm}`}>{finReport.margin.toFixed(1)}% dari harga jual</p>
+                <p className={`text-sm font-semibold uppercase tracking-wider ${th.acc}`}>Selisih</p>
+                <p className={`text-sm mt-1 ${th.txm}`}>Pendapatan − Pengeluaran</p>
               </div>
-              <p className={`relative font-display text-[32px] font-black leading-none ${th.acc}`} style={{ fontVariationSettings: '"wght" 900' }}>
-                {$(finReport.net)}
+              <p className={`relative font-display text-[32px] font-black leading-none ${rangeSelisih >= 0 ? th.acc : "text-[#BE123C] dark:text-[#FB7185]"}`} style={{ fontVariationSettings: '"wght" 900' }}>
+                {rangeSelisih >= 0 ? "+" : ""}{$(rangeSelisih)}
               </p>
             </div>
           </div>
-          <p className={`text-sm mt-3 ${th.txf}`}>Gain = Harga Jual − Modal.</p>
+          <div className={`mt-3 p-3 rounded-lg ${th.elev}`}>
+            <p className={`text-xs font-bold ${th.txm}`}>Info Tambahan (tidak mengurangi selisih)</p>
+            <p className={`text-xs mt-1 ${th.txf}`}>
+              Modal Barang Terjual: <strong className={th.tx}>{$(finReport.cogs)}</strong>
+              <span className="block mt-0.5">
+                = harga beli barang yang sudah terjual. Untuk lihat detail arus kas masuk-keluar harian dan saldo, buka <strong className={th.acc}>Laporan → Arus Kas</strong>.
+              </span>
+            </p>
+          </div>
 
           {finReport.rows.length > 0 && (
             <div className="mt-3">

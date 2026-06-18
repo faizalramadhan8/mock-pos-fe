@@ -16,3 +16,5 @@ export { memberApi, cashSessionApi, auditApi, settingsApi, dashboardApi } from '
 export type { MemberRes, CashSessionRes, AuditRes, SettingsRes, DashboardRes } from './support';
 export { uploadApi } from './upload';
 export { pushApi } from './support';
+export { cashbookApi } from './cashbook';
+export type { OpeningBalanceRes } from './cashbook';
