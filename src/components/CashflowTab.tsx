@@ -110,7 +110,18 @@ export function CashflowTab() {
   const isCurrentMonth = today >= monthStart && today <= monthEnd;
 
   // ── Aggregate per-day sums ───────────────────────────────────────────
-  const { ledger, totalIn, totalOut, salesDays } = useMemo(() => {
+  //
+  // PENTING (per Bu Santi 19 Jun 2026): "Pengeluaran" yang muncul di summary
+  // dan masuk hitungan Selisih HANYA "operasional" (expense entries — listrik,
+  // plastik, dll). Faktur supplier yang dibayar lunas TIDAK termasuk
+  // pengeluaran operasional — itu siklus beli-jual stok, dilaporkan terpisah
+  // sebagai info "Bayar Supplier" supaya owner tetap aware cash out untuk
+  // stok, tapi tidak masuk hitungan selisih operasional.
+  //
+  // Implikasi: Saldo Akhir di laporan ini = Saldo Awal + Pendapatan − Operasional.
+  // Bukan saldo cash actual di laci (yang juga harus dikurangi bayar supplier).
+  // Per request owner: ini "operating cash flow" view, bukan "true cash position".
+  const { ledger, totalIn, totalOut, totalInvoicePaid, salesDays } = useMemo(() => {
     // Map: date YYYY-MM-DD → { salesTotal, salesCount, salesOrders[] }
     const salesByDay = new Map<string, { total: number; count: number; orders: typeof orders }>();
     orders.forEach(o => {
@@ -159,6 +170,7 @@ export function CashflowTab() {
     const sortedDates = Array.from(allDates).sort();
     let runningIn = 0;
     let runningOut = 0;
+    let runningInvoicePaid = 0;
     let salesDaysCount = 0;
 
     for (const date of sortedDates) {
@@ -193,7 +205,9 @@ export function CashflowTab() {
         runningOut += e.amount;
       }
 
-      // Invoice paid per hari
+      // Invoice paid per hari — TIDAK masuk runningOut (Bu Santi: faktur
+      // bukan pengeluaran operasional). Tetap tampil di ledger sebagai
+      // info dengan styling lebih muted supaya jelas "tidak dihitung".
       const iRows = invoiceRows
         .filter(i => i.paidAt!.slice(0, 10) === date)
         .sort((a, b) => (a.paidAt || "").localeCompare(b.paidAt || ""));
@@ -204,7 +218,8 @@ export function CashflowTab() {
           out: i.totalAmount,
           type: "invoice",
         });
-        runningOut += i.totalAmount;
+        runningInvoicePaid += i.totalAmount;
+        // tidak runningOut += i.totalAmount;
       }
 
       // Refunds per hari
@@ -222,7 +237,8 @@ export function CashflowTab() {
       }
     }
 
-    // Convert ke LedgerRow dengan running balance
+    // Convert ke LedgerRow dengan running balance — invoice rows tidak
+    // mengurangi saldo (sesuai keputusan "faktur ≠ pengeluaran operasional").
     let balance = openingBalance;
     const finalRows: LedgerRow[] = [];
     finalRows.push({
@@ -233,7 +249,9 @@ export function CashflowTab() {
       type: "opening",
     });
     rawRows.forEach((row, idx) => {
-      balance += (row.in || 0) - (row.out || 0);
+      if (row.type !== "invoice") {
+        balance += (row.in || 0) - (row.out || 0);
+      }
       finalRows.push({ ...row, no: idx + 2, balance });
     });
 
@@ -241,6 +259,7 @@ export function CashflowTab() {
       ledger: finalRows,
       totalIn: runningIn,
       totalOut: runningOut,
+      totalInvoicePaid: runningInvoicePaid,
       salesDays: salesDaysCount,
     };
   }, [orders, expenses, invoices, refunds, monthStart, monthEnd, openingBalance]);
@@ -340,7 +359,7 @@ export function CashflowTab() {
           <div>
             <p className={`text-xs ${th.txm}`}>Pengeluaran</p>
             <p className="text-lg font-black text-[#BE123C] dark:text-[#FB7185]">−{$(totalOut)}</p>
-            <p className={`text-xs ${th.txf}`}>operasional + faktur + refund</p>
+            <p className={`text-xs ${th.txf}`}>operasional (listrik, plastik, dll)</p>
           </div>
         </div>
         <div className={`mt-3 pt-3 border-t ${th.bdr}`}>
@@ -354,14 +373,28 @@ export function CashflowTab() {
         </div>
       </div>
 
-      {/* Info tambahan (bukan masuk hitungan selisih, tapi konteks) */}
-      {(unpaidInvoicesCount > 0) && (
+      {/* Info tambahan: Bayar Supplier — bukan pengeluaran operasional,
+          tapi tetap perlu tampil supaya owner aware cash out untuk stok. */}
+      {totalInvoicePaid > 0 && (
+        <div className={`rounded-2xl border p-3 ${th.card2} ${th.bdr} flex items-start gap-2`}>
+          <Info size={14} className={`${th.txm} mt-0.5 shrink-0`} />
+          <div className="flex-1">
+            <p className={`text-xs font-bold ${th.tx}`}>Bayar Supplier Bulan Ini</p>
+            <p className={`text-xs mt-0.5 ${th.txm}`}>
+              <strong className={th.tx}>{$(totalInvoicePaid)}</strong> — pembelian stok, tidak masuk hitungan Pengeluaran/Selisih.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Utang faktur belum lunas — liability info, tidak masuk hitungan. */}
+      {unpaidInvoicesCount > 0 && (
         <div className={`rounded-2xl border border-[#BE123C]/30 p-3 ${th.card2} flex items-start gap-2`}>
           <Info size={14} className="text-[#BE123C] dark:text-[#FB7185] mt-0.5 shrink-0" />
           <div className="flex-1">
             <p className={`text-xs font-bold text-[#BE123C] dark:text-[#FB7185]`}>Utang Faktur Belum Lunas</p>
             <p className={`text-xs mt-0.5 ${th.txm}`}>
-              <strong className={th.tx}>{$(unpaidInvoicesValue)}</strong> dari {unpaidInvoicesCount} faktur — belum masuk hitungan keluar sampai dibayar.
+              <strong className={th.tx}>{$(unpaidInvoicesValue)}</strong> dari {unpaidInvoicesCount} faktur — belum dibayar.
             </p>
           </div>
         </div>
@@ -398,11 +431,14 @@ export function CashflowTab() {
                     <>
                       <tr key={row.no}
                         onClick={() => isExpandable && setExpandedRow(isExpanded ? null : row.no)}
-                        className={`border-t ${th.bdrSoft} ${isExpandable ? "cursor-pointer hover:opacity-70" : ""} ${row.type === "opening" ? "bg-[#FFE4E9]/40 dark:bg-[#E11D48]/10 font-semibold" : ""}`}>
+                        className={`border-t ${th.bdrSoft} ${isExpandable ? "cursor-pointer hover:opacity-70" : ""} ${row.type === "opening" ? "bg-[#FFE4E9]/40 dark:bg-[#E11D48]/10 font-semibold" : ""} ${row.type === "invoice" ? "opacity-60" : ""}`}>
                         <td className={`px-3 py-2 ${th.txm} font-mono`}>{row.no}</td>
                         <td className={`px-3 py-2 ${th.tx} whitespace-nowrap`}>{dayLabel(row.dateStr, lang)}</td>
                         <td className={`px-3 py-2 ${th.tx}`}>
                           {row.description}
+                          {row.type === "invoice" && (
+                            <span className={`ml-1.5 text-xs ${th.txf} italic`}>(tidak masuk selisih)</span>
+                          )}
                           {isExpandable && (
                             <span className="inline-flex items-center ml-1 align-middle">
                               {isExpanded ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
@@ -412,7 +448,7 @@ export function CashflowTab() {
                         <td className={`px-3 py-2 text-right font-bold ${row.in ? th.acc : th.txf}`}>
                           {row.in ? `+${$(row.in)}` : "—"}
                         </td>
-                        <td className={`px-3 py-2 text-right font-bold ${row.out ? "text-[#BE123C] dark:text-[#FB7185]" : th.txf}`}>
+                        <td className={`px-3 py-2 text-right font-bold ${row.out ? (row.type === "invoice" ? `${th.txm} line-through` : "text-[#BE123C] dark:text-[#FB7185]") : th.txf}`}>
                           {row.out ? `−${$(row.out)}` : "—"}
                         </td>
                         <td className={`px-3 py-2 text-right font-bold ${th.tx}`}>{$(row.balance)}</td>
