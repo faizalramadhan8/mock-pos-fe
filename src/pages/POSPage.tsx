@@ -257,15 +257,15 @@ export function POSPage() {
     () => cartItems.some(ci => ci.priceSource === "tier_member"),
     [cartItems]
   );
-  // Preview earn: 500 poin per kelipatan Rp 100.000 di cartTotal (cash).
-  // FLOOR rule (19 Jun 2026): 100rb=500, 144rb=500, 200rb=1000, 300rb=1500.
-  // Rate diturunkan dari 1000 → 500 + switch STRICT → FLOOR.
+  // Preview earn: 1 poin per kelipatan Rp 100.000 di cartTotal (cash).
+  // FLOOR rule. Rate diubah 21 Jun 2026: 500 → 1 per request Bu Santi
+  // "100rb jadi 1 poin" untuk simplicity.
   const pointsEarnedPreview = useMemo(() => {
     if (!activeMember) return 0;
     if (hasMemberSpecificTier) return 0;
     if (cartTotal < 100_000) return 0;
     const cents = Math.round(cartTotal * 100);
-    return Math.floor(cents / (100_000 * 100)) * 500;
+    return Math.floor(cents / (100_000 * 100));
   }, [cartTotal, activeMember, hasMemberSpecificTier]);
 
   // Tier transition detection — kasir aware kalau harga grosir tier match
@@ -949,7 +949,7 @@ export function POSPage() {
           )}
           {activeMember && !hasMemberSpecificTier && pointsEarnedPreview === 0 && cartTotal > 0 && cartTotal < 100_000 && (
             <p className={`text-xs mt-1.5 ${th.txf} text-center`}>
-              Tambah {$(100_000 - cartTotal)} lagi untuk dapat 500 poin
+              Tambah {$(100_000 - cartTotal)} lagi untuk dapat 1 poin
             </p>
           )}
           {/* Order discount toggle */}

@@ -507,7 +507,7 @@ export function OrdersPage() {
                 </p>
                 {pointsFilter === "with_points" && (
                   <p className={`text-sm mt-1 ${th.txm}`}>
-                    Poin akan muncul setelah member transaksi (1 paket 100rb = 500 poin).
+                    Poin akan muncul setelah member transaksi (Rp 100rb = 1 poin).
                   </p>
                 )}
               </div>
