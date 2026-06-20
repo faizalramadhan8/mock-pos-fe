@@ -35,7 +35,7 @@ export interface ProductPriceTierRes {
   product_id: string;
   min_qty: number;
   price: number;
-  target_type: 'all_members' | 'member_specific';
+  target_type: 'all_customers' | 'member_specific';
   members?: ProductPriceTierMemberRefRes[];
   note?: string;
   created_at: string;
@@ -55,6 +55,23 @@ export interface SupplierRes {
   phone?: string;
   email?: string;
   address?: string;
+  created_at: string;
+}
+
+export interface ProductPriceTierHistoryRes {
+  id: string;
+  tier_id: string;
+  product_id: string;
+  min_qty: number;
+  price: number;
+  target_type: 'all_customers' | 'member_specific';
+  member_ids?: string[];
+  note?: string;
+  status: 'active' | 'inactive';
+  action: 'create' | 'update' | 'delete';
+  start_date: string;
+  end_date?: string | null;
+  changed_by?: string | null;
   created_at: string;
 }
 
@@ -142,7 +159,7 @@ export const productApi = {
   createTier: (productId: string, data: {
     min_qty: number;
     price: number;
-    target_type: 'all_members' | 'member_specific';
+    target_type: 'all_customers' | 'member_specific';
     member_ids?: string[];
     note?: string;
   }) => api.post<ProductPriceTierRes>(`/products/${productId}/tiers`, data),
@@ -150,13 +167,17 @@ export const productApi = {
   updateTier: (productId: string, tierId: string, data: {
     min_qty: number;
     price: number;
-    target_type: 'all_members' | 'member_specific';
+    target_type: 'all_customers' | 'member_specific';
     member_ids?: string[];
     note?: string;
   }) => api.put<ProductPriceTierRes>(`/products/${productId}/tiers/${tierId}`, data),
 
   deleteTier: (productId: string, tierId: string) =>
     api.del(`/products/${productId}/tiers/${tierId}`),
+
+  // Audit trail untuk tier CRUD (create/update/delete). Admin-only di BE.
+  getTierHistory: (productId: string) =>
+    api.get<ProductPriceTierHistoryRes[]>(`/products/${productId}/tier-history`),
 
   delete: (id: string) => api.del(`/products/${id}`),
 

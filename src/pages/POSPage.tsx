@@ -226,12 +226,13 @@ export function POSPage() {
   // Discount-aware calculations (operate on CASH items only).
   const itemDiscountsTotal = useMemo(() => cashItems.reduce((s, i) => s + calcItemDiscount(i), 0), [cashItems]);
   const cartSubtotal = useMemo(() => cashItems.reduce((s, i) => s + i.unitPrice * i.quantity, 0), [cashItems]);
+  // Savings = sum(regularPrice − unitPrice) per line. Termasuk diskon member
+  // baseline DAN diskon tier (grosir all_customers / member_specific). Walk-in
+  // juga bisa dapat savings dari tier all_customers (rename 20 Jun 2026).
   const memberSavings = useMemo(() =>
-    activeMember
-      ? cartItems.reduce((s, i) =>
-          s + (i.regularPrice && i.regularPrice > i.unitPrice ? (i.regularPrice - i.unitPrice) * i.quantity : 0), 0)
-      : 0,
-    [cartItems, activeMember]
+    cartItems.reduce((s, i) =>
+      s + (i.regularPrice && i.regularPrice > i.unitPrice ? (i.regularPrice - i.unitPrice) * i.quantity : 0), 0),
+    [cartItems]
   );
   const cartSubtotalAfterItemDisc = cartSubtotal - itemDiscountsTotal;
   const orderDiscAmount = useMemo(() => {
@@ -258,10 +259,6 @@ export function POSPage() {
   // line, fire toast hanya saat transisi (no spam saat data baru tersedia).
   const prevTierRef = useRef<Map<string, string>>(new Map());
   useEffect(() => {
-    if (!activeMember) {
-      prevTierRef.current = new Map();
-      return;
-    }
     const next = new Map<string, string>();
     cartItems.forEach(ci => {
       const product = products.find(p => p.id === ci.productId);
@@ -269,7 +266,8 @@ export function POSPage() {
       const qtySatuan = ci.unitType === "box" ? ci.quantity * ci.qtyPerBox : ci.quantity;
       const matching = (product.priceTiers || []).filter(t => {
         if (qtySatuan < t.minQty) return false;
-        if (t.target === "all_members") return true;
+        if (t.target === "all_customers") return true;
+        if (!activeMember) return false;
         return (t.members || []).some(m => m.id === activeMember.id);
       });
       if (matching.length === 0) return;
@@ -438,6 +436,8 @@ export function POSPage() {
         ...(ci.regularPrice !== undefined ? { regularPrice: ci.regularPrice } : {}),
         ...(ci.discountType ? { discountType: ci.discountType, discountValue: ci.discountValue, discountAmount: disc } : {}),
         ...(ci.redeemWithPoints ? { redeemedWithPoints: true } : {}),
+        ...(ci.priceSource ? { priceSource: ci.priceSource } : {}),
+        ...(ci.tierId ? { tierId: ci.tierId } : {}),
       };
     });
     // Compute payments split — if cash primary + rcv < total, split into
@@ -745,8 +745,9 @@ export function POSPage() {
                   const qtySatuan = ci.unitType === "box" ? ci.quantity * ci.qtyPerBox : ci.quantity;
                   const tierMatched = !!product?.priceTiers?.some(t => {
                     if (qtySatuan < t.minQty) return false;
-                    if (t.target === "all_members") return true;
-                    return (t.members || []).some(m => m.id === activeMember?.id);
+                    if (t.target === "all_customers") return true;
+                    if (!activeMember) return false;
+                    return (t.members || []).some(m => m.id === activeMember.id);
                   });
                   return (
                     <>
@@ -764,11 +765,13 @@ export function POSPage() {
               </div>
               {/* Hint tier — tampilkan kalau ada tier berikutnya yang belum
                   match. Bantu kasir suggest "tambah 1 lagi lebih hemat" ke
-                  customer. Hanya muncul kalau ada member + bukan tebus poin. */}
-              {activeMember && !isRedeemed && product && (() => {
+                  customer. Berlaku untuk walk-in (all_customers tier) + member.
+                  Tidak muncul saat row tebus poin. */}
+              {!isRedeemed && product && (() => {
                 const qtySatuan = ci.unitType === "box" ? ci.quantity * ci.qtyPerBox : ci.quantity;
                 const eligibleTiers = (product.priceTiers || []).filter(t => {
-                  if (t.target === "all_members") return true;
+                  if (t.target === "all_customers") return true;
+                  if (!activeMember) return false;
                   return (t.members || []).some(m => m.id === activeMember.id);
                 });
                 const nextTier = eligibleTiers
@@ -1648,6 +1651,8 @@ export function POSPage() {
                     ...(ci.regularPrice !== undefined ? { regularPrice: ci.regularPrice } : {}),
                     ...(ci.discountType ? { discountType: ci.discountType, discountValue: ci.discountValue, discountAmount: disc } : {}),
                     ...(ci.redeemWithPoints ? { redeemedWithPoints: true } : {}),
+                    ...(ci.priceSource ? { priceSource: ci.priceSource } : {}),
+                    ...(ci.tierId ? { tierId: ci.tierId } : {}),
                   };
                 });
                 const pendingOrder: Order = {

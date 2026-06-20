@@ -28,7 +28,7 @@ interface DraftTier {
 const emptyDraft: DraftTier = {
   minQty: "",
   totalPrice: "",
-  target: "all_members",
+  target: "all_customers",
   memberIds: [],
   note: "",
 };
@@ -191,56 +191,56 @@ export function PriceTierEditor({ productId }: Props) {
   };
 
   return (
-    <div className={`rounded-2xl border p-3.5 ${th.bdr} ${th.card2}`}>
-      <div className="flex items-center justify-between mb-2">
-        <div>
-          <p className={`text-sm font-extrabold ${th.tx}`}>Harga Khusus Member</p>
-          <p className={`text-xs ${th.txm}`}>
-            Beli jumlah tertentu dapat harga khusus. Hanya untuk member.
+    <div className={`rounded-2xl border p-4 ${th.bdr} ${th.card2}`}>
+      <div className="flex items-center justify-between mb-3 gap-2">
+        <div className="min-w-0">
+          <p className={`text-base font-extrabold ${th.tx}`}>Tier Harga</p>
+          <p className={`text-sm ${th.txm}`}>
+            Beli jumlah tertentu dapat harga khusus.
           </p>
         </div>
         <button
           onClick={openAdd}
-          className="px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48] inline-flex items-center gap-1">
-          <Plus size={12} strokeWidth={2.8} /> Tambah Tier
+          className="px-4 py-2.5 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48] inline-flex items-center gap-1.5 shrink-0">
+          <Plus size={16} strokeWidth={2.6} /> Tambah Tier
         </button>
       </div>
 
       {loading && tiers.length === 0 ? (
-        <p className={`text-xs text-center py-3 ${th.txm}`}>Memuat…</p>
+        <p className={`text-sm text-center py-4 ${th.txm}`}>Memuat…</p>
       ) : tiers.length === 0 ? (
-        <p className={`text-xs text-center py-3 ${th.txm}`}>Belum ada tier harga khusus</p>
+        <p className={`text-sm text-center py-4 ${th.txm}`}>Belum ada tier harga khusus</p>
       ) : (
-        <div className="space-y-1.5">
+        <div className="space-y-2">
           {tiers.map(t => (
-            <div key={t.id} className={`flex items-center justify-between gap-2 p-2.5 rounded-xl border ${th.bdr}`}>
+            <div key={t.id} className={`flex items-center justify-between gap-2 p-3 rounded-xl border ${th.bdr}`}>
               <button
                 onClick={() => openEdit(t)}
                 className="flex-1 min-w-0 text-left">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className={`text-xs font-bold ${th.tx}`}>Beli {t.minQty} satuan</span>
-                  <span className={`text-xs ${th.txm}`}>=</span>
-                  <span className={`text-xs font-black ${th.acc}`}>{$(Math.round(t.price * t.minQty))}</span>
-                  <span className={`text-xs ${th.txf}`}>({$(Math.round(t.price))}/satuan)</span>
+                  <span className={`text-base font-bold ${th.tx}`}>Beli {t.minQty} satuan</span>
+                  <span className={`text-base ${th.txm}`}>=</span>
+                  <span className={`text-base font-black ${th.acc}`}>{$(Math.round(t.price * t.minQty))}</span>
+                  <span className={`text-sm ${th.txf}`}>({$(Math.round(t.price))}/satuan)</span>
                 </div>
-                <div className="flex items-center gap-1.5 mt-1">
-                  {t.target === "all_members" ? (
-                    <span className={`text-xs font-semibold inline-flex items-center gap-1 px-1.5 py-0.5 rounded ${th.accBg} ${th.acc}`}>
-                      <Users size={10} strokeWidth={2.8} /> Semua member
+                <div className="flex items-center gap-1.5 mt-1.5">
+                  {t.target === "all_customers" ? (
+                    <span className={`text-sm font-semibold inline-flex items-center gap-1.5 px-2 py-1 rounded-md ${th.accBg} ${th.acc}`}>
+                      <Users size={14} strokeWidth={2.8} /> Semua customer
                     </span>
                   ) : (
-                    <span className={`text-xs font-semibold inline-flex items-center gap-1 px-1.5 py-0.5 rounded ${th.accBg} ${th.acc}`}>
-                      <UserCheck size={10} strokeWidth={2.8} /> {(t.members || []).length} member tertentu
+                    <span className={`text-sm font-semibold inline-flex items-center gap-1.5 px-2 py-1 rounded-md ${th.accBg} ${th.acc}`}>
+                      <UserCheck size={14} strokeWidth={2.8} /> {(t.members || []).length} member tertentu
                     </span>
                   )}
-                  {t.note && <span className={`text-xs ${th.txf} truncate`}>· {t.note}</span>}
+                  {t.note && <span className={`text-sm ${th.txf} truncate`}>· {t.note}</span>}
                 </div>
               </button>
               <button
                 onClick={() => remove(t.id)}
                 aria-label="Hapus tier"
-                className="w-8 h-8 rounded-lg flex items-center justify-center bg-[#FCE4EC] text-[#BE123C] active:scale-90 transition-transform">
-                <Trash2 size={12} strokeWidth={2.6} />
+                className="w-10 h-10 rounded-lg flex items-center justify-center bg-[#FCE4EC] text-[#BE123C] active:scale-90 transition-transform shrink-0">
+                <Trash2 size={16} strokeWidth={2.6} />
               </button>
             </div>
           ))}
@@ -248,45 +248,45 @@ export function PriceTierEditor({ productId }: Props) {
       )}
 
       <Modal open={editorOpen} onClose={() => setEditorOpen(false)} title={draft.id ? "Edit Tier" : "Tambah Tier"}>
-        <div className="space-y-3">
+        <div className="space-y-3.5">
           {/* Konteks harga normal — read-only display supaya admin
               tidak bingung dengan input "Harga tier" di bawah. */}
           {product && (
-            <div className={`rounded-xl border p-2.5 ${th.bdr} ${th.card2}`}>
-              <p className={`text-xs ${th.txm}`}>
+            <div className={`rounded-xl border p-3 ${th.bdr} ${th.card2}`}>
+              <p className={`text-sm ${th.txm}`}>
                 Harga jual normal saat ini
               </p>
-              <p className={`text-base font-black mt-0.5 ${th.tx}`}>
-                {$(product.sellingPrice)}<span className={`text-xs font-normal ${th.txm}`}> / satuan</span>
+              <p className={`text-lg font-black mt-0.5 ${th.tx}`}>
+                {$(product.sellingPrice)}<span className={`text-sm font-normal ${th.txm}`}> / satuan</span>
               </p>
               {typeof product.memberPrice === "number" && product.memberPrice > 0 && (
-                <p className={`text-xs mt-0.5 ${th.acc}`}>
+                <p className={`text-sm mt-0.5 ${th.acc}`}>
                   Member baseline: {$(product.memberPrice)} / satuan
                 </p>
               )}
             </div>
           )}
 
-          <p className={`text-xs ${th.txm} -mt-1`}>
-            <strong className={th.tx}>Aturan:</strong> Kalau member beli minimal qty di bawah, total bayarnya sesuai harga bundle yang di-set.
+          <p className={`text-sm ${th.txm} -mt-1`}>
+            <strong className={th.tx}>Aturan:</strong> Kalau customer beli minimal qty di bawah, total bayarnya sesuai harga bundle yang di-set. Pilih "Semua Customer" supaya berlaku untuk member maupun non-member, atau "Member Tertentu" untuk batasi ke member yang di-pilih.
           </p>
 
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <p className={`text-xs font-semibold mb-1 ${th.txm}`}>Beli minimal (satuan)</p>
+              <p className={`text-sm font-semibold mb-1.5 ${th.txm}`}>Beli minimal (satuan)</p>
               <input type="number" min="1"
                 value={draft.minQty}
                 onChange={e => setDraft({ ...draft, minQty: e.target.value })}
                 placeholder="3"
-                className={`w-full px-3 py-2.5 text-sm rounded-xl border ${th.inp}`} />
+                className={`w-full px-3 py-3 text-base rounded-xl border ${th.inp}`} />
             </div>
             <div>
-              <p className={`text-xs font-semibold mb-1 ${th.txm}`}>Total bundle (Rp)</p>
+              <p className={`text-sm font-semibold mb-1.5 ${th.txm}`}>Total bundle (Rp)</p>
               <input type="number" min="0"
                 value={draft.totalPrice}
                 onChange={e => setDraft({ ...draft, totalPrice: e.target.value })}
                 placeholder="149000"
-                className={`w-full px-3 py-2.5 text-sm rounded-xl border ${th.inp}`} />
+                className={`w-full px-3 py-3 text-base rounded-xl border ${th.inp}`} />
             </div>
           </div>
 
@@ -300,7 +300,7 @@ export function PriceTierEditor({ productId }: Props) {
             const perSatuan = totalN / minQtyN;
             if (diff > 0) {
               return (
-                <div className="text-xs px-3 py-2 rounded-lg bg-[#FFE4E9] dark:bg-[#E11D48]/15 text-[#9F1239] dark:text-[#FB7185] space-y-0.5">
+                <div className="text-sm px-3.5 py-2.5 rounded-lg bg-[#FFE4E9] dark:bg-[#E11D48]/15 text-[#9F1239] dark:text-[#FB7185] space-y-0.5">
                   <p>Beli {minQtyN} satuan: <strong>{$(totalN)}</strong> (normal {$(normalTotal)})</p>
                   <p>Hemat <strong>{$(diff)}</strong> · efektif {$(Math.round(perSatuan))}/satuan</p>
                 </div>
@@ -308,50 +308,50 @@ export function PriceTierEditor({ productId }: Props) {
             }
             if (diff < 0) {
               return (
-                <p className="text-xs px-3 py-2 rounded-lg bg-[#FCE4EC] text-[#BE123C]">
-                  ⚠ Total bundle {$(totalN)} lebih mahal dari harga normal {$(normalTotal)} untuk {minQtyN} satuan. Yakin?
+                <p className="text-sm px-3.5 py-2.5 rounded-lg bg-[#FCE4EC] text-[#BE123C]">
+                  Total bundle {$(totalN)} lebih mahal dari harga normal {$(normalTotal)} untuk {minQtyN} satuan. Yakin?
                 </p>
               );
             }
             return (
-              <p className={`text-xs px-3 py-2 rounded-lg ${th.elev} ${th.txm}`}>
+              <p className={`text-sm px-3.5 py-2.5 rounded-lg ${th.elev} ${th.txm}`}>
                 Total bundle sama dengan harga normal — tier ini tidak memberi diskon.
               </p>
             );
           })()}
 
           <div>
-            <p className={`text-xs font-semibold mb-1 ${th.txm}`}>Untuk siapa?</p>
+            <p className={`text-sm font-semibold mb-1.5 ${th.txm}`}>Untuk siapa?</p>
             <div className="flex gap-2">
               <button
-                onClick={() => setDraft({ ...draft, target: "all_members" })}
-                className={`flex-1 py-2.5 rounded-xl text-xs font-bold inline-flex items-center justify-center gap-1.5 border ${draft.target === "all_members" ? "bg-gradient-to-r from-[#FB7185] to-[#E11D48] text-white border-transparent" : `${th.bdr} ${th.txm}`}`}>
-                <Users size={12} strokeWidth={2.6} /> Semua Member
+                onClick={() => setDraft({ ...draft, target: "all_customers" })}
+                className={`flex-1 py-3 rounded-xl text-sm font-bold inline-flex items-center justify-center gap-2 border ${draft.target === "all_customers" ? "bg-gradient-to-r from-[#FB7185] to-[#E11D48] text-white border-transparent" : `${th.bdr} ${th.txm}`}`}>
+                <Users size={16} strokeWidth={2.6} /> Semua Customer
               </button>
               <button
                 onClick={() => setDraft({ ...draft, target: "member_specific" })}
-                className={`flex-1 py-2.5 rounded-xl text-xs font-bold inline-flex items-center justify-center gap-1.5 border ${draft.target === "member_specific" ? "bg-gradient-to-r from-[#FB7185] to-[#E11D48] text-white border-transparent" : `${th.bdr} ${th.txm}`}`}>
-                <UserCheck size={12} strokeWidth={2.6} /> Member Tertentu
+                className={`flex-1 py-3 rounded-xl text-sm font-bold inline-flex items-center justify-center gap-2 border ${draft.target === "member_specific" ? "bg-gradient-to-r from-[#FB7185] to-[#E11D48] text-white border-transparent" : `${th.bdr} ${th.txm}`}`}>
+                <UserCheck size={16} strokeWidth={2.6} /> Member Tertentu
               </button>
             </div>
           </div>
 
           {draft.target === "member_specific" && (
-            <div className={`rounded-xl border p-2.5 ${th.bdr}`}>
-              <p className={`text-xs font-semibold mb-1.5 ${th.txm}`}>
+            <div className={`rounded-xl border p-3 ${th.bdr}`}>
+              <p className={`text-sm font-semibold mb-2 ${th.txm}`}>
                 Pilih member ({draft.memberIds.length} dipilih)
               </p>
               <div className="relative mb-2">
-                <Search size={12} className={`absolute left-2.5 top-1/2 -translate-y-1/2 ${th.txf}`} />
+                <Search size={16} className={`absolute left-3 top-1/2 -translate-y-1/2 ${th.txf}`} />
                 <input
                   value={memberQuery}
                   onChange={e => setMemberQuery(e.target.value)}
                   placeholder="Cari nama / nomor HP…"
-                  className={`w-full pl-7 pr-2 py-2 text-xs rounded-lg border ${th.inp}`} />
+                  className={`w-full pl-9 pr-3 py-2.5 text-sm rounded-lg border ${th.inp}`} />
               </div>
-              <div className="max-h-48 overflow-y-auto space-y-1">
+              <div className="max-h-56 overflow-y-auto space-y-1.5">
                 {filteredMembers.length === 0 ? (
-                  <p className={`text-xs text-center py-2 ${th.txm}`}>Member tidak ditemukan</p>
+                  <p className={`text-sm text-center py-3 ${th.txm}`}>Member tidak ditemukan</p>
                 ) : (
                   filteredMembers.map(m => {
                     const selected = draft.memberIds.includes(m.id);
@@ -359,12 +359,12 @@ export function PriceTierEditor({ productId }: Props) {
                       <button
                         key={m.id}
                         onClick={() => toggleMember(m.id)}
-                        className={`w-full text-left flex items-center justify-between gap-2 p-2 rounded-lg border transition-colors ${selected ? "bg-[#FFE4E9] dark:bg-[#E11D48]/15 border-[#E11D48]/30" : `${th.bdr}`}`}>
+                        className={`w-full text-left flex items-center justify-between gap-2 p-2.5 rounded-lg border transition-colors ${selected ? "bg-[#FFE4E9] dark:bg-[#E11D48]/15 border-[#E11D48]/30" : `${th.bdr}`}`}>
                         <div className="min-w-0">
-                          <p className={`text-xs font-bold truncate ${th.tx}`}>{m.name}</p>
-                          <p className={`text-xs ${th.txf}`}>{m.phone}</p>
+                          <p className={`text-sm font-bold truncate ${th.tx}`}>{m.name}</p>
+                          <p className={`text-sm ${th.txf}`}>{m.phone}</p>
                         </div>
-                        {selected && <span className={`text-xs font-bold ${th.acc}`}>✓</span>}
+                        {selected && <span className={`text-sm font-bold ${th.acc}`}>✓</span>}
                       </button>
                     );
                   })
@@ -374,21 +374,21 @@ export function PriceTierEditor({ productId }: Props) {
           )}
 
           <div>
-            <p className={`text-xs font-semibold mb-1 ${th.txm}`}>Catatan (opsional)</p>
+            <p className={`text-sm font-semibold mb-1.5 ${th.txm}`}>Catatan (opsional)</p>
             <input
               value={draft.note}
               onChange={e => setDraft({ ...draft, note: e.target.value })}
               placeholder="Promo Lebaran, Grosir, dll."
-              className={`w-full px-3 py-2.5 text-sm rounded-xl border ${th.inp}`} />
+              className={`w-full px-3 py-3 text-base rounded-xl border ${th.inp}`} />
           </div>
 
           <div className="flex gap-2 pt-1">
             <button onClick={() => setEditorOpen(false)}
-              className={`flex-1 py-2.5 rounded-xl text-xs font-bold border ${th.bdr} ${th.txm}`}>
+              className={`flex-1 py-3 rounded-xl text-sm font-bold border ${th.bdr} ${th.txm}`}>
               Batal
             </button>
             <button onClick={save} disabled={saving}
-              className="flex-1 py-2.5 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48] disabled:opacity-40">
+              className="flex-1 py-3 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48] disabled:opacity-40">
               {saving ? "Menyimpan…" : draft.id ? "Update" : "Tambah"}
             </button>
           </div>

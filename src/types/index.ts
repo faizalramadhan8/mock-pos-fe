@@ -72,7 +72,7 @@ export interface Product {
   createdAt: string;
 }
 
-export type PriceTierTarget = "all_members" | "member_specific";
+export type PriceTierTarget = "all_customers" | "member_specific";
 
 export interface ProductPriceTier {
   id: string;
@@ -82,11 +82,14 @@ export interface ProductPriceTier {
   /** Harga per satuan (sama dengan sellingPrice/memberPrice baseline). */
   price: number;
   target: PriceTierTarget;
-  /** Whitelist member kalau target='member_specific'. Kosong utk 'all_members'. */
+  /** Whitelist member kalau target='member_specific'. Kosong utk 'all_customers'. */
   members?: { id: string; name: string; phone: string }[];
   note?: string;
   createdAt: string;
 }
+
+/** Tag asal harga saat sale time untuk audit. Lihat migration 000037. */
+export type PriceSource = "regular" | "member_price" | "tier_all" | "tier_member";
 
 export interface CartItem {
   id: string;
@@ -108,6 +111,10 @@ export interface CartItem {
    * tidak masuk hitungan cash actual untuk earn poin baru.
    */
   redeemWithPoints?: boolean;
+  /** Audit: tag sumber harga (regular / member_price / tier_all / tier_member). */
+  priceSource?: PriceSource;
+  /** Audit: ID tier yang dipakai kalau priceSource ∈ {tier_all, tier_member}. */
+  tierId?: string;
 }
 
 export interface OrderPaymentSplit {
@@ -157,6 +164,27 @@ export interface OrderItem {
   discountValue?: number;
   discountAmount?: number;
   redeemedWithPoints?: boolean;
+  /** Audit: tag sumber harga saat sale time. */
+  priceSource?: PriceSource;
+  /** Audit: ID tier yang dipakai (nullable kalau bukan dari tier). */
+  tierId?: string;
+}
+
+export interface ProductPriceTierHistoryEntry {
+  id: string;
+  tierId: string;
+  productId: string;
+  minQty: number;
+  price: number;
+  targetType: PriceTierTarget;
+  memberIds?: string[];
+  note?: string;
+  status: "active" | "inactive";
+  action: "create" | "update" | "delete";
+  startDate: string;
+  endDate?: string | null;
+  changedBy?: string | null;
+  createdAt: string;
 }
 
 export interface MemberStats {

@@ -4,8 +4,11 @@ import { useThemeClasses } from "@/hooks/useThemeClasses";
 import { formatCurrency as $ } from "@/utils";
 import { Modal } from "./Modal";
 import { PriceTierEditor } from "./PriceTierEditor";
-import { Plus, Search, Tag, Users, UserCheck } from "lucide-react";
-import type { Product } from "@/types";
+import { TierHistoryModal } from "./TierHistoryModal";
+import { productApi } from "@/api";
+import { Pencil, Plus, Search, Tag, Trash2, Users, UserCheck, History, Settings } from "lucide-react";
+import toast from "react-hot-toast";
+import type { Product, ProductPriceTier } from "@/types";
 
 interface Props {
   canWrite: boolean;
@@ -29,6 +32,25 @@ export function PriceTierCatalog({ canWrite }: Props) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerQuery, setPickerQuery] = useState("");
   const [openProductId, setOpenProductId] = useState<string | null>(null);
+  // Tier history view — buka untuk audit "kapan tier diubah / dihapus".
+  const [historyProductId, setHistoryProductId] = useState<string | null>(null);
+  const [deletingTierId, setDeletingTierId] = useState<string | null>(null);
+  const fetchProducts = useProductStore(s => s.fetchProducts);
+
+  const deleteTier = async (productId: string, tier: ProductPriceTier) => {
+    const ok = confirm(`Hapus tier "Beli ${tier.minQty} = ${$(Math.round(tier.price * tier.minQty))}"?`);
+    if (!ok) return;
+    setDeletingTierId(tier.id);
+    try {
+      await productApi.deleteTier(productId, tier.id);
+      toast.success("Tier dihapus");
+      void fetchProducts();
+    } catch (e: any) {
+      toast.error(e?.message || "Gagal hapus tier");
+    } finally {
+      setDeletingTierId(null);
+    }
+  };
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -69,15 +91,15 @@ export function PriceTierCatalog({ canWrite }: Props) {
       {/* Info card */}
       <div className={`p-4 rounded-2xl border ${th.bdr} ${th.card2}`}>
         <div className="flex items-start gap-3">
-          <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-[#FFE4E9] text-[#E11D48] shrink-0">
-            <Tag size={16} strokeWidth={2.4} />
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-[#FFE4E9] text-[#E11D48] shrink-0">
+            <Tag size={18} strokeWidth={2.4} />
           </div>
           <div>
-            <p className={`text-sm font-extrabold ${th.tx}`}>Harga Khusus Member</p>
-            <p className={`text-xs mt-0.5 ${th.txm}`}>
-              Atur harga khusus berdasarkan jumlah beli untuk member. Walk-in
-              non-member selalu bayar harga jual normal. Member yang beli sesuai
-              jumlah minimum dapat tier; bisa target semua member atau member tertentu.
+            <p className={`text-base font-extrabold ${th.tx}`}>Harga Khusus / Grosir</p>
+            <p className={`text-sm mt-0.5 ${th.txm}`}>
+              Atur harga khusus berdasarkan jumlah beli. Pilih target "Semua Customer"
+              supaya berlaku untuk member maupun walk-in, atau "Member Tertentu" untuk
+              batasi ke member yang di-pilih.
             </p>
           </div>
         </div>
@@ -90,24 +112,24 @@ export function PriceTierCatalog({ canWrite }: Props) {
             <button
               key={f}
               onClick={() => setFilter(f)}
-              className={`px-3 py-2 text-xs font-bold ${filter === f ? "bg-[#E11D48] text-white" : `${th.elev} ${th.txm}`}`}>
+              className={`px-4 py-2.5 text-sm font-bold ${filter === f ? "bg-[#E11D48] text-white" : `${th.elev} ${th.txm}`}`}>
               {f === "with_tiers" ? `Sudah punya tier (${withTiersCount})` : "Semua produk"}
             </button>
           ))}
         </div>
         <div className="flex-1 min-w-[180px] relative">
-          <Search size={12} className={`absolute left-3 top-1/2 -translate-y-1/2 ${th.txf}`} />
+          <Search size={16} className={`absolute left-3.5 top-1/2 -translate-y-1/2 ${th.txf}`} />
           <input
             value={query}
             onChange={e => setQuery(e.target.value)}
             placeholder="Cari nama atau SKU…"
-            className={`w-full pl-9 pr-3 py-2 text-sm rounded-xl border ${th.inp}`} />
+            className={`w-full pl-10 pr-3 py-2.5 text-sm rounded-xl border ${th.inp}`} />
         </div>
         {canWrite && (
           <button
             onClick={() => { setPickerOpen(true); setPickerQuery(""); }}
-            className="px-4 py-2 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48] inline-flex items-center gap-1.5">
-            <Plus size={14} strokeWidth={2.6} /> Tambah untuk Produk Lain
+            className="px-4 py-2.5 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48] inline-flex items-center gap-1.5">
+            <Plus size={16} strokeWidth={2.6} /> Tambah untuk Produk Lain
           </button>
         )}
       </div>
@@ -115,12 +137,12 @@ export function PriceTierCatalog({ canWrite }: Props) {
       {/* List of products */}
       {filtered.length === 0 ? (
         <div className={`text-center py-12 rounded-2xl border ${th.bdr} ${th.card2}`}>
-          <Tag size={36} className="mx-auto opacity-20 mb-2" />
-          <p className={`text-sm font-bold ${th.tx}`}>
+          <Tag size={40} className="mx-auto opacity-20 mb-2" />
+          <p className={`text-base font-bold ${th.tx}`}>
             {filter === "with_tiers" ? "Belum ada produk dengan tier" : "Tidak ada produk cocok"}
           </p>
           {filter === "with_tiers" && canWrite && (
-            <p className={`text-xs mt-1 ${th.txm}`}>
+            <p className={`text-sm mt-1 ${th.txm}`}>
               Klik "Tambah untuk Produk Lain" untuk mulai.
             </p>
           )}
@@ -133,42 +155,72 @@ export function PriceTierCatalog({ canWrite }: Props) {
               <div key={p.id} className={`rounded-2xl border overflow-hidden ${th.card} ${th.bdr}`}>
                 <div className={`px-4 py-3 border-b ${th.bdr} flex items-center justify-between gap-2`}>
                   <div className="min-w-0">
-                    <p className={`text-sm font-extrabold truncate ${th.tx}`}>
+                    <p className={`text-base font-extrabold truncate ${th.tx}`}>
                       {lang === "id" ? p.nameId : p.name}
                     </p>
-                    <p className={`text-xs font-mono ${th.txf}`}>
+                    <p className={`text-sm font-mono ${th.txf}`}>
                       {p.sku} · normal {$(p.sellingPrice)}
                       {typeof p.memberPrice === "number" && p.memberPrice > 0 && (
                         <> · member {$(p.memberPrice)}</>
                       )}
                     </p>
                   </div>
-                  {canWrite && (
-                    <button
-                      onClick={() => setOpenProductId(p.id)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-bold ${th.elev} ${th.tx} inline-flex items-center gap-1`}>
-                      <Plus size={12} strokeWidth={2.8} /> Tier
-                    </button>
-                  )}
+                  <div className="flex items-center gap-2 shrink-0">
+                    {canWrite && (
+                      <button
+                        onClick={() => setHistoryProductId(p.id)}
+                        aria-label="Riwayat perubahan tier"
+                        title="Riwayat tier"
+                        className={`px-3 py-2 rounded-lg text-sm font-bold ${th.elev} ${th.txm} inline-flex items-center gap-1.5`}>
+                        <History size={16} strokeWidth={2.6} /> Riwayat
+                      </button>
+                    )}
+                    {canWrite && (
+                      <button
+                        onClick={() => setOpenProductId(p.id)}
+                        className="px-4 py-2 rounded-lg text-sm font-bold text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48] inline-flex items-center gap-1.5">
+                        <Settings size={16} strokeWidth={2.6} /> Atur Tier
+                      </button>
+                    )}
+                  </div>
                 </div>
                 {tiers.length === 0 ? (
-                  <p className={`px-4 py-3 text-xs ${th.txm}`}>Belum ada tier — klik tombol "Tier" untuk tambah</p>
+                  <p className={`px-4 py-3 text-sm ${th.txm}`}>Belum ada tier — klik "Atur Tier" untuk tambah.</p>
                 ) : (
-                  <div className="px-4 py-3 space-y-1.5">
+                  <div className="px-4 py-3 space-y-2">
                     {tiers.map(t => (
-                      <div key={t.id} className="flex items-center gap-2 text-sm flex-wrap">
+                      <div key={t.id} className={`flex items-center gap-2 text-base flex-wrap px-3 py-2.5 rounded-lg ${th.elev}`}>
                         <span className={`font-bold ${th.tx} shrink-0`}>Beli {t.minQty}</span>
                         <span className={`${th.txm} shrink-0`}>=</span>
                         <span className={`font-black ${th.acc} shrink-0`}>{$(Math.round(t.price * t.minQty))}</span>
-                        <span className={`text-xs ${th.txf} shrink-0`}>({$(Math.round(t.price))}/satuan)</span>
-                        <span className={`text-xs inline-flex items-center gap-1 px-1.5 py-0.5 rounded ${th.accBg} ${th.acc}`}>
-                          {t.target === "all_members" ? (
-                            <><Users size={10} strokeWidth={2.8} /> Semua member</>
+                        <span className={`text-sm ${th.txf} shrink-0`}>({$(Math.round(t.price))}/satuan)</span>
+                        <span className={`text-sm inline-flex items-center gap-1.5 px-2 py-1 rounded-md ${th.accBg} ${th.acc} font-semibold`}>
+                          {t.target === "all_customers" ? (
+                            <><Users size={14} strokeWidth={2.8} /> Semua customer</>
                           ) : (
-                            <><UserCheck size={10} strokeWidth={2.8} /> {(t.members || []).length} member</>
+                            <><UserCheck size={14} strokeWidth={2.8} /> {(t.members || []).length} member</>
                           )}
                         </span>
-                        {t.note && <span className={`text-xs ${th.txf} truncate`}>· {t.note}</span>}
+                        {t.note && <span className={`text-sm ${th.txf} truncate flex-1 min-w-0`}>· {t.note}</span>}
+                        {canWrite && (
+                          <div className="ml-auto flex items-center gap-1.5 shrink-0">
+                            <button
+                              onClick={() => setOpenProductId(p.id)}
+                              aria-label="Edit tier"
+                              title="Edit tier"
+                              className={`w-9 h-9 rounded-lg flex items-center justify-center ${th.elev} ${th.tx} active:scale-90 transition-transform`}>
+                              <Pencil size={16} strokeWidth={2.6} />
+                            </button>
+                            <button
+                              onClick={() => deleteTier(p.id, t)}
+                              aria-label="Hapus tier"
+                              title="Hapus tier"
+                              disabled={deletingTierId === t.id}
+                              className="w-9 h-9 rounded-lg flex items-center justify-center bg-[#FCE4EC] text-[#BE123C] active:scale-90 transition-transform disabled:opacity-50">
+                              <Trash2 size={16} strokeWidth={2.6} />
+                            </button>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -183,31 +235,31 @@ export function PriceTierCatalog({ canWrite }: Props) {
       {canWrite && (
         <Modal open={pickerOpen} onClose={() => setPickerOpen(false)} title="Pilih Produk untuk Tier Baru" size="lg">
           <div className="relative mb-3">
-            <Search size={14} className={`absolute left-3 top-1/2 -translate-y-1/2 ${th.txf}`} />
+            <Search size={16} className={`absolute left-3.5 top-1/2 -translate-y-1/2 ${th.txf}`} />
             <input
               autoFocus
               value={pickerQuery}
               onChange={e => setPickerQuery(e.target.value)}
               placeholder="Cari nama atau SKU…"
-              className={`w-full pl-9 pr-3 py-2.5 text-sm rounded-xl border ${th.inp}`} />
+              className={`w-full pl-10 pr-3 py-3 text-sm rounded-xl border ${th.inp}`} />
           </div>
           {eligibleForPicker.length === 0 ? (
-            <p className={`text-center py-8 text-xs ${th.txm}`}>
+            <p className={`text-center py-8 text-sm ${th.txm}`}>
               Semua produk aktif sudah punya tier, atau tidak ada produk cocok.
             </p>
           ) : (
-            <div className="max-h-[60vh] overflow-y-auto space-y-1">
+            <div className="max-h-[60vh] overflow-y-auto space-y-1.5">
               {eligibleForPicker.map(p => (
                 <button
                   key={p.id}
                   onClick={() => { setPickerOpen(false); setOpenProductId(p.id); }}
-                  className={`w-full text-left flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl border active:scale-[.98] transition-transform ${th.bdr} ${th.card2}`}>
+                  className={`w-full text-left flex items-center justify-between gap-3 px-3.5 py-3 rounded-xl border active:scale-[.98] transition-transform ${th.bdr} ${th.card2}`}>
                   <div className="min-w-0">
-                    <p className={`text-sm font-bold truncate ${th.tx}`}>{lang === "id" ? p.nameId : p.name}</p>
-                    <p className={`text-xs font-mono ${th.txf}`}>{p.sku}</p>
+                    <p className={`text-base font-bold truncate ${th.tx}`}>{lang === "id" ? p.nameId : p.name}</p>
+                    <p className={`text-sm font-mono ${th.txf}`}>{p.sku}</p>
                   </div>
                   <div className="text-right shrink-0">
-                    <p className={`text-xs font-bold ${th.acc}`}>{$(p.sellingPrice)}</p>
+                    <p className={`text-base font-bold ${th.acc}`}>{$(p.sellingPrice)}</p>
                   </div>
                 </button>
               ))}
@@ -222,12 +274,19 @@ export function PriceTierCatalog({ canWrite }: Props) {
         onClose={() => setOpenProductId(null)}
         title={(() => {
           const p = openProductId ? products.find(x => x.id === openProductId) : null;
-          return p ? `Tier: ${lang === "id" ? p.nameId : p.name}` : "Tier";
+          return p ? `Atur Tier: ${lang === "id" ? p.nameId : p.name}` : "Atur Tier";
         })()}
         size="lg"
       >
         {openProductId && <PriceTierEditor productId={openProductId} />}
       </Modal>
+
+      {/* Audit timeline modal — admin-only via canWrite gate. */}
+      <TierHistoryModal
+        productId={historyProductId}
+        open={historyProductId !== null}
+        onClose={() => setHistoryProductId(null)}
+      />
     </div>
   );
 }

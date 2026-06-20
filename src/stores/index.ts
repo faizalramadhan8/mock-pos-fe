@@ -21,7 +21,9 @@ const mapPriceTier = (t: any) => ({
   productId: t.product_id,
   minQty: t.min_qty,
   price: t.price,
-  target: (t.target_type || 'all_members') as 'all_members' | 'member_specific',
+  // Map old 'all_members' (pre-rename) ke 'all_customers' supaya FE konsisten
+  // walaupun BE belum di-migrate. Migration 000036 backfill DB.
+  target: ((t.target_type === 'all_members' ? 'all_customers' : t.target_type) || 'all_customers') as 'all_customers' | 'member_specific',
   members: Array.isArray(t.members)
     ? t.members.map((m: any) => ({ id: m.id, name: m.name, phone: m.phone }))
     : [],
@@ -59,6 +61,8 @@ const mapOrderItem = (i: any): OrderItem => ({
   discountType: i.discount_type, discountValue: i.discount_value,
   discountAmount: i.discount_amount,
   redeemedWithPoints: !!i.redeemed_with_points,
+  priceSource: i.price_source || undefined,
+  tierId: i.tier_id || undefined,
 });
 
 const mapOrder = (o: any): Order => ({
@@ -402,11 +406,16 @@ interface CartState {
 
 // computeBestUnitPrice — pricing logic dengan tier-aware lookup.
 //
-// Walk-in non-member: SELALU sellingPrice (no tier, no member_price).
-// Member:
-//   1. Cari tier yang qty match + target match (all_members / member_specific).
+// Tier 'all_customers' (rename dari 'all_members', 20 Jun 2026) berlaku untuk
+// semua customer termasuk walk-in non-member. Tier 'member_specific' tetap
+// khusus member yang di-whitelist.
+//
+// Logic:
+//   1. Cari tier yang qty match. all_customers selalu eligible; member_specific
+//      hanya kalau member terpilih DAN ada di whitelist.
 //   2. Kalau ada tier match → pakai MIN(tier.price) — tier WIN over member_price.
-//   3. Kalau tidak match → member_price (kalau ada) atau sellingPrice.
+//   3. Tidak match: member pakai member_price (kalau ada), walk-in pakai
+//      sellingPrice.
 //
 // regularPrice = sellingPrice * boxMul, untuk display "harga normal" + savings.
 function computeBestUnitPrice(
@@ -414,11 +423,9 @@ function computeBestUnitPrice(
   unitType: UnitType,
   member: ActiveMember | null,
   qty: number
-): { unitPrice: number; regularPrice: number } {
+): { unitPrice: number; regularPrice: number; priceSource: "regular" | "member_price" | "tier_all" | "tier_member"; tierId?: string } {
   const boxMul = unitType === "box" ? product.qtyPerBox : 1;
   const regular = product.sellingPrice * boxMul;
-
-  if (!member) return { unitPrice: regular, regularPrice: regular };
 
   // Qty satuan untuk tier compare — kalau cart unit_type=box, hitung total
   // satuan terjual (qty × qtyPerBox).
@@ -426,24 +433,36 @@ function computeBestUnitPrice(
 
   const matchingTiers = (product.priceTiers || []).filter(t => {
     if (qtySatuan < t.minQty) return false;
-    if (t.target === "all_members") return true;
+    if (t.target === "all_customers") return true;
     if (t.target === "member_specific") {
+      if (!member) return false;
       return (t.members || []).some(m => m.id === member.id);
     }
     return false;
   });
 
   if (matchingTiers.length > 0) {
-    const bestTier = Math.min(...matchingTiers.map(t => t.price));
-    return { unitPrice: bestTier * boxMul, regularPrice: regular };
+    // Pick tier dengan MIN price; kalau seri, tie-break ke first.
+    const best = matchingTiers.reduce((a, b) => (a.price <= b.price ? a : b));
+    return {
+      unitPrice: best.price * boxMul,
+      regularPrice: regular,
+      priceSource: best.target === "member_specific" ? "tier_member" : "tier_all",
+      tierId: best.id,
+    };
   }
 
-  const hasMemberPrice = typeof product.memberPrice === "number" && product.memberPrice > 0;
-  if (hasMemberPrice) {
-    const memberTotal = (product.memberPrice as number) * boxMul;
-    return { unitPrice: Math.min(memberTotal, regular), regularPrice: regular };
+  if (member) {
+    const hasMemberPrice = typeof product.memberPrice === "number" && product.memberPrice > 0;
+    if (hasMemberPrice) {
+      const memberTotal = (product.memberPrice as number) * boxMul;
+      // Kalau memberPrice >= regular, fallback ke regular (no discount applied).
+      if (memberTotal < regular) {
+        return { unitPrice: memberTotal, regularPrice: regular, priceSource: "member_price" };
+      }
+    }
   }
-  return { unitPrice: regular, regularPrice: regular };
+  return { unitPrice: regular, regularPrice: regular, priceSource: "regular" };
 }
 
 export const useCartStore = create<CartState>()(
@@ -473,7 +492,10 @@ export const useCartStore = create<CartState>()(
           items: s.items.map(i => {
             const product = products.find(p => p.id === i.productId);
             const base = product
-              ? { ...i, ...computeBestUnitPrice(product, i.unitType, m, i.quantity) }
+              ? (() => {
+                  const r = computeBestUnitPrice(product, i.unitType, m, i.quantity);
+                  return { ...i, unitPrice: r.unitPrice, regularPrice: r.regularPrice, priceSource: r.priceSource, tierId: r.tierId };
+                })()
               : i;
             return m ? base : { ...base, redeemWithPoints: false };
           }),
@@ -488,18 +510,19 @@ export const useCartStore = create<CartState>()(
               items: s.items.map(i => {
                 if (i.productId !== product.id || i.unitType !== unitType) return i;
                 const nextQty = i.quantity + 1;
-                const { unitPrice, regularPrice } = computeBestUnitPrice(product, unitType, s.member, nextQty);
-                return { ...i, quantity: nextQty, unitPrice, regularPrice };
+                const r = computeBestUnitPrice(product, unitType, s.member, nextQty);
+                return { ...i, quantity: nextQty, unitPrice: r.unitPrice, regularPrice: r.regularPrice, priceSource: r.priceSource, tierId: r.tierId };
               }),
             };
           }
-          const { unitPrice, regularPrice } = computeBestUnitPrice(product, unitType, s.member, 1);
+          const r = computeBestUnitPrice(product, unitType, s.member, 1);
           const item: CartItem = {
             id: genId(), productId: product.id,
             name: lang === "id" ? product.nameId : product.name,
             category: product.category, image: product.image,
             quantity: 1, unitType,
-            unitPrice, regularPrice,
+            unitPrice: r.unitPrice, regularPrice: r.regularPrice,
+            priceSource: r.priceSource, tierId: r.tierId,
             qtyPerBox: product.qtyPerBox, unit: product.unit,
           };
           return { items: [...s.items, item] };
@@ -516,8 +539,8 @@ export const useCartStore = create<CartState>()(
               // Recompute price — tier breakpoint mungkin di-cross.
               const product = products.find(p => p.id === i.productId);
               if (!product) return { ...i, quantity: nextQty };
-              const { unitPrice, regularPrice } = computeBestUnitPrice(product, i.unitType, s.member, nextQty);
-              return { ...i, quantity: nextQty, unitPrice, regularPrice };
+              const r = computeBestUnitPrice(product, i.unitType, s.member, nextQty);
+              return { ...i, quantity: nextQty, unitPrice: r.unitPrice, regularPrice: r.regularPrice, priceSource: r.priceSource, tierId: r.tierId };
             })
             .filter(i => i.quantity > 0),
         }));
@@ -577,6 +600,8 @@ export const useOrderStore = create<OrderState>((set, get) => ({
           discount_type: i.discountType, discount_value: i.discountValue,
           discount_amount: i.discountAmount,
           ...(i.redeemedWithPoints ? { redeem_with_points: true } : {}),
+          ...(i.priceSource ? { price_source: i.priceSource } : {}),
+          ...(i.tierId ? { tier_id: i.tierId } : {}),
         })),
         ...(order.clientRequestId ? { client_request_id: order.clientRequestId } : {}),
         subtotal: order.subtotal, ppn_rate: order.ppnRate, ppn: order.ppn, total: order.total,
@@ -641,6 +666,8 @@ export const useOrderStore = create<OrderState>((set, get) => ({
           discount_type: i.discountType, discount_value: i.discountValue,
           discount_amount: i.discountAmount,
           ...(i.redeemedWithPoints ? { redeem_with_points: true } : {}),
+          ...(i.priceSource ? { price_source: i.priceSource } : {}),
+          ...(i.tierId ? { tier_id: i.tierId } : {}),
         })),
         subtotal: order.subtotal, ppn_rate: order.ppnRate, ppn: order.ppn, total: order.total,
         customer: order.customer, customer_phone: order.customerPhone || "",

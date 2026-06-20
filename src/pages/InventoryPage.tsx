@@ -163,7 +163,7 @@ export function InventoryPage() {
     { id: "invoices", label: lang === "id" ? "Catat Faktur Barang Masuk" : "Stock-In Invoices", icon: <Receipt size={14} /> },
     { id: "suppliers", label: t.invSuppliers as string, icon: <Truck size={14} /> },
     { id: "redeem", label: lang === "id" ? "Katalog Tebus Poin" : "Redeemable Catalog", icon: <Gift size={14} /> },
-    { id: "memberPricing", label: lang === "id" ? "Harga Khusus Member" : "Member Pricing", icon: <Tag size={14} /> },
+    { id: "memberPricing", label: lang === "id" ? "Harga Khusus / Grosir" : "Tier Pricing", icon: <Tag size={14} /> },
   ];
 
   // Overview stats
