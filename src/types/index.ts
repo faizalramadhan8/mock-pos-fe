@@ -91,9 +91,27 @@ export interface ProductPriceTier {
 /** Tag asal harga saat sale time untuk audit. Lihat migration 000037. */
 export type PriceSource = "regular" | "member_price" | "tier_all" | "tier_member";
 
+/** Barang khusus tebus poin yang admin set manual (terpisah dari katalog
+ *  produk POS). Lihat migration 000040. */
+export interface RedeemableItem {
+  id: string;
+  name: string;
+  description?: string;
+  image?: string;
+  pointsCost: number;
+  stock: number;
+  redeemed: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface CartItem {
   id: string;
+  /** Empty string kalau row ini redeem dari redeemable_items. */
   productId: string;
+  /** Set kalau row ini redeem dari redeemable_items table. */
+  redeemableItemId?: string;
   name: string;
   category: string;
   image: string;
@@ -115,6 +133,10 @@ export interface CartItem {
   priceSource?: PriceSource;
   /** Audit: ID tier yang dipakai kalau priceSource ∈ {tier_all, tier_member}. */
   tierId?: string;
+  /** Paket snapshot: floor(qtySatuan / tier.minQty). 0 kalau bukan paket. */
+  paketCount?: number;
+  /** Sisa unit yang tidak masuk paket — pakai harga normal/member. */
+  extraCount?: number;
 }
 
 export interface OrderPaymentSplit {
@@ -154,6 +176,8 @@ export interface Order {
 
 export interface OrderItem {
   productId: string;
+  /** Set kalau row ini redeem dari redeemable_items table. */
+  redeemableItemId?: string;
   name: string;
   quantity: number;
   unitType: UnitType;
@@ -168,6 +192,10 @@ export interface OrderItem {
   priceSource?: PriceSource;
   /** Audit: ID tier yang dipakai (nullable kalau bukan dari tier). */
   tierId?: string;
+  /** Paket snapshot: berapa "paket" yang dipakai dari tier ini. */
+  paketCount?: number;
+  /** Sisa unit yang tidak masuk paket — pakai harga normal/member baseline. */
+  extraCount?: number;
 }
 
 export interface ProductPriceTierHistoryEntry {

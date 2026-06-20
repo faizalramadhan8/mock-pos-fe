@@ -18,3 +18,5 @@ export { uploadApi } from './upload';
 export { pushApi } from './support';
 export { cashbookApi } from './cashbook';
 export type { OpeningBalanceRes } from './cashbook';
+export { redeemableApi } from './redeemable';
+export type { RedeemableItemRes } from './redeemable';

@@ -126,7 +126,7 @@ export async function exportOrderReport(orders: Order[], dateLabel: string, prof
       "No. HP": m.phone,
       "Jumlah Order": m.orders,
       "Total Belanja": m.spend,
-      "Hemat Member": m.savings,
+      "Hemat": m.savings,
       "Kunjungan Terakhir": new Date(m.lastVisit).toLocaleString("id-ID"),
     }));
 
@@ -173,9 +173,37 @@ export async function exportOrderReport(orders: Order[], dateLabel: string, prof
     XLSX.utils.book_append_sheet(wb, wsPL, "Laba Rugi");
   }
 
+  // Bundling sheet — 1 row per order_item dengan price_source ∈ tier_*.
+  // Snapshot field paket_count + extra_count langsung dari order_items
+  // (migration 000039), tidak perlu JOIN tier.
+  const bundling = orders.flatMap(o =>
+    o.items
+      .filter(it => it.priceSource === "tier_all" || it.priceSource === "tier_member")
+      .map(it => ({
+        "Tanggal": new Date(o.createdAt).toLocaleString("id-ID"),
+        "Order #": o.id.slice(-8).toUpperCase(),
+        "Customer": o.member?.name || o.customer || "Walk-in",
+        "Tipe": o.member?.id ? "Member" : "Walk-in",
+        "No. HP": o.member?.phone || o.customerPhone || "",
+        "Produk": it.name,
+        "Tier": it.priceSource === "tier_member" ? "Member Tertentu" : "Semua Customer",
+        "Tier ID": it.tierId || "(dihapus)",
+        "Qty Total": it.quantity,
+        "Paket": it.paketCount || 0,
+        "Satuan Ekstra": it.extraCount || 0,
+        "Harga/Unit (avg)": Math.round(it.unitPrice),
+        "Harga Normal": it.regularPrice || 0,
+        "Total Bayar": Math.round(it.unitPrice * it.quantity),
+        "Hemat": Math.round(((it.regularPrice || 0) - it.unitPrice) * it.quantity),
+      }))
+  );
+
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(transaksi), "Transaksi");
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(topProduk), "Top Produk");
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(member), "Member");
+  if (bundling.length > 0) {
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(bundling), "Bundling");
+  }
   const buf = XLSX.write(wb, { bookType: "xlsx", type: "array" });
   const safeLabel = dateLabel.replace(/[^a-zA-Z0-9_-]+/g, "-").toLowerCase();
   downloadBlob(

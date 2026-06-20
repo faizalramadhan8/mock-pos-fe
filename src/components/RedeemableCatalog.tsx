@@ -1,76 +1,127 @@
-import { useMemo, useState } from "react";
-import { useProductStore, useLangStore } from "@/stores";
+import { useEffect, useMemo, useState } from "react";
+import { useRedeemableStore } from "@/stores";
 import { useThemeClasses } from "@/hooks/useThemeClasses";
-import { formatCurrency as $ } from "@/utils";
 import { Modal } from "./Modal";
-import { Gift, Plus, Search, X } from "lucide-react";
+import { Gift, Plus, Search, Pencil, Trash2 } from "lucide-react";
 import toast from "react-hot-toast";
+import type { RedeemableItem } from "@/types";
 
 interface Props {
-  /** false → tampil read-only (kasir bisa lihat tapi tidak edit) */
+  /** Read-only kalau kasir (non-admin). */
   canWrite: boolean;
 }
 
+interface Draft {
+  id?: string;
+  name: string;
+  description: string;
+  image: string;
+  pointsCost: string;
+  stock: string;
+  isActive: boolean;
+}
+
+const emptyDraft: Draft = {
+  name: "",
+  description: "",
+  image: "",
+  pointsCost: "",
+  stock: "0",
+  isActive: true,
+};
+
 /**
- * Katalog produk yang admin tandai eligible untuk tebus pakai member.points.
- * Admin add/remove dari catalog di sini; POS hanya tampilkan tombol "Tebus"
- * untuk produk yang isRedeemable === true.
+ * Katalog barang khusus tebus poin — TERPISAH dari katalog produk POS.
+ * Admin set manual: nama, gambar (opsional), points_cost, stok awal.
+ * Saat customer tebus di POS, stok auto-decrement + redeemed counter ++.
  *
- * Poin cost = product.sellingPrice (1 poin = Rp 1). Tidak ada custom cost
- * field — kalau Bu Santi mau hadiah khusus, atur harga jual produk biasa.
+ * Beda dengan flow lama (`products.is_redeemable` boolean) — sekarang
+ * full standalone catalog di tabel `redeemable_items`. Lihat migration 000040.
  */
 export function RedeemableCatalog({ canWrite }: Props) {
   const th = useThemeClasses();
-  const { lang } = useLangStore();
-  const products = useProductStore(s => s.products);
-  const setRedeemable = useProductStore(s => s.setRedeemable);
+  const items = useRedeemableStore(s => s.items);
+  const loading = useRedeemableStore(s => s.loading);
+  const fetchItems = useRedeemableStore(s => s.fetchItems);
+  const createItem = useRedeemableStore(s => s.create);
+  const updateItem = useRedeemableStore(s => s.update);
+  const removeItem = useRedeemableStore(s => s.remove);
 
-  const [addOpen, setAddOpen] = useState(false);
-  const [pickerQuery, setPickerQuery] = useState("");
-  const [savingId, setSavingId] = useState<string | null>(null);
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [draft, setDraft] = useState<Draft>(emptyDraft);
+  const [saving, setSaving] = useState(false);
+  const [query, setQuery] = useState("");
 
-  const redeemable = useMemo(
-    () => products.filter(p => p.isRedeemable && p.isActive).sort((a, b) => a.name.localeCompare(b.name)),
-    [products]
-  );
-  const eligible = useMemo(() => {
-    const q = pickerQuery.trim().toLowerCase();
-    // No slice cap — semua produk eligible tampil. Container modal punya
-    // `max-h-[60vh] overflow-y-auto` jadi scroll natural. Sebelumnya
-    // slice(0, 30) bikin user kira "cuma produk huruf A yang muncul"
-    // karena sort alphabetical + cap di 30 row pertama.
-    return products
-      .filter(p => p.isActive && !p.isRedeemable)
-      .filter(p =>
-        !q ||
-        (lang === "id" ? p.nameId : p.name).toLowerCase().includes(q) ||
-        p.sku.toLowerCase().includes(q)
-      )
-      .sort((a, b) => a.name.localeCompare(b.name));
-  }, [products, pickerQuery, lang]);
+  useEffect(() => {
+    fetchItems();
+  }, [fetchItems]);
 
-  const addToCatalog = async (id: string) => {
-    setSavingId(id);
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return items;
+    return items.filter(i =>
+      i.name.toLowerCase().includes(q) ||
+      (i.description || "").toLowerCase().includes(q)
+    );
+  }, [items, query]);
+
+  const openAdd = () => { setDraft({ ...emptyDraft }); setEditorOpen(true); };
+  const openEdit = (it: RedeemableItem) => {
+    setDraft({
+      id: it.id,
+      name: it.name,
+      description: it.description || "",
+      image: it.image || "",
+      pointsCost: String(it.pointsCost),
+      stock: String(it.stock),
+      isActive: it.isActive,
+    });
+    setEditorOpen(true);
+  };
+
+  const save = async () => {
+    const pointsN = parseInt(draft.pointsCost);
+    const stockN = parseInt(draft.stock);
+    if (!draft.name.trim()) { toast.error("Nama wajib diisi"); return; }
+    if (!Number.isFinite(pointsN) || pointsN < 1) { toast.error("Poin harus ≥ 1"); return; }
+    if (!Number.isFinite(stockN) || stockN < 0) { toast.error("Stok tidak valid"); return; }
+    setSaving(true);
     try {
-      await setRedeemable(id, true);
-      toast.success("Ditambahkan ke katalog tebus");
+      if (draft.id) {
+        await updateItem(draft.id, {
+          name: draft.name.trim(),
+          description: draft.description.trim(),
+          image: draft.image.trim(),
+          pointsCost: pointsN,
+          stock: stockN,
+          isActive: draft.isActive,
+        });
+        toast.success("Item tebus diperbarui");
+      } else {
+        await createItem({
+          name: draft.name.trim(),
+          description: draft.description.trim(),
+          image: draft.image.trim(),
+          pointsCost: pointsN,
+          stock: stockN,
+          isActive: draft.isActive,
+        });
+        toast.success("Item tebus ditambahkan");
+      }
+      setEditorOpen(false);
     } catch {
-      /* setRedeemable already toasts error */
+      /* toast already shown in store */
     } finally {
-      setSavingId(null);
+      setSaving(false);
     }
   };
 
-  const removeFromCatalog = async (id: string) => {
-    setSavingId(id);
+  const remove = async (it: RedeemableItem) => {
+    if (!confirm(`Hapus "${it.name}" dari katalog tebus?\n(Stok yang sudah ke-redeem ${it.redeemed}× akan tetap terlihat di history transaksi.)`)) return;
     try {
-      await setRedeemable(id, false);
-      toast.success("Dihapus dari katalog tebus");
-    } catch {
-      /* */
-    } finally {
-      setSavingId(null);
-    }
+      await removeItem(it.id);
+      toast.success("Item tebus dihapus");
+    } catch { /* */ }
   };
 
   return (
@@ -78,119 +129,181 @@ export function RedeemableCatalog({ canWrite }: Props) {
       {/* Info card */}
       <div className={`p-4 rounded-2xl border ${th.bdr} ${th.card2}`}>
         <div className="flex items-start gap-3">
-          <div className={`w-9 h-9 rounded-xl flex items-center justify-center bg-[#FFE4E9] text-[#E11D48] shrink-0`}>
-            <Gift size={16} strokeWidth={2.4} />
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-[#FFE4E9] text-[#E11D48] shrink-0">
+            <Gift size={18} strokeWidth={2.4} />
           </div>
           <div>
-            <p className={`text-sm font-extrabold ${th.tx}`}>Katalog Tebus Poin</p>
-            <p className={`text-xs mt-0.5 ${th.txm}`}>
-              Daftar produk yang bisa ditebus pakai poin member di kasir.
-              Member bayar pakai poin senilai harga jual produk (1 poin = Rp 1).
+            <p className={`text-base font-extrabold ${th.tx}`}>Katalog Tebus Poin</p>
+            <p className={`text-sm mt-0.5 ${th.txm}`}>
+              Daftar barang khusus tebus poin yang admin siapkan (mug, kaos, voucher, hampers, dll).
+              Terpisah dari katalog produk jual normal. Poin cost di-set sendiri sesuai value reward.
             </p>
           </div>
         </div>
       </div>
 
-      {/* Header + Tambah */}
-      <div className="flex items-center justify-between">
-        <div>
-          <p className={`text-sm font-extrabold ${th.tx}`}>
-            {redeemable.length} produk di katalog
-          </p>
-          {redeemable.length > 0 && (
-            <p className={`text-xs ${th.txm}`}>Kasir bisa tebus barang ini saat ada member aktif</p>
-          )}
+      {/* Toolbar */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex-1 min-w-[180px] relative">
+          <Search size={16} className={`absolute left-3.5 top-1/2 -translate-y-1/2 ${th.txf}`} />
+          <input
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            placeholder="Cari nama item…"
+            className={`w-full pl-10 pr-3 py-2.5 text-sm rounded-xl border ${th.inp}`} />
         </div>
         {canWrite && (
           <button
-            onClick={() => { setAddOpen(true); setPickerQuery(""); }}
+            onClick={openAdd}
             className="px-4 py-2.5 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48] inline-flex items-center gap-1.5">
-            <Plus size={14} strokeWidth={2.6} /> Tambah Produk
+            <Plus size={16} strokeWidth={2.6} /> Tambah Item
           </button>
         )}
       </div>
 
-      {/* List of redeemable products */}
-      {redeemable.length === 0 ? (
+      {/* List */}
+      {loading && items.length === 0 ? (
+        <p className={`text-center py-8 text-sm ${th.txm}`}>Memuat…</p>
+      ) : filtered.length === 0 ? (
         <div className={`text-center py-12 rounded-2xl border ${th.bdr} ${th.card2}`}>
-          <Gift size={36} className="mx-auto opacity-20 mb-2" />
-          <p className={`text-sm font-bold ${th.tx}`}>Belum ada produk di katalog tebus</p>
-          <p className={`text-xs mt-1 ${th.txm}`}>
-            {canWrite
-              ? "Klik 'Tambah Produk' di atas untuk pilih produk yang bisa ditebus."
-              : "Hubungi admin untuk menambahkan produk."}
+          <Gift size={40} className="mx-auto opacity-20 mb-2" />
+          <p className={`text-base font-bold ${th.tx}`}>
+            {query ? "Tidak ada item cocok" : "Belum ada item tebus"}
           </p>
+          {!query && canWrite && (
+            <p className={`text-sm mt-1 ${th.txm}`}>Klik "Tambah Item" untuk mulai.</p>
+          )}
         </div>
       ) : (
         <div className={`rounded-2xl border overflow-hidden ${th.bdr} ${th.card}`}>
-          {redeemable.map((p, idx) => (
-            <div key={p.id} className={`flex items-center justify-between gap-3 px-4 py-3 ${idx > 0 ? `border-t ${th.bdrSoft}` : ""}`}>
+          {filtered.map((it, idx) => (
+            <div key={it.id} className={`flex items-start gap-3 px-4 py-3.5 ${idx > 0 ? `border-t ${th.bdrSoft}` : ""}`}>
+              {it.image ? (
+                <img src={it.image} alt="" className="w-12 h-12 rounded-lg object-cover shrink-0" />
+              ) : (
+                <div className="w-12 h-12 rounded-lg bg-[#FFE4E9] text-[#E11D48] shrink-0 flex items-center justify-center">
+                  <Gift size={20} strokeWidth={2.2} />
+                </div>
+              )}
               <div className="min-w-0 flex-1">
-                <p className={`text-sm font-bold truncate ${th.tx}`}>{lang === "id" ? p.nameId : p.name}</p>
-                <p className={`text-xs font-mono ${th.txf} truncate`}>{p.sku}</p>
-                <p className={`text-xs font-bold mt-0.5 ${th.acc}`}>
-                  {$(p.sellingPrice)} = {p.sellingPrice.toLocaleString("id-ID")} poin
-                </p>
-              </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <span className={`text-xs font-semibold px-2 py-0.5 rounded-md ${p.stock > 0 ? `${th.accBg} ${th.acc}` : "bg-[#FCE4EC] text-[#BE123C]"}`}>
-                  {p.stock > 0 ? `${p.stock} stok` : "Habis"}
-                </span>
-                {canWrite && (
-                  <button
-                    onClick={() => removeFromCatalog(p.id)}
-                    disabled={savingId === p.id}
-                    aria-label="Hapus dari katalog"
-                    className="w-9 h-9 rounded-xl flex items-center justify-center bg-[#FCE4EC] text-[#BE123C] active:scale-90 transition-transform disabled:opacity-50">
-                    <X size={14} strokeWidth={2.6} />
-                  </button>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className={`text-base font-extrabold truncate ${th.tx}`}>{it.name}</p>
+                  {!it.isActive && (
+                    <span className={`text-xs font-bold px-2 py-0.5 rounded-md bg-[#FCE4EC] text-[#BE123C]`}>Non-aktif</span>
+                  )}
+                </div>
+                {it.description && (
+                  <p className={`text-sm mt-0.5 truncate ${th.txm}`}>{it.description}</p>
                 )}
+                <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                  <span className={`text-sm font-bold ${th.acc}`}>
+                    {it.pointsCost.toLocaleString("id-ID")} poin
+                  </span>
+                  <span className={`text-sm ${th.txm}`}>·</span>
+                  <span className={`text-sm font-semibold ${it.stock > 0 ? th.tx : "text-[#BE123C]"}`}>
+                    {it.stock > 0 ? `Stok ${it.stock}` : "Stok habis"}
+                  </span>
+                  {it.redeemed > 0 && (
+                    <>
+                      <span className={`text-sm ${th.txm}`}>·</span>
+                      <span className={`text-sm ${th.txm}`}>Sudah ditebus {it.redeemed}×</span>
+                    </>
+                  )}
+                </div>
               </div>
+              {canWrite && (
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <button
+                    onClick={() => openEdit(it)}
+                    aria-label="Edit item"
+                    title="Edit item"
+                    className={`w-10 h-10 rounded-lg flex items-center justify-center ${th.elev} ${th.tx} active:scale-90 transition-transform`}>
+                    <Pencil size={16} strokeWidth={2.6} />
+                  </button>
+                  <button
+                    onClick={() => remove(it)}
+                    aria-label="Hapus item"
+                    title="Hapus item"
+                    className="w-10 h-10 rounded-lg flex items-center justify-center bg-[#FCE4EC] text-[#BE123C] active:scale-90 transition-transform">
+                    <Trash2 size={16} strokeWidth={2.6} />
+                  </button>
+                </div>
+              )}
             </div>
           ))}
         </div>
       )}
 
-      {/* Add-product modal */}
-      {canWrite && (
-        <Modal open={addOpen} onClose={() => setAddOpen(false)} title="Tambah Produk ke Katalog Tebus" size="lg">
-          <div className="relative mb-3">
-            <Search size={14} className={`absolute left-3 top-1/2 -translate-y-1/2 ${th.txf}`} />
+      {/* Editor modal */}
+      <Modal open={editorOpen} onClose={() => setEditorOpen(false)} title={draft.id ? "Edit Item Tebus" : "Tambah Item Tebus"}>
+        <div className="space-y-3.5">
+          <div>
+            <p className={`text-sm font-semibold mb-1.5 ${th.txm}`}>Nama barang</p>
             <input
               autoFocus
-              value={pickerQuery}
-              onChange={e => setPickerQuery(e.target.value)}
-              placeholder="Cari nama atau SKU…"
-              className={`w-full pl-9 pr-3 py-2.5 text-sm rounded-xl border ${th.inp}`} />
+              value={draft.name}
+              onChange={e => setDraft({ ...draft, name: e.target.value })}
+              placeholder="Contoh: Mug Toko Santi"
+              className={`w-full px-3 py-3 text-base rounded-xl border ${th.inp}`} />
           </div>
-          {eligible.length === 0 ? (
-            <p className={`text-center py-8 text-xs ${th.txm}`}>
-              {products.filter(p => p.isActive && !p.isRedeemable).length === 0
-                ? "Semua produk sudah di katalog tebus."
-                : "Tidak ada produk yang cocok."}
-            </p>
-          ) : (
-            <div className="max-h-[60vh] overflow-y-auto space-y-1">
-              {eligible.map(p => (
-                <button
-                  key={p.id}
-                  onClick={() => addToCatalog(p.id)}
-                  disabled={savingId === p.id}
-                  className={`w-full text-left flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl border active:scale-[.98] transition-transform disabled:opacity-50 ${th.bdr} ${th.card2}`}>
-                  <div className="min-w-0">
-                    <p className={`text-sm font-bold truncate ${th.tx}`}>{lang === "id" ? p.nameId : p.name}</p>
-                    <p className={`text-xs font-mono ${th.txf}`}>{p.sku}</p>
-                  </div>
-                  <div className="text-right shrink-0">
-                    <p className={`text-xs font-bold ${th.acc}`}>{$(p.sellingPrice)}</p>
-                    <p className={`text-xs ${th.txf}`}>{p.stock} stok</p>
-                  </div>
-                </button>
-              ))}
+          <div>
+            <p className={`text-sm font-semibold mb-1.5 ${th.txm}`}>Deskripsi (opsional)</p>
+            <input
+              value={draft.description}
+              onChange={e => setDraft({ ...draft, description: e.target.value })}
+              placeholder="Mug keramik 350ml warna pink"
+              className={`w-full px-3 py-3 text-base rounded-xl border ${th.inp}`} />
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <p className={`text-sm font-semibold mb-1.5 ${th.txm}`}>Poin tebus</p>
+              <input
+                type="number"
+                min="1"
+                value={draft.pointsCost}
+                onChange={e => setDraft({ ...draft, pointsCost: e.target.value })}
+                placeholder="5000"
+                className={`w-full px-3 py-3 text-base rounded-xl border ${th.inp}`} />
             </div>
-          )}
-        </Modal>
-      )}
+            <div>
+              <p className={`text-sm font-semibold mb-1.5 ${th.txm}`}>Stok awal</p>
+              <input
+                type="number"
+                min="0"
+                value={draft.stock}
+                onChange={e => setDraft({ ...draft, stock: e.target.value })}
+                placeholder="10"
+                className={`w-full px-3 py-3 text-base rounded-xl border ${th.inp}`} />
+            </div>
+          </div>
+          <div>
+            <p className={`text-sm font-semibold mb-1.5 ${th.txm}`}>URL gambar (opsional)</p>
+            <input
+              value={draft.image}
+              onChange={e => setDraft({ ...draft, image: e.target.value })}
+              placeholder="https://…"
+              className={`w-full px-3 py-3 text-base rounded-xl border ${th.inp}`} />
+          </div>
+          <label className={`flex items-center gap-2 cursor-pointer text-sm ${th.tx}`}>
+            <input
+              type="checkbox"
+              checked={draft.isActive}
+              onChange={e => setDraft({ ...draft, isActive: e.target.checked })}
+              className="w-4 h-4 accent-[#E11D48]" />
+            <span className="font-semibold">Aktif (tampil di POS untuk customer tebus)</span>
+          </label>
+          <div className="flex gap-2 pt-1">
+            <button onClick={() => setEditorOpen(false)}
+              className={`flex-1 py-3 rounded-xl text-sm font-bold border ${th.bdr} ${th.txm}`}>
+              Batal
+            </button>
+            <button onClick={save} disabled={saving}
+              className="flex-1 py-3 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48] disabled:opacity-40">
+              {saving ? "Menyimpan…" : draft.id ? "Update" : "Tambah"}
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

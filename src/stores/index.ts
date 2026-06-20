@@ -1,11 +1,11 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import toast from "react-hot-toast";
-import type { User, Product, CartItem, Order, OrderItem, StockMovement, StockBatch, Category, Supplier, BankAccount, Member, Refund, RefundItem, CashSession, AuditEntry, PaymentMethod, PaymentStatus, DiscountType, UnitType, Lang, PageId, AuditAction, PurchaseInvoice, PurchaseInvoiceItem } from "@/types";
+import type { User, Product, CartItem, Order, OrderItem, StockMovement, StockBatch, Category, Supplier, BankAccount, Member, Refund, RefundItem, CashSession, AuditEntry, PaymentMethod, PaymentStatus, DiscountType, UnitType, Lang, PageId, AuditAction, PurchaseInvoice, PurchaseInvoiceItem, RedeemableItem } from "@/types";
 import { translations } from "@/i18n";
 import { ROLE_PERMISSIONS } from "@/constants";
 import { genId } from "@/utils";
-import { authApi, userApi, productApi, categoryApi, supplierApi, orderApi, refundApi, movementApi, batchApi, memberApi, cashSessionApi, auditApi, settingsApi, purchaseInvoiceApi, expenseApi } from "@/api";
+import { authApi, userApi, productApi, categoryApi, supplierApi, orderApi, refundApi, movementApi, batchApi, memberApi, cashSessionApi, auditApi, settingsApi, purchaseInvoiceApi, expenseApi, redeemableApi } from "@/api";
 import type { CreatePurchaseInvoiceBody, PurchaseInvoiceRes, PurchaseInvoiceItemRes, ExpenseRes, ExpenseCategoryRes, CreateExpenseBody } from "@/api";
 import { setToken, getToken } from "@/api/client";
 
@@ -63,6 +63,9 @@ const mapOrderItem = (i: any): OrderItem => ({
   redeemedWithPoints: !!i.redeemed_with_points,
   priceSource: i.price_source || undefined,
   tierId: i.tier_id || undefined,
+  paketCount: typeof i.paket_count === 'number' ? i.paket_count : undefined,
+  extraCount: typeof i.extra_count === 'number' ? i.extra_count : undefined,
+  redeemableItemId: i.redeemable_item_id || undefined,
 });
 
 const mapOrder = (o: any): Order => ({
@@ -394,6 +397,7 @@ interface CartState {
   setPayment: (p: PaymentMethod) => void;
   setMember: (m: ActiveMember | null) => void;
   addItem: (product: Product, unitType: UnitType, lang: Lang) => void;
+  addRedeemable: (item: RedeemableItem) => void;
   updateQty: (id: string, delta: number) => void;
   removeItem: (id: string) => void;
   setItemDiscount: (id: string, type: DiscountType | null, value: number) => void;
@@ -404,26 +408,41 @@ interface CartState {
   count: () => number;
 }
 
-// computeBestUnitPrice — pricing logic dengan tier-aware lookup.
+// computeBestUnitPrice — pricing logic dengan tier-aware lookup (PAKET mode).
 //
 // Tier 'all_customers' (rename dari 'all_members', 20 Jun 2026) berlaku untuk
 // semua customer termasuk walk-in non-member. Tier 'member_specific' tetap
 // khusus member yang di-whitelist.
 //
-// Logic:
-//   1. Cari tier yang qty match. all_customers selalu eligible; member_specific
-//      hanya kalau member terpilih DAN ada di whitelist.
-//   2. Kalau ada tier match → pakai MIN(tier.price) — tier WIN over member_price.
-//   3. Tidak match: member pakai member_price (kalau ada), walk-in pakai
-//      sellingPrice.
+// PAKET SEMANTICS (21 Jun 2026, per request Bu Santi):
+//   Tier berlaku HANYA dalam kelipatan minQty. Sisa unit (modulo) pakai harga
+//   normal/member_price. Contoh tier "beli 2 = Rp 33.000":
+//     qty=2 → 1 paket = 33rb (16.5rb/sat)
+//     qty=3 → 1 paket + 1 satuan normal = 33rb + 18rb = 51rb
+//     qty=4 → 2 paket = 66rb
+//     qty=5 → 2 paket + 1 satuan = 84rb
 //
-// regularPrice = sellingPrice * boxMul, untuk display "harga normal" + savings.
+// Logic:
+//   1. Cari tier eligible (qty >= minQty + target match). Pilih tier dengan
+//      minQty TERBESAR (pack lebih besar) yang masih muat — greedy fit.
+//      Kalau pack sama-sama muat, pilih yang price lebih murah per-satuan.
+//   2. paketCount = floor(qty / tier.minQty), extra = qty % tier.minQty.
+//   3. lineTotal = paketCount × (tier.price × tier.minQty) + extra × baseline.
+//      baseline = member_price kalau member punya, kalau gak ya regular.
+//   4. unitPrice (untuk storage) = lineTotal / qty (averaged). BE pakai
+//      unit_price × quantity = lineTotal, jadi total tetap akurat.
+//   5. priceSource = tier_all / tier_member kalau paketCount > 0, kalau extra
+//      yang dominan ya tetap tag tier (mayoritas dari tier).
+//
+// Tidak ada tier match: member pakai member_price (kalau ada), walk-in pakai
+// sellingPrice. regularPrice = sellingPrice * boxMul untuk display "harga
+// normal" + savings calc.
 function computeBestUnitPrice(
   product: Product,
   unitType: UnitType,
   member: ActiveMember | null,
   qty: number
-): { unitPrice: number; regularPrice: number; priceSource: "regular" | "member_price" | "tier_all" | "tier_member"; tierId?: string } {
+): { unitPrice: number; regularPrice: number; priceSource: "regular" | "member_price" | "tier_all" | "tier_member"; tierId?: string; paketCount?: number; extraCount?: number } {
   const boxMul = unitType === "box" ? product.qtyPerBox : 1;
   const regular = product.sellingPrice * boxMul;
 
@@ -431,7 +450,7 @@ function computeBestUnitPrice(
   // satuan terjual (qty × qtyPerBox).
   const qtySatuan = unitType === "box" ? qty * product.qtyPerBox : qty;
 
-  const matchingTiers = (product.priceTiers || []).filter(t => {
+  const eligibleTiers = (product.priceTiers || []).filter(t => {
     if (qtySatuan < t.minQty) return false;
     if (t.target === "all_customers") return true;
     if (t.target === "member_specific") {
@@ -441,28 +460,52 @@ function computeBestUnitPrice(
     return false;
   });
 
-  if (matchingTiers.length > 0) {
-    // Pick tier dengan MIN price; kalau seri, tie-break ke first.
-    const best = matchingTiers.reduce((a, b) => (a.price <= b.price ? a : b));
+  // Baseline untuk "extra" unit (sisa modulo) — member pakai memberPrice
+  // kalau ada, walk-in pakai regular. Tidak pernah mahal dari regular.
+  let baseline = regular;
+  let baselineSource: "regular" | "member_price" = "regular";
+  if (member) {
+    const mp = typeof product.memberPrice === "number" && product.memberPrice > 0
+      ? (product.memberPrice as number) * boxMul
+      : null;
+    if (mp !== null && mp < regular) {
+      baseline = mp;
+      baselineSource = "member_price";
+    }
+  }
+
+  if (eligibleTiers.length > 0) {
+    // Greedy: pilih tier dengan minQty TERBESAR yang muat. Kalau seri, pilih
+    // tier dengan price per-satuan paling murah. Trade-off vs MIN price:
+    // greedy paket lebih natural ("kalau ada paket 5, kasih paket 5 dulu;
+    // sisa 2 baru paket 2 — tapi karena kita ambil 1 tier saja, paket 5 win").
+    // Untuk multi-tier optimization (mix paket 5 + paket 2) lihat TODO future.
+    const best = eligibleTiers.reduce((a, b) => {
+      if (a.minQty !== b.minQty) return a.minQty > b.minQty ? a : b;
+      return a.price <= b.price ? a : b;
+    });
+    const paketCount = Math.floor(qtySatuan / best.minQty);
+    const extraSatuan = qtySatuan - paketCount * best.minQty;
+    // best.price tersimpan per-satuan (sudah dibagi minQty saat save di editor).
+    const paketTotal = paketCount * best.price * best.minQty;
+    // extra di-priced per satuan (bukan per box), karena best.price per satuan.
+    // Untuk unit_type=box, baseline adalah perBox, jadi konversi:
+    //   extraPerSatuan = baseline / boxMul (price per single satuan)
+    const baselinePerSatuan = baseline / boxMul;
+    const extraTotal = extraSatuan * baselinePerSatuan;
+    const lineTotal = paketTotal + extraTotal;
+    const unitPrice = lineTotal / qty;
     return {
-      unitPrice: best.price * boxMul,
+      unitPrice,
       regularPrice: regular,
       priceSource: best.target === "member_specific" ? "tier_member" : "tier_all",
       tierId: best.id,
+      paketCount,
+      extraCount: extraSatuan,
     };
   }
 
-  if (member) {
-    const hasMemberPrice = typeof product.memberPrice === "number" && product.memberPrice > 0;
-    if (hasMemberPrice) {
-      const memberTotal = (product.memberPrice as number) * boxMul;
-      // Kalau memberPrice >= regular, fallback ke regular (no discount applied).
-      if (memberTotal < regular) {
-        return { unitPrice: memberTotal, regularPrice: regular, priceSource: "member_price" };
-      }
-    }
-  }
-  return { unitPrice: regular, regularPrice: regular, priceSource: "regular" };
+  return { unitPrice: baseline, regularPrice: regular, priceSource: baselineSource, paketCount: 0, extraCount: 0 };
 }
 
 export const useCartStore = create<CartState>()(
@@ -489,16 +532,22 @@ export const useCartStore = create<CartState>()(
           member: m,
           customer: m ? "" : s.customer,
           customerPhone: m ? "" : s.customerPhone,
-          items: s.items.map(i => {
-            const product = products.find(p => p.id === i.productId);
-            const base = product
-              ? (() => {
-                  const r = computeBestUnitPrice(product, i.unitType, m, i.quantity);
-                  return { ...i, unitPrice: r.unitPrice, regularPrice: r.regularPrice, priceSource: r.priceSource, tierId: r.tierId };
-                })()
-              : i;
-            return m ? base : { ...base, redeemWithPoints: false };
-          }),
+          items: s.items
+            // Saat member dihapus, hapus item tebus poin (redeem hanya valid
+            // kalau ada member terpilih).
+            .filter(i => m || !i.redeemableItemId)
+            .map(i => {
+              // Redeem row: skip recompute (tidak ada product, harga = pointsCost).
+              if (i.redeemableItemId) return i;
+              const product = products.find(p => p.id === i.productId);
+              const base = product
+                ? (() => {
+                    const r = computeBestUnitPrice(product, i.unitType, m, i.quantity);
+                    return { ...i, unitPrice: r.unitPrice, regularPrice: r.regularPrice, priceSource: r.priceSource, tierId: r.tierId, paketCount: r.paketCount, extraCount: r.extraCount };
+                  })()
+                : i;
+              return m ? base : { ...base, redeemWithPoints: false };
+            }),
         }));
       },
       addItem: (product, unitType, lang) => {
@@ -511,7 +560,7 @@ export const useCartStore = create<CartState>()(
                 if (i.productId !== product.id || i.unitType !== unitType) return i;
                 const nextQty = i.quantity + 1;
                 const r = computeBestUnitPrice(product, unitType, s.member, nextQty);
-                return { ...i, quantity: nextQty, unitPrice: r.unitPrice, regularPrice: r.regularPrice, priceSource: r.priceSource, tierId: r.tierId };
+                return { ...i, quantity: nextQty, unitPrice: r.unitPrice, regularPrice: r.regularPrice, priceSource: r.priceSource, tierId: r.tierId, paketCount: r.paketCount, extraCount: r.extraCount };
               }),
             };
           }
@@ -523,9 +572,43 @@ export const useCartStore = create<CartState>()(
             quantity: 1, unitType,
             unitPrice: r.unitPrice, regularPrice: r.regularPrice,
             priceSource: r.priceSource, tierId: r.tierId,
+            paketCount: r.paketCount, extraCount: r.extraCount,
             qtyPerBox: product.qtyPerBox, unit: product.unit,
           };
           return { items: [...s.items, item] };
+        });
+      },
+      addRedeemable: (item) => {
+        set(s => {
+          // Tebus row: tambah qty kalau sudah ada di cart, else create row baru.
+          // unit_price = pointsCost (interpret 1 poin = Rp 1 untuk BE pointsToRedeem
+          // calc yang baca lineTotal = unit_price × qty).
+          const existing = s.items.find(i => i.redeemableItemId === item.id);
+          if (existing) {
+            return {
+              items: s.items.map(i =>
+                i.redeemableItemId === item.id
+                  ? { ...i, quantity: i.quantity + 1 }
+                  : i
+              ),
+            };
+          }
+          const cartItem: CartItem = {
+            id: genId(),
+            productId: "", // sentinel: empty string = redeem row
+            redeemableItemId: item.id,
+            name: item.name,
+            category: "",
+            image: item.image || "",
+            quantity: 1,
+            unitType: "individual",
+            unitPrice: item.pointsCost,
+            regularPrice: 0,
+            qtyPerBox: 1,
+            unit: "",
+            redeemWithPoints: true,
+          };
+          return { items: [...s.items, cartItem] };
         });
       },
       updateQty: (id, delta) => {
@@ -540,7 +623,7 @@ export const useCartStore = create<CartState>()(
               const product = products.find(p => p.id === i.productId);
               if (!product) return { ...i, quantity: nextQty };
               const r = computeBestUnitPrice(product, i.unitType, s.member, nextQty);
-              return { ...i, quantity: nextQty, unitPrice: r.unitPrice, regularPrice: r.regularPrice, priceSource: r.priceSource, tierId: r.tierId };
+              return { ...i, quantity: nextQty, unitPrice: r.unitPrice, regularPrice: r.regularPrice, priceSource: r.priceSource, tierId: r.tierId, paketCount: r.paketCount, extraCount: r.extraCount };
             })
             .filter(i => i.quantity > 0),
         }));
@@ -602,6 +685,9 @@ export const useOrderStore = create<OrderState>((set, get) => ({
           ...(i.redeemedWithPoints ? { redeem_with_points: true } : {}),
           ...(i.priceSource ? { price_source: i.priceSource } : {}),
           ...(i.tierId ? { tier_id: i.tierId } : {}),
+          ...(i.paketCount ? { paket_count: i.paketCount } : {}),
+          ...(i.extraCount ? { extra_count: i.extraCount } : {}),
+          ...(i.redeemableItemId ? { redeemable_item_id: i.redeemableItemId } : {}),
         })),
         ...(order.clientRequestId ? { client_request_id: order.clientRequestId } : {}),
         subtotal: order.subtotal, ppn_rate: order.ppnRate, ppn: order.ppn, total: order.total,
@@ -668,6 +754,9 @@ export const useOrderStore = create<OrderState>((set, get) => ({
           ...(i.redeemedWithPoints ? { redeem_with_points: true } : {}),
           ...(i.priceSource ? { price_source: i.priceSource } : {}),
           ...(i.tierId ? { tier_id: i.tierId } : {}),
+          ...(i.paketCount ? { paket_count: i.paketCount } : {}),
+          ...(i.extraCount ? { extra_count: i.extraCount } : {}),
+          ...(i.redeemableItemId ? { redeemable_item_id: i.redeemableItemId } : {}),
         })),
         subtotal: order.subtotal, ppn_rate: order.ppnRate, ppn: order.ppn, total: order.total,
         customer: order.customer, customer_phone: order.customerPhone || "",
@@ -1286,6 +1375,100 @@ export const useExpenseStore = create<ExpenseState>((set) => ({
       toast.success("Pengeluaran dihapus");
     } catch (e: any) {
       toast.error(e.message || "Gagal menghapus pengeluaran");
+    }
+  },
+}));
+
+// ─── Redeemable Items store (Katalog Tebus Poin) ───
+// Barang khusus tebus poin yang admin set manual. TERPISAH dari `useProductStore`
+// (katalog jual normal). Lihat migration 000040 + entity RedeemableItem.
+interface RedeemableState {
+  items: RedeemableItem[];
+  loading: boolean;
+  fetchItems: () => Promise<void>;
+  fetchActive: () => Promise<void>;
+  create: (data: Omit<RedeemableItem, "id" | "redeemed" | "createdAt" | "updatedAt">) => Promise<void>;
+  update: (id: string, data: Partial<Omit<RedeemableItem, "id" | "redeemed" | "createdAt" | "updatedAt">>) => Promise<void>;
+  remove: (id: string) => Promise<void>;
+}
+
+const mapRedeemable = (r: any): RedeemableItem => ({
+  id: r.id,
+  name: r.name,
+  description: r.description || undefined,
+  image: r.image || undefined,
+  pointsCost: r.points_cost,
+  stock: r.stock,
+  redeemed: r.redeemed,
+  isActive: r.is_active !== false,
+  createdAt: r.created_at,
+  updatedAt: r.updated_at,
+});
+
+export const useRedeemableStore = create<RedeemableState>((set, get) => ({
+  items: [],
+  loading: false,
+  fetchItems: async () => {
+    set({ loading: true });
+    try {
+      const res = await redeemableApi.getAll();
+      set({ items: (res.body || []).map(mapRedeemable) });
+    } catch {
+      /* ignore */
+    } finally {
+      set({ loading: false });
+    }
+  },
+  fetchActive: async () => {
+    try {
+      const res = await redeemableApi.getActive();
+      set({ items: (res.body || []).map(mapRedeemable) });
+    } catch { /* ignore */ }
+  },
+  create: async (data) => {
+    try {
+      const res = await redeemableApi.create({
+        name: data.name,
+        description: data.description,
+        image: data.image,
+        points_cost: data.pointsCost,
+        stock: data.stock,
+        is_active: data.isActive,
+      });
+      if (res.body) set(s => ({ items: [...s.items, mapRedeemable(res.body!)].sort((a, b) => a.name.localeCompare(b.name)) }));
+    } catch (e: any) {
+      toast.error(e?.message || "Gagal tambah item tebus");
+      throw e;
+    }
+  },
+  update: async (id, data) => {
+    const existing = get().items.find(i => i.id === id);
+    if (!existing) return;
+    try {
+      const res = await redeemableApi.update(id, {
+        name: data.name ?? existing.name,
+        description: data.description ?? existing.description,
+        image: data.image ?? existing.image,
+        points_cost: data.pointsCost ?? existing.pointsCost,
+        stock: data.stock ?? existing.stock,
+        is_active: data.isActive ?? existing.isActive,
+      });
+      if (res.body) {
+        const updated = mapRedeemable(res.body);
+        set(s => ({ items: s.items.map(i => i.id === id ? updated : i) }));
+      }
+    } catch (e: any) {
+      toast.error(e?.message || "Gagal update item tebus");
+      throw e;
+    }
+  },
+  remove: async (id) => {
+    try {
+      await redeemableApi.delete(id);
+      set(s => ({ items: s.items.filter(i => i.id !== id) }));
+    } catch (e: any) {
+      toast.error(e?.message || "Gagal hapus item tebus");
+      throw e;
     }
   },
 }));

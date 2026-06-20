@@ -180,7 +180,7 @@ export function printReceipt(order: Order, opts?: { cashierName?: string }) {
   }).join("")}
   <div class="ln"></div>
   <div class="r"><span class="l">Subtotal</span><span class="v">${fmt(subtotal)}</span></div>
-  ${memberSavings > 0 ? `<div class="r"><span class="l">Hemat Member</span><span class="v">-${fmt(memberSavings)}</span></div>` : ""}
+  ${memberSavings > 0 ? `<div class="r"><span class="l">Hemat</span><span class="v">-${fmt(memberSavings)}</span></div>` : ""}
   ${pointsUsed > 0 ? `<div class="r"><span class="l">Poin Dipakai</span><span class="v">-${Math.round(pointsUsed).toLocaleString("id-ID")} poin</span></div>` : ""}
   <div class="r total"><span class="l">Total</span><span class="v">${fmt(order.total)}</span></div>
   ${pointsEarned > 0 ? `<div class="r" style="margin-top:1mm"><span class="l">Poin Diperoleh</span><span class="v">+${pointsEarned.toLocaleString("id-ID")} poin</span></div>` : ""}

@@ -13,7 +13,7 @@ import { FileText, Search, Users, Trash2, Plus, Receipt, Pencil, Sparkles, MapPi
 import type { Member } from "@/types";
 import toast from "react-hot-toast";
 
-type OrdersTab = "orders" | "members";
+type OrdersTab = "orders" | "members" | "points";
 
 // Shared pill button for filters/tabs on this page. One shape, one active
 // color (pink gradient), one inactive treatment — enforces visual discipline
@@ -76,6 +76,9 @@ export function OrdersPage() {
   const deleteMemberAction = useMemberStore(s => s.deleteMember);
   const [memberSearch, setMemberSearch] = useState("");
   const debouncedMemberSearch = useDebounce(memberSearch, 150);
+  // Filter di tab "Poin Member": default tampil yang sudah ada poin saja
+  // (yang penting bagi Bu Santi audit). "Semua" untuk lihat zero-poin juga.
+  const [pointsFilter, setPointsFilter] = useState<"with_points" | "all">("with_points");
   const [statsMember, setStatsMember] = useState<{ id: string; name: string; phone: string } | null>(null);
   const [addMemberOpen, setAddMemberOpen] = useState(false);
   const emptyMemberForm = { name: "", phone: "", address: "", memberNumber: "" };
@@ -174,6 +177,7 @@ export function OrdersPage() {
           {([
             { id: "orders" as OrdersTab, label: "Transaksi", icon: <Receipt size={14} /> },
             { id: "members" as OrdersTab, label: "Members", icon: <Users size={14} /> },
+            { id: "points" as OrdersTab, label: "Poin Member", icon: <Sparkles size={14} /> },
           ]).map(tab => (
             <FilterPill key={tab.id} th={th} active={activeTab === tab.id} onClick={() => setActiveTab(tab.id)}>
               {tab.icon} {tab.label}
@@ -435,6 +439,123 @@ export function OrdersPage() {
           })()}
         </>
       )}
+
+      {/* Poin Member tab — audit-focused view buat Bu Santi. Sort by poin
+          DESC (yang paling banyak duluan), display poin BESAR (font-display),
+          filter "Yang punya poin" vs "Semua", search nama/HP. Tap row → buka
+          MemberStatsModal yang sudah ada (drill-down history naik-turun poin).
+          Sengaja dipisah dari tab Members yang fokus ke CRUD member. */}
+      {activeTab === "points" && canViewMembers && (() => {
+        const q = debouncedMemberSearch.toLowerCase().trim();
+        const all = members.filter(m =>
+          !q ||
+          m.name.toLowerCase().includes(q) ||
+          m.phone.toLowerCase().includes(q) ||
+          (m.memberNumber || "").toLowerCase().includes(q)
+        );
+        const filtered = pointsFilter === "with_points"
+          ? all.filter(m => (m.points ?? 0) > 0)
+          : all;
+        const sorted = [...filtered].sort((a, b) => (b.points ?? 0) - (a.points ?? 0));
+        const totalPoints = members.reduce((s, m) => s + (m.points ?? 0), 0);
+        const withPointsCount = members.filter(m => (m.points ?? 0) > 0).length;
+
+        return (
+          <div className="flex flex-col gap-3">
+            {/* Hero summary — total liability + member aktif */}
+            <div className={`p-5 rounded-3xl border bg-gradient-to-br from-[#FFE4E9] to-[#FFD1DB] dark:from-[#E11D48]/15 dark:to-[#9F1239]/20 ${th.bdr}`}>
+              <p className={`text-sm font-bold uppercase tracking-wider mb-2 ${th.acc}`}>
+                Total Poin Beredar
+              </p>
+              <p className={`font-display text-4xl font-black ${th.acc}`} style={{ fontVariationSettings: '"wght" 900' }}>
+                {totalPoints.toLocaleString("id-ID")}
+              </p>
+              <p className={`text-sm mt-1.5 ${th.acc} opacity-80`}>
+                Tersebar ke <strong>{withPointsCount}</strong> member dari total <strong>{members.length}</strong> member
+              </p>
+            </div>
+
+            {/* Toolbar — search + filter */}
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex-1 min-w-[200px] relative">
+                <Search size={16} className={`absolute left-3.5 top-1/2 -translate-y-1/2 ${th.txf}`} />
+                <input
+                  value={memberSearch}
+                  onChange={e => setMemberSearch(e.target.value)}
+                  placeholder="Cari nama atau nomor HP…"
+                  className={`w-full pl-10 pr-3 py-3 text-base rounded-xl border ${th.inp}`}
+                />
+              </div>
+              <div className="flex rounded-xl overflow-hidden border">
+                {(["with_points", "all"] as const).map(f => (
+                  <button
+                    key={f}
+                    onClick={() => setPointsFilter(f)}
+                    className={`px-4 py-3 text-sm font-bold ${pointsFilter === f ? "bg-[#E11D48] text-white" : `${th.elev} ${th.txm}`}`}>
+                    {f === "with_points" ? `Punya poin (${withPointsCount})` : "Semua"}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* List sort by points DESC */}
+            {sorted.length === 0 ? (
+              <div className={`rounded-3xl border bg-bakery-stripe py-12 text-center ${th.card2} ${th.bdr}`}>
+                <Sparkles size={40} className={`mx-auto opacity-20 mb-2 ${th.txm}`} />
+                <p className={`text-base font-bold ${th.tx}`}>
+                  {pointsFilter === "with_points" ? "Belum ada member yang punya poin" : "Tidak ada member cocok"}
+                </p>
+                {pointsFilter === "with_points" && (
+                  <p className={`text-sm mt-1 ${th.txm}`}>
+                    Poin akan muncul setelah member transaksi (1 paket 100rb = 500 poin).
+                  </p>
+                )}
+              </div>
+            ) : (
+              <div className={`rounded-3xl border overflow-hidden ${th.card} ${th.bdr}`}>
+                <div className={`px-5 py-3 border-b flex items-center justify-between ${th.bdr} ${th.elev}`}>
+                  <p className={`text-sm font-extrabold tracking-tight ${th.tx}`}>
+                    Peringkat Poin ({sorted.length})
+                  </p>
+                  <p className={`text-sm ${th.txm}`}>Klik untuk lihat riwayat poin</p>
+                </div>
+                {sorted.map((m, idx) => {
+                  const points = m.points ?? 0;
+                  return (
+                    <button
+                      key={m.id}
+                      onClick={() => setStatsMember({ id: m.id, name: m.name, phone: m.phone })}
+                      className={`w-full flex items-center gap-3 px-4 py-4 text-left ${idx > 0 ? `border-t ${th.bdrSoft}` : ""} active:opacity-70 transition-opacity min-h-[64px]`}>
+                      <span aria-hidden className={`shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-base font-black ${
+                        idx === 0 ? "text-white bg-gradient-to-br from-[#FFB5C0] to-[#E11D48] shadow-sm"
+                        : idx < 3 ? `${th.accBg} ${th.acc}`
+                        : `${th.elev} ${th.txm}`
+                      }`}>
+                        {idx + 1}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className={`text-base font-extrabold truncate ${th.tx}`}>{m.name}</p>
+                        <p className={`text-sm ${th.txm} truncate`}>
+                          {m.phone}
+                          {m.memberNumber ? ` · #${m.memberNumber}` : ""}
+                        </p>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className={`font-display text-2xl font-black ${points > 0 ? th.acc : th.txf}`} style={{ fontVariationSettings: '"wght" 900' }}>
+                          {points.toLocaleString("id-ID")}
+                        </p>
+                        <p className={`text-sm font-semibold ${points > 0 ? th.acc : th.txf} -mt-0.5`}>
+                          poin
+                        </p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       <ProductDetailModal productId={detailProductId} onClose={() => setDetailProductId(null)} />
       <OrderDetailModal orderId={detailOrderId} onClose={() => setDetailOrderId(null)} />

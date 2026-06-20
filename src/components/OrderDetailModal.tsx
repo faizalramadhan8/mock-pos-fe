@@ -222,7 +222,7 @@ export function OrderDetailModal({ orderId, onClose }: OrderDetailModalProps) {
               </div>
               {(order.memberSavings || 0) > 0 && (
                 <div className="flex justify-between mb-1.5">
-                  <span className={`text-xs ${th.acc}`}>💎 Hemat sebagai member</span>
+                  <span className={`text-xs ${th.acc}`}>Hemat</span>
                   <span className={`text-sm font-semibold ${th.acc}`}>-{$(order.memberSavings || 0)}</span>
                 </div>
               )}

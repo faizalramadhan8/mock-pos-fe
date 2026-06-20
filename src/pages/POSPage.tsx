@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
-import { useCategoryStore, useProductStore, useCartStore, useOrderStore, useAuthStore, useBatchStore, useLangStore, useSettingsStore, useMemberStore, useAuditStore, useCashSessionStore } from "@/stores";
+import { useCategoryStore, useProductStore, useCartStore, useOrderStore, useAuthStore, useBatchStore, useLangStore, useSettingsStore, useMemberStore, useAuditStore, useCashSessionStore, useRedeemableStore } from "@/stores";
 import { Modal } from "@/components/Modal";
 import { ProductImage } from "@/components/ProductImage";
 import { ProductCard } from "@/components/ProductCard";
@@ -30,6 +30,7 @@ export function POSPage() {
     { key: "orders",   fetch: () => useOrderStore.getState().fetchOrders() },
     { key: "members",  fetch: () => useMemberStore.getState().fetchMembers() },
     { key: "settings", fetch: () => useSettingsStore.getState().fetchSettings() },
+    { key: "redeemable", fetch: () => useRedeemableStore.getState().fetchActive() },
   ], { pollMs: 30_000 });
   const th = useThemeClasses();
   const { t, lang } = useLangStore();
@@ -42,6 +43,8 @@ export function POSPage() {
   const setCustomerPhone = useCartStore(s => s.setCustomerPhone);
   const payment = useCartStore(s => s.payment);
   const addItem = useCartStore(s => s.addItem);
+  const addRedeemable = useCartStore(s => s.addRedeemable);
+  const redeemableItems = useRedeemableStore(s => s.items);
   const updateQty = useCartStore(s => s.updateQty);
   const removeItem = useCartStore(s => s.removeItem);
   const clearCart = useCartStore(s => s.clearCart);
@@ -67,6 +70,8 @@ export function POSPage() {
   const PAGE_SIZE = 60;
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [shiftDetailOpen, setShiftDetailOpen] = useState(false);
+  const [redeemModalOpen, setRedeemModalOpen] = useState(false);
+  const [redeemSearch, setRedeemSearch] = useState("");
   // Default-hidden total sales — privacy concern di toko, customer dari depan
   // kasir bisa intip layar. Cashier toggle eye icon kalau perlu lihat.
   const [salesRevealed, setSalesRevealed] = useState(false);
@@ -244,15 +249,24 @@ export function POSPage() {
   const cartTotal = discountedSubtotal + ppnAmount; // CASH actual yang customer bayar
   const totalDiscount = itemDiscountsTotal + orderDiscAmount;
   const cartCount = useMemo(() => cartItems.reduce((s, i) => s + i.quantity, 0), [cartItems]);
+  // SKIP earn kalau cart ada item tier_member (member-specific discount).
+  // Per request Bu Santi 21 Jun 2026: member yang sudah dapat harga khusus
+  // reseller tidak boleh dobel benefit dengan poin earn. Indicator ke kasir
+  // di bawah ("Tidak dapat poin di transaksi ini — sudah dapat harga khusus").
+  const hasMemberSpecificTier = useMemo(
+    () => cartItems.some(ci => ci.priceSource === "tier_member"),
+    [cartItems]
+  );
   // Preview earn: 500 poin per kelipatan Rp 100.000 di cartTotal (cash).
   // FLOOR rule (19 Jun 2026): 100rb=500, 144rb=500, 200rb=1000, 300rb=1500.
   // Rate diturunkan dari 1000 → 500 + switch STRICT → FLOOR.
   const pointsEarnedPreview = useMemo(() => {
     if (!activeMember) return 0;
+    if (hasMemberSpecificTier) return 0;
     if (cartTotal < 100_000) return 0;
     const cents = Math.round(cartTotal * 100);
     return Math.floor(cents / (100_000 * 100)) * 500;
-  }, [cartTotal, activeMember]);
+  }, [cartTotal, activeMember, hasMemberSpecificTier]);
 
   // Tier transition detection — kasir aware kalau harga grosir tier match
   // setelah qty cross threshold. Pakai Ref untuk track best tier per cart
@@ -271,18 +285,24 @@ export function POSPage() {
         return (t.members || []).some(m => m.id === activeMember.id);
       });
       if (matching.length === 0) return;
-      const best = matching.reduce((a, b) => a.price <= b.price ? a : b);
+      // Greedy selection: minQty TERBESAR yang muat (konsisten dengan
+      // computeBestUnitPrice paket logic). Tie-break by lowest price.
+      const best = matching.reduce((a, b) => {
+        if (a.minQty !== b.minQty) return a.minQty > b.minQty ? a : b;
+        return a.price <= b.price ? a : b;
+      });
       next.set(ci.id, best.id);
       const prevId = prevTierRef.current.get(ci.id);
       // Fire toast saat tier match TRANSISI ke tier baru (atau dari no-tier).
       // Skip kalau prev === current (no change). Skip juga kalau prev undefined
       // (first render dengan sudah ada match — cegah noise saat reload page).
       if (prevId !== undefined && prevId !== best.id) {
-        const normalLineTotal = product.sellingPrice * (ci.unitType === "box" ? ci.qtyPerBox : 1) * ci.quantity;
-        const tierLineTotal = best.price * (ci.unitType === "box" ? ci.qtyPerBox : 1) * ci.quantity;
-        const savePerLine = Math.round(normalLineTotal - tierLineTotal);
+        // Hitung savings paket: paketCount × tier vs paketCount × regular per satuan.
+        // Extra unit pakai harga normal jadi tidak masuk hitung savings.
+        const paketCount = Math.floor(qtySatuan / best.minQty);
+        const savePerLine = Math.round(paketCount * (product.sellingPrice - best.price) * best.minQty);
         toast.success(
-          `Harga grosir aktif: ${ci.name} — hemat Rp ${savePerLine.toLocaleString("id-ID")}`,
+          `Harga paket aktif: ${ci.name} — hemat Rp ${savePerLine.toLocaleString("id-ID")}`,
           {
             icon: <TrendingDown size={16} strokeWidth={2.6} className="text-[#E11D48]" />,
             duration: 3500,
@@ -438,6 +458,9 @@ export function POSPage() {
         ...(ci.redeemWithPoints ? { redeemedWithPoints: true } : {}),
         ...(ci.priceSource ? { priceSource: ci.priceSource } : {}),
         ...(ci.tierId ? { tierId: ci.tierId } : {}),
+        ...(ci.paketCount ? { paketCount: ci.paketCount } : {}),
+        ...(ci.extraCount ? { extraCount: ci.extraCount } : {}),
+        ...(ci.redeemableItemId ? { redeemableItemId: ci.redeemableItemId } : {}),
       };
     });
     // Compute payments split — if cash primary + rcv < total, split into
@@ -831,28 +854,17 @@ export function POSPage() {
                       {$(itemGross)}
                     </span>
                   )}
-                  {/* Tebus poin: hanya tampil kalau ada member terpilih DAN
-                      produk eligible (di Katalog Tebus). Disabled kalau saldo
-                      tidak cukup (kecuali sudah aktif — supaya bisa di-untoggle). */}
-                  {activeMember && (isRedeemableProduct || isRedeemed) && (
+                  {/* Tebus poin lama (toggle pada produk POS) — DEPRECATED
+                      21 Jun 2026. Sekarang tebus dari katalog terpisah
+                      (`redeemable_items`) via tombol Gift di toolbar.
+                      Toggle ini disisakan HANYA untuk produk legacy yang
+                      sudah pernah ditandai `isRedeemable=true` (rare). */}
+                  {activeMember && isRedeemed && !ci.redeemableItemId && (
                     <button
                       onClick={() => toggleRedeemPoints(ci.id)}
-                      disabled={!isRedeemed && !canRedeem}
-                      aria-label={isRedeemed ? "Batal tebus" : "Tebus dengan poin"}
-                      title={
-                        isRedeemed
-                          ? "Batal tebus"
-                          : !isRedeemableProduct
-                          ? "Produk tidak di katalog tebus"
-                          : canRedeem
-                          ? `Tebus dengan ${itemGross.toLocaleString("id-ID")} poin`
-                          : "Saldo poin tidak cukup"
-                      }
-                      className={`w-10 h-10 rounded-xl flex items-center justify-center active:scale-90 transition-transform disabled:opacity-30 ${
-                        isRedeemed
-                          ? "bg-[#E11D48] text-white"
-                          : `${th.elev} ${th.txm}`
-                      }`}
+                      aria-label="Batal tebus"
+                      title="Batal tebus"
+                      className="w-10 h-10 rounded-xl flex items-center justify-center bg-[#E11D48] text-white active:scale-90 transition-transform"
                     >
                       <Gift size={16} strokeWidth={2.4} />
                     </button>
@@ -901,7 +913,7 @@ export function POSPage() {
         <div className={`p-4 rounded-[18px] ${th.elev}`}>
           <div className="flex justify-between text-sm"><span className={th.txm}>{t.subtotal}</span><span className={`font-semibold ${th.tx}`}>{$(cartSubtotal)}</span></div>
           {memberSavings > 0 && (
-            <div className="flex justify-between text-sm mt-1"><span className={th.acc}>💎 Hemat sebagai member</span><span className={`font-semibold ${th.acc}`}>-{$(memberSavings)}</span></div>
+            <div className="flex justify-between text-sm mt-1"><span className={th.acc}>Hemat</span><span className={`font-semibold ${th.acc}`}>-{$(memberSavings)}</span></div>
           )}
           {itemDiscountsTotal > 0 && (
             <div className="flex justify-between text-sm mt-1"><span className="text-[#E11D48]">{t.itemDiscount}</span><span className="font-semibold text-[#E11D48]">-{$(itemDiscountsTotal)}</span></div>
@@ -930,7 +942,12 @@ export function POSPage() {
               <span className="font-bold text-[#9F1239] dark:text-[#FB7185]">+{pointsEarnedPreview.toLocaleString("id-ID")}</span>
             </div>
           )}
-          {activeMember && pointsEarnedPreview === 0 && cartTotal > 0 && cartTotal < 100_000 && (
+          {activeMember && hasMemberSpecificTier && (
+            <p className={`text-xs mt-1.5 px-2 py-1.5 rounded-lg ${th.txm} text-center ${th.elev}`}>
+              Tidak dapat poin — sudah dapat harga khusus member di transaksi ini
+            </p>
+          )}
+          {activeMember && !hasMemberSpecificTier && pointsEarnedPreview === 0 && cartTotal > 0 && cartTotal < 100_000 && (
             <p className={`text-xs mt-1.5 ${th.txf} text-center`}>
               Tambah {$(100_000 - cartTotal)} lagi untuk dapat 500 poin
             </p>
@@ -1091,6 +1108,21 @@ export function POSPage() {
               {pendingCount}
             </span>
           )}
+        </button>
+        {/* Tebus Poin — buka katalog tebus untuk customer member. Disabled
+            kalau tidak ada member aktif (poin hanya valid untuk member). */}
+        <button
+          onClick={() => {
+            if (!activeMember) {
+              toast.error("Pilih member dulu untuk tebus poin");
+              return;
+            }
+            setRedeemModalOpen(true);
+          }}
+          aria-label="Tebus Poin"
+          title={activeMember ? "Tebus barang dengan poin" : "Pilih member dulu"}
+          className={`shrink-0 flex items-center justify-center w-11 py-3 rounded-2xl text-xs font-bold border ${th.bdr} ${activeMember ? th.acc : th.txf} ${!activeMember ? "opacity-50" : ""}`}>
+          <Gift size={14} />
         </button>
         {canManageRegister && (
           <button onClick={() => setCloseRegisterOpen(true)} aria-label={t.closeRegister as string}
@@ -1653,6 +1685,8 @@ export function POSPage() {
                     ...(ci.redeemWithPoints ? { redeemedWithPoints: true } : {}),
                     ...(ci.priceSource ? { priceSource: ci.priceSource } : {}),
                     ...(ci.tierId ? { tierId: ci.tierId } : {}),
+                    ...(ci.paketCount ? { paketCount: ci.paketCount } : {}),
+                    ...(ci.extraCount ? { extraCount: ci.extraCount } : {}),
                   };
                 });
                 const pendingOrder: Order = {
@@ -2064,6 +2098,83 @@ export function POSPage() {
               ))}
             </div>
           )}
+        </div>
+      </Modal>
+
+      {/* Tebus Poin modal — browse katalog redeemable_items + add to cart. */}
+      <Modal open={redeemModalOpen} onClose={() => { setRedeemModalOpen(false); setRedeemSearch(""); }} title="Tebus Barang dengan Poin" size="lg">
+        <div className="space-y-3">
+          {activeMember && (
+            <div className={`p-3 rounded-xl ${th.accBg}`}>
+              <p className={`text-sm font-bold ${th.acc}`}>
+                {activeMember.name} · Saldo poin: <span className="font-display">{memberPoints.toLocaleString("id-ID")}</span>
+              </p>
+            </div>
+          )}
+          <div className="relative">
+            <Search size={16} className={`absolute left-3.5 top-1/2 -translate-y-1/2 ${th.txf}`} />
+            <input
+              autoFocus
+              value={redeemSearch}
+              onChange={e => setRedeemSearch(e.target.value)}
+              placeholder="Cari nama barang…"
+              className={`w-full pl-10 pr-3 py-3 text-base rounded-xl border ${th.inp}`} />
+          </div>
+          {(() => {
+            const q = redeemSearch.trim().toLowerCase();
+            const list = redeemableItems
+              .filter(i => i.isActive)
+              .filter(i => !q || i.name.toLowerCase().includes(q));
+            if (list.length === 0) {
+              return (
+                <p className={`text-center py-8 text-sm ${th.txm}`}>
+                  {redeemableItems.length === 0 ? "Belum ada item tebus di katalog." : "Tidak ada item cocok."}
+                </p>
+              );
+            }
+            return (
+              <div className="max-h-[60vh] overflow-y-auto space-y-2">
+                {list.map(it => {
+                  const canAfford = memberPoints >= it.pointsCost;
+                  const inStock = it.stock > 0;
+                  const disabled = !canAfford || !inStock;
+                  return (
+                    <button
+                      key={it.id}
+                      onClick={() => {
+                        if (disabled) return;
+                        addRedeemable(it);
+                        toast.success(`Ditambahkan: ${it.name}`, { icon: <Gift size={16} strokeWidth={2.6} className="text-[#E11D48]" /> });
+                      }}
+                      disabled={disabled}
+                      className={`w-full text-left flex items-start gap-3 p-3 rounded-xl border transition ${disabled ? "opacity-50" : "active:scale-[.98]"} ${th.bdr} ${th.card2}`}>
+                      {it.image ? (
+                        <img src={it.image} alt="" className="w-14 h-14 rounded-lg object-cover shrink-0" />
+                      ) : (
+                        <div className="w-14 h-14 rounded-lg bg-[#FFE4E9] text-[#E11D48] shrink-0 flex items-center justify-center">
+                          <Gift size={22} strokeWidth={2.2} />
+                        </div>
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <p className={`text-base font-extrabold truncate ${th.tx}`}>{it.name}</p>
+                        {it.description && <p className={`text-sm mt-0.5 truncate ${th.txm}`}>{it.description}</p>}
+                        <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                          <span className={`text-sm font-black ${th.acc}`}>{it.pointsCost.toLocaleString("id-ID")} poin</span>
+                          <span className={`text-sm ${th.txm}`}>·</span>
+                          <span className={`text-sm font-semibold ${inStock ? th.tx : "text-[#BE123C]"}`}>
+                            {inStock ? `Stok ${it.stock}` : "Habis"}
+                          </span>
+                          {!canAfford && inStock && (
+                            <span className="text-sm font-semibold text-[#BE123C]">· Saldo tidak cukup</span>
+                          )}
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            );
+          })()}
         </div>
       </Modal>
     </div>

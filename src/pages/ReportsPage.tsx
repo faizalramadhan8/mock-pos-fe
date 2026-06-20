@@ -9,11 +9,11 @@ import { getDateRange, type DateRange, type CustomRange } from "@/utils/dateRang
 import { orderApi, type OrderAggregateResponse } from "@/api/orders";
 import { expenseApi, type ProfitLossRes } from "@/api/expenses";
 import { BakeryLogo } from "@/components/icons";
-import { Package, Users, Wallet, BookOpen, ChevronDown, ChevronUp, TrendingUp, TrendingDown, Minus, Download, Info } from "lucide-react";
+import { Package, Users, Wallet, BookOpen, ChevronDown, ChevronUp, TrendingUp, TrendingDown, Minus, Download, Info, Tag } from "lucide-react";
 import { CashflowTab } from "@/components/CashflowTab";
 import toast from "react-hot-toast";
 
-type ReportTab = "cashflow" | "products" | "members" | "profit-loss";
+type ReportTab = "cashflow" | "products" | "members" | "bundling" | "profit-loss";
 
 // YYYY-MM-DD in local time (WIB) — BE aggregate expects calendar-date strings.
 function toYMD(d: Date): string {
@@ -241,6 +241,91 @@ export function ReportsPage() {
   const totalQty = aggregateData?.total_qty ?? topProducts.reduce((s, p) => s + p.qty, 0);
   const totalRevenue = aggregateData?.total_revenue ?? topProducts.reduce((s, p) => s + p.revenue, 0);
 
+  // Bundling stats — agregat order_items dengan price_source ∈ tier_*.
+  // Group by (productId, tierId) supaya tier yang beda di produk sama
+  // tampil terpisah. Tier yang sudah dihapus tetap muncul (tierId NULL ok).
+  // Untuk tier yang masih ada, label "Beli N = Rp X" diambil dari product.priceTiers.
+  const bundlingStats = useMemo(() => {
+    type Row = {
+      key: string;
+      productId: string;
+      productName: string;
+      tierId: string | null;
+      tierLabel: string;
+      orderCount: number;
+      orderIds: Set<string>;
+      totalQty: number;
+      totalPaket: number;
+      totalExtra: number;
+      revenue: number;
+      memberSet: Set<string>;
+      walkInCount: number;
+      memberPriceCount: number;
+    };
+    const map = new Map<string, Row>();
+    for (const o of filteredOrders) {
+      for (const it of o.items) {
+        if (it.priceSource !== "tier_all" && it.priceSource !== "tier_member") continue;
+        const tierId = it.tierId || null;
+        const key = `${it.productId}__${tierId || "deleted"}`;
+        const product = products.find(p => p.id === it.productId);
+        const tier = product?.priceTiers?.find(t => t.id === tierId);
+        const tierLabel = tier
+          ? `Beli ${tier.minQty} = ${$(Math.round(tier.price * tier.minQty))}`
+          : tierId ? `Tier #${tierId.slice(0, 8)} (sudah dihapus)` : "Tier tidak ter-link";
+        const row = map.get(key) || {
+          key,
+          productId: it.productId,
+          productName: it.name,
+          tierId,
+          tierLabel,
+          orderCount: 0,
+          orderIds: new Set<string>(),
+          totalQty: 0,
+          totalPaket: 0,
+          totalExtra: 0,
+          revenue: 0,
+          memberSet: new Set<string>(),
+          walkInCount: 0,
+          memberPriceCount: 0,
+        };
+        row.orderIds.add(o.id);
+        row.totalQty += it.quantity;
+        row.totalPaket += it.paketCount || 0;
+        row.totalExtra += it.extraCount || 0;
+        row.revenue += it.unitPrice * it.quantity;
+        if (it.priceSource === "tier_member") {
+          row.memberPriceCount += 1;
+          if (o.member?.id) row.memberSet.add(o.member.id);
+        } else {
+          row.walkInCount += 1;
+          if (o.member?.id) row.memberSet.add(o.member.id);
+        }
+        map.set(key, row);
+      }
+    }
+    return Array.from(map.values())
+      .map(r => ({ ...r, orderCount: r.orderIds.size }))
+      .sort((a, b) => b.revenue - a.revenue);
+  }, [filteredOrders, products]);
+
+  const bundlingTotals = useMemo(() => {
+    const trxIds = new Set<string>();
+    let qty = 0, paket = 0, extra = 0, revenue = 0;
+    const memberIds = new Set<string>();
+    for (const r of bundlingStats) {
+      for (const id of r.orderIds) trxIds.add(id);
+      qty += r.totalQty;
+      paket += r.totalPaket;
+      extra += r.totalExtra;
+      revenue += r.revenue;
+      for (const m of r.memberSet) memberIds.add(m);
+    }
+    return { trxCount: trxIds.size, qty, paket, extra, revenue, memberCount: memberIds.size };
+  }, [bundlingStats]);
+
+  const [expandedBundle, setExpandedBundle] = useState<string | null>(null);
+
   // Empty-state: prefer aggregate count kalau ada (truthful source of truth),
   // else fallback ke filteredOrders.length.
   const hasData = aggregateData ? aggregateData.total_orders > 0 : filteredOrders.length > 0;
@@ -277,7 +362,7 @@ export function ReportsPage() {
               await exportOrderReport(filteredOrders, exportRangeLabel(), profitLoss);
               toast.success(lang === "id" ? "Laporan diunduh" : "Report downloaded");
             }}
-            title={lang === "id" ? "Excel berisi: Laba Rugi, Transaksi, Top Produk, Member" : "Excel contains: Profit/Loss, Transactions, Top Products, Members"}
+            title={lang === "id" ? "Excel berisi: Laba Rugi, Transaksi, Top Produk, Member, Bundling" : "Excel contains: Profit/Loss, Transactions, Top Products, Members, Bundling"}
             className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold ${th.accBg} ${th.acc} disabled:opacity-40`}>
             <Download size={12} /> Excel
           </button>
@@ -332,6 +417,7 @@ export function ReportsPage() {
           { id: "cashflow" as ReportTab, label: lang === "id" ? "Arus Kas" : "Cash Flow", icon: <BookOpen size={16} /> },
           { id: "products" as ReportTab, label: lang === "id" ? "Top Produk" : "Top Products", icon: <Package size={16} /> },
           { id: "members" as ReportTab, label: lang === "id" ? "Member" : "Members", icon: <Users size={16} /> },
+          { id: "bundling" as ReportTab, label: lang === "id" ? "Bundling" : "Bundling", icon: <Tag size={16} /> },
           { id: "profit-loss" as ReportTab, label: lang === "id" ? "Laba Rugi" : "Profit/Loss", icon: <Wallet size={16} /> },
         ]).map(item => (
           <button key={item.id} role="tab" aria-selected={tab === item.id}
@@ -345,8 +431,8 @@ export function ReportsPage() {
       </div>
 
       {/* Empty state — pakai BakeryLogo besar supaya warm (toko kue), bukan
-          generic icon. */}
-      {tab !== "cashflow" && !hasData && !customError && (
+          generic icon. Bundling tab punya empty state sendiri. */}
+      {tab !== "cashflow" && tab !== "bundling" && !hasData && !customError && (
         <div className={`rounded-3xl border bg-bakery-stripe p-10 text-center ${th.bdr} ${th.card2}`}>
           <div className="mx-auto mb-4 opacity-70" style={{ width: 80 }}>
             <BakeryLogo size={80} />
@@ -542,6 +628,144 @@ export function ReportsPage() {
             </>
           )}
         </div>
+      )}
+
+      {/* Bundling — agregat per tier × produk: berapa paket laku, berapa
+          revenue, siapa customer (member vs walk-in). Sumber: order_items
+          dengan price_source ∈ {tier_all, tier_member} di periode. */}
+      {tab === "bundling" && !customError && (
+        bundlingStats.length === 0 ? (
+          <div className={`rounded-3xl border bg-bakery-stripe p-10 text-center ${th.bdr} ${th.card2}`}>
+            <div className="mx-auto mb-4 opacity-70" style={{ width: 64 }}>
+              <BakeryLogo size={64} />
+            </div>
+            <p className={`text-base font-bold ${th.tx}`}>
+              {lang === "id" ? "Belum ada transaksi bundling" : "No bundling transactions"}
+            </p>
+            <p className={`text-sm mt-1 ${th.txm}`}>
+              {lang === "id"
+                ? "Periode ini tidak ada customer beli paket / harga grosir."
+                : "No bundle / wholesale purchases in this period."}
+            </p>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-3">
+            {/* Hero + summary stats */}
+            <div className="grid gap-3 lg:grid-cols-3">
+              <RevenueHero
+                amount={bundlingTotals.revenue}
+                th={th}
+                lang={lang}
+                label={lang === "id" ? "Pendapatan Bundling" : "Bundling Revenue"}
+              />
+              <StatChip
+                label={lang === "id" ? "Total Paket Terjual" : "Total Bundles Sold"}
+                value={bundlingTotals.paket}
+                th={th}
+              />
+              <StatChip
+                label={lang === "id" ? "Customer Beli Bundling" : "Bundle Customers"}
+                value={bundlingTotals.trxCount}
+                th={th}
+              />
+            </div>
+
+            <div className={`p-3 rounded-2xl border ${th.bdr} ${th.card2} flex items-start gap-2`}>
+              <Info size={16} className={`mt-0.5 shrink-0 ${th.acc}`} />
+              <p className={`text-sm ${th.txm}`}>
+                {lang === "id" ? (
+                  <>
+                    <strong className={th.tx}>{bundlingTotals.trxCount}</strong> transaksi pakai bundling ·
+                    <strong className={th.tx}> {bundlingTotals.qty}</strong> total satuan
+                    (<strong>{bundlingTotals.paket}</strong> paket + <strong>{bundlingTotals.extra}</strong> satuan ekstra) ·
+                    <strong className={th.tx}> {bundlingTotals.memberCount}</strong> member terlibat.
+                  </>
+                ) : (
+                  <>
+                    <strong className={th.tx}>{bundlingTotals.trxCount}</strong> transactions with bundling ·
+                    <strong className={th.tx}> {bundlingTotals.qty}</strong> total units
+                    (<strong>{bundlingTotals.paket}</strong> bundles + <strong>{bundlingTotals.extra}</strong> extras) ·
+                    <strong className={th.tx}> {bundlingTotals.memberCount}</strong> unique members.
+                  </>
+                )}
+              </p>
+            </div>
+
+            <div className="flex items-center gap-3 mt-2 px-1">
+              <h2 className={`text-xs font-black uppercase tracking-wider ${th.txf}`}>
+                {lang === "id" ? "Peringkat Tier" : "Tier Ranking"}
+              </h2>
+              <div className={`flex-1 divider-dotted ${th.txm}`} />
+            </div>
+
+            {/* Per-tier list, expandable */}
+            <div className={`rounded-2xl border overflow-hidden ${th.bdr} ${th.card2}`}>
+              {bundlingStats.map((r, idx) => {
+                const expanded = expandedBundle === r.key;
+                const panelId = `bundling-panel-${r.key}`;
+                const rowOrders = filteredOrders.filter(o => r.orderIds.has(o.id));
+                return (
+                  <div key={r.key} className={`${idx > 0 ? `border-t ${th.bdrSoft}` : ""}`}>
+                    <button onClick={() => setExpandedBundle(expanded ? null : r.key)}
+                      aria-expanded={expanded} aria-controls={panelId}
+                      className="w-full flex items-start gap-3 px-4 py-3.5 text-left">
+                      <span aria-hidden className={`shrink-0 w-9 h-9 rounded-full flex items-center justify-center text-sm font-black ${
+                        idx === 0 ? "text-white bg-gradient-to-br from-[#FFB5C0] to-[#E11D48] shadow-sm"
+                        : idx < 3 ? `${th.accBg} ${th.acc}`
+                        : `${th.elev} ${th.txm}`
+                      }`}>
+                        {idx + 1}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className={`font-bold text-base truncate ${th.tx}`}>{r.productName}</p>
+                        <p className={`text-sm font-semibold mt-0.5 ${th.acc} truncate`}>{r.tierLabel}</p>
+                        <p className={`text-sm mt-1 ${th.txm}`}>
+                          <strong className={th.tx}>{r.totalPaket}</strong> {lang === "id" ? "paket" : "bundles"}
+                          {r.totalExtra > 0 && <> + <strong className={th.tx}>{r.totalExtra}</strong> {lang === "id" ? "satuan extra" : "extra"}</>}
+                          {" "}· {r.orderCount} {lang === "id" ? "trx" : "trx"}
+                          {r.memberSet.size > 0 && <> · {r.memberSet.size} member</>}
+                          {r.walkInCount > 0 && <> · {r.walkInCount} walk-in</>}
+                        </p>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className={`font-display font-black text-base ${th.acc}`}>{$(r.revenue)}</p>
+                        {expanded ? <ChevronUp size={18} className={`mt-1 ${th.txm} ml-auto`} /> : <ChevronDown size={18} className={`mt-1 ${th.txm} ml-auto`} />}
+                      </div>
+                    </button>
+                    {expanded && (
+                      <div id={panelId} className={`px-4 pb-3 ${th.elev}`}>
+                        <p className={`text-xs font-bold uppercase tracking-wider mb-2 ${th.txf}`}>
+                          {lang === "id" ? "Daftar Transaksi" : "Transactions"}
+                        </p>
+                        <div className="space-y-1.5">
+                          {rowOrders.map(o => {
+                            const items = o.items.filter(it => it.productId === r.productId && (it.tierId || null) === r.tierId);
+                            const lineRevenue = items.reduce((s, it) => s + it.unitPrice * it.quantity, 0);
+                            const lineQty = items.reduce((s, it) => s + it.quantity, 0);
+                            const linePaket = items.reduce((s, it) => s + (it.paketCount || 0), 0);
+                            const buyer = o.member?.name || o.customer || (lang === "id" ? "Walk-in" : "Walk-in");
+                            return (
+                              <div key={o.id} className={`flex items-center justify-between gap-2 text-sm px-3 py-2 rounded-lg ${th.card}`}>
+                                <div className="min-w-0 flex-1">
+                                  <p className={`font-bold truncate ${th.tx}`}>{buyer}</p>
+                                  <p className={`text-xs ${th.txm}`}>
+                                    {new Date(o.createdAt).toLocaleString("id-ID", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                                    {" · "}{lineQty} satuan ({linePaket} paket)
+                                  </p>
+                                </div>
+                                <span className={`font-bold ${th.acc} shrink-0`}>{$(lineRevenue)}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )
       )}
 
       {/* Laba Rugi — owner format: Pendapatan − Modal Barang = Laba Kotor
