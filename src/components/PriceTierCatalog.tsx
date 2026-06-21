@@ -201,6 +201,22 @@ export function PriceTierCatalog({ canWrite }: Props) {
                             <><UserCheck size={14} strokeWidth={2.8} /> {(t.members || []).length} member</>
                           )}
                         </span>
+                        {(() => {
+                          if (!t.expiresAt) return null;
+                          const ms = new Date(t.expiresAt).getTime();
+                          const now = Date.now();
+                          const expired = ms < now;
+                          const daysLeft = Math.ceil((ms - now) / 86400000);
+                          return expired ? (
+                            <span className="text-sm font-bold inline-flex items-center gap-1 px-2 py-1 rounded-md bg-[#FCE4EC] text-[#BE123C]">
+                              Sudah expire
+                            </span>
+                          ) : (
+                            <span className={`text-sm font-semibold inline-flex items-center gap-1 px-2 py-1 rounded-md ${th.elev} ${th.txm}`}>
+                              Sisa {daysLeft} hari
+                            </span>
+                          );
+                        })()}
                         {t.note && <span className={`text-sm ${th.txf} truncate flex-1 min-w-0`}>· {t.note}</span>}
                         {canWrite && (
                           <div className="ml-auto flex items-center gap-1.5 shrink-0">

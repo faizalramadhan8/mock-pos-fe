@@ -23,6 +23,8 @@ interface DraftTier {
   target: PriceTierTarget;
   memberIds: string[];
   note: string;
+  /** Durasi promo: 0 = tidak terbatas, 1/3/6/12/30 hari. */
+  durationDays: 0 | 1 | 3 | 6 | 12 | 30;
 }
 
 const emptyDraft: DraftTier = {
@@ -31,6 +33,7 @@ const emptyDraft: DraftTier = {
   target: "all_customers",
   memberIds: [],
   note: "",
+  durationDays: 0,
 };
 
 function mapRes(t: ProductPriceTierRes): ProductPriceTier {
@@ -42,6 +45,7 @@ function mapRes(t: ProductPriceTierRes): ProductPriceTier {
     target: t.target_type,
     members: t.members || [],
     note: t.note,
+    expiresAt: t.expires_at || undefined,
     createdAt: t.created_at,
   };
 }
@@ -106,6 +110,9 @@ export function PriceTierEditor({ productId }: Props) {
       target: t.target,
       memberIds: (t.members || []).map(m => m.id),
       note: t.note || "",
+      // Edit existing: tier durasi tidak ke-load (BE tidak return remaining days).
+      // Admin re-pick kalau mau perpanjang/ubah. Default = tidak terbatas.
+      durationDays: 0,
     });
     setMemberQuery("");
     setEditorOpen(true);
@@ -156,6 +163,7 @@ export function PriceTierEditor({ productId }: Props) {
         target_type: draft.target,
         member_ids: draft.target === "member_specific" ? draft.memberIds : undefined,
         note: draft.note || undefined,
+        duration_days: draft.durationDays > 0 ? draft.durationDays : undefined,
       };
       if (draft.id) {
         const res = await productApi.updateTier(productId, draft.id, payload);
@@ -223,7 +231,7 @@ export function PriceTierEditor({ productId }: Props) {
                   <span className={`text-base font-black ${th.acc}`}>{$(Math.round(t.price * t.minQty))}</span>
                   <span className={`text-sm ${th.txf}`}>({$(Math.round(t.price))}/satuan)</span>
                 </div>
-                <div className="flex items-center gap-1.5 mt-1.5">
+                <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
                   {t.target === "all_customers" ? (
                     <span className={`text-sm font-semibold inline-flex items-center gap-1.5 px-2 py-1 rounded-md ${th.accBg} ${th.acc}`}>
                       <Users size={14} strokeWidth={2.8} /> Semua customer
@@ -233,6 +241,22 @@ export function PriceTierEditor({ productId }: Props) {
                       <UserCheck size={14} strokeWidth={2.8} /> {(t.members || []).length} member tertentu
                     </span>
                   )}
+                  {(() => {
+                    if (!t.expiresAt) return null;
+                    const ms = new Date(t.expiresAt).getTime();
+                    const now = Date.now();
+                    const expired = ms < now;
+                    const daysLeft = Math.ceil((ms - now) / 86400000);
+                    return expired ? (
+                      <span className="text-sm font-bold inline-flex items-center gap-1 px-2 py-1 rounded-md bg-[#FCE4EC] text-[#BE123C]">
+                        Sudah expire
+                      </span>
+                    ) : (
+                      <span className={`text-sm font-semibold inline-flex items-center gap-1 px-2 py-1 rounded-md ${th.elev} ${th.txm}`}>
+                        Sisa {daysLeft} hari
+                      </span>
+                    );
+                  })()}
                   {t.note && <span className={`text-sm ${th.txf} truncate`}>· {t.note}</span>}
                 </div>
               </button>
@@ -372,6 +396,41 @@ export function PriceTierEditor({ productId }: Props) {
               </div>
             </div>
           )}
+
+          <div>
+            <p className={`text-sm font-semibold mb-1.5 ${th.txm}`}>Berlaku selama</p>
+            <div className="flex gap-1.5 flex-wrap">
+              {([
+                { val: 0, label: "Tidak terbatas" },
+                { val: 1, label: "1 hari" },
+                { val: 3, label: "3 hari" },
+                { val: 6, label: "6 hari" },
+                { val: 12, label: "12 hari" },
+                { val: 30, label: "30 hari" },
+              ] as const).map(opt => (
+                <button
+                  key={opt.val}
+                  onClick={() => setDraft({ ...draft, durationDays: opt.val })}
+                  className={`px-3 py-2 rounded-lg text-sm font-bold border ${
+                    draft.durationDays === opt.val
+                      ? "bg-gradient-to-r from-[#FB7185] to-[#E11D48] text-white border-transparent"
+                      : `${th.bdr} ${th.txm}`
+                  }`}>
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            {draft.id && (
+              <p className={`text-xs mt-1.5 ${th.txf}`}>
+                Pilih durasi baru kalau mau perpanjang. "Tidak terbatas" = hilangkan expiry.
+              </p>
+            )}
+            {!draft.id && draft.durationDays > 0 && (
+              <p className={`text-xs mt-1.5 ${th.acc}`}>
+                Tier akan otomatis non-aktif {draft.durationDays} hari dari sekarang.
+              </p>
+            )}
+          </div>
 
           <div>
             <p className={`text-sm font-semibold mb-1.5 ${th.txm}`}>Catatan (opsional)</p>

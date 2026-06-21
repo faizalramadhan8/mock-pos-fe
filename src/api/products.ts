@@ -38,6 +38,7 @@ export interface ProductPriceTierRes {
   target_type: 'all_customers' | 'member_specific';
   members?: ProductPriceTierMemberRefRes[];
   note?: string;
+  expires_at?: string | null;
   created_at: string;
 }
 
@@ -67,6 +68,7 @@ export interface ProductPriceTierHistoryRes {
   target_type: 'all_customers' | 'member_specific';
   member_ids?: string[];
   note?: string;
+  expires_at?: string | null;
   status: 'active' | 'inactive';
   action: 'create' | 'update' | 'delete';
   start_date: string;
@@ -162,6 +164,7 @@ export const productApi = {
     target_type: 'all_customers' | 'member_specific';
     member_ids?: string[];
     note?: string;
+    duration_days?: number;
   }) => api.post<ProductPriceTierRes>(`/products/${productId}/tiers`, data),
 
   updateTier: (productId: string, tierId: string, data: {
@@ -170,6 +173,7 @@ export const productApi = {
     target_type: 'all_customers' | 'member_specific';
     member_ids?: string[];
     note?: string;
+    duration_days?: number;
   }) => api.put<ProductPriceTierRes>(`/products/${productId}/tiers/${tierId}`, data),
 
   deleteTier: (productId: string, tierId: string) =>

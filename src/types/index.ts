@@ -85,6 +85,9 @@ export interface ProductPriceTier {
   /** Whitelist member kalau target='member_specific'. Kosong utk 'all_customers'. */
   members?: { id: string; name: string; phone: string }[];
   note?: string;
+  /** ISO datetime kapan tier expire. null/undefined = tidak terbatas.
+   *  Tier dengan expiresAt < now di-skip di POS compute. */
+  expiresAt?: string | null;
   createdAt: string;
 }
 

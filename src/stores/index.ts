@@ -28,6 +28,7 @@ const mapPriceTier = (t: any) => ({
     ? t.members.map((m: any) => ({ id: m.id, name: m.name, phone: m.phone }))
     : [],
   note: t.note || undefined,
+  expiresAt: t.expires_at || undefined,
   createdAt: t.created_at,
 });
 
@@ -450,8 +451,11 @@ function computeBestUnitPrice(
   // satuan terjual (qty × qtyPerBox).
   const qtySatuan = unitType === "box" ? qty * product.qtyPerBox : qty;
 
+  const nowMs = Date.now();
   const eligibleTiers = (product.priceTiers || []).filter(t => {
     if (qtySatuan < t.minQty) return false;
+    // Skip tier yang sudah expire (expiresAt < now). NULL/undefined = unlimited.
+    if (t.expiresAt && new Date(t.expiresAt).getTime() < nowMs) return false;
     if (t.target === "all_customers") return true;
     if (t.target === "member_specific") {
       if (!member) return false;
@@ -493,7 +497,10 @@ function computeBestUnitPrice(
     //   extraPerSatuan = baseline / boxMul (price per single satuan)
     const baselinePerSatuan = baseline / boxMul;
     const extraTotal = extraSatuan * baselinePerSatuan;
-    const lineTotal = paketTotal + extraTotal;
+    // Round ke rupiah bulat — DECIMAL(15,2) storage kadang bikin cents (.01)
+    // di total. Contoh: tier "beli 3 = 29.000" → price stored 9666.67,
+    // 3 × 9666.67 = 29.000,01. Round agar bulat seperti yang Bu Santi input.
+    const lineTotal = Math.round(paketTotal + extraTotal);
     const unitPrice = lineTotal / qty;
     return {
       unitPrice,
