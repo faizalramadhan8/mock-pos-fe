@@ -3,7 +3,9 @@ import { useOrderStore, useExpenseStore, usePurchaseInvoiceStore, useRefundStore
 import { useThemeClasses } from "@/hooks/useThemeClasses";
 import { formatCurrency as $ } from "@/utils";
 import { cashbookApi } from "@/api/cashbook";
-import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Pencil, Save, Info } from "lucide-react";
+import { capitalApi } from "@/api/capital";
+import { Modal } from "./Modal";
+import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Pencil, Save, Info, Plus, Trash2, Wallet } from "lucide-react";
 import toast from "react-hot-toast";
 
 // ── Helpers ─────────────────────────────────────────────────────────────
@@ -31,8 +33,17 @@ interface LedgerRow {
   in?: number;
   out?: number;
   balance: number;
-  type: "opening" | "sales" | "expense" | "invoice" | "refund";
+  type: "opening" | "sales" | "expense" | "invoice" | "refund" | "capital";
   detail?: { name: string; amount: number }[]; // for drill-down (sales/refund)
+  capitalId?: string; // untuk inline delete capital injection
+}
+
+interface CapitalEntry {
+  id: string;
+  amount: number;
+  source: string;
+  note: string;
+  injectedAt: string; // YYYY-MM-DD
 }
 
 /**
@@ -69,7 +80,30 @@ export function CashflowTab() {
   const [openingInput, setOpeningInput] = useState("");
   const [savingOpening, setSavingOpening] = useState(false);
 
-  // Fetch opening balance saat year/month berubah
+  // ── Capital injections (Tambahan Modal Owner) ────────────────────────
+  const [capitalEntries, setCapitalEntries] = useState<CapitalEntry[]>([]);
+  const [capitalModalOpen, setCapitalModalOpen] = useState(false);
+  const [capitalDraft, setCapitalDraft] = useState({ amount: "", source: "Owner", note: "", date: "" });
+  const [savingCapital, setSavingCapital] = useState(false);
+
+  const refetchCapital = () => {
+    const from = `${year}-${String(month).padStart(2, "0")}-01`;
+    const lastDay = new Date(year, month, 0).getDate();
+    const to = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+    capitalApi.list(from, to)
+      .then(res => {
+        setCapitalEntries((res.body || []).map(r => ({
+          id: r.id,
+          amount: r.amount,
+          source: r.source || "",
+          note: r.note || "",
+          injectedAt: r.injected_at.slice(0, 10),
+        })));
+      })
+      .catch(() => { /* silent */ });
+  };
+
+  // Fetch opening balance + capital saat year/month berubah
   useEffect(() => {
     cashbookApi.getOpening(year, month)
       .then(res => {
@@ -84,7 +118,43 @@ export function CashflowTab() {
         }
       })
       .catch(() => { /* silent — biarkan tampil 0 */ });
+    refetchCapital();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [year, month]);
+
+  const saveCapital = async () => {
+    const amt = parseFloat(capitalDraft.amount);
+    if (!Number.isFinite(amt) || amt <= 0) { toast.error("Nominal harus > 0"); return; }
+    if (!capitalDraft.date) { toast.error("Tanggal wajib diisi"); return; }
+    setSavingCapital(true);
+    try {
+      await capitalApi.create({
+        amount: amt,
+        source: capitalDraft.source.trim() || undefined,
+        note: capitalDraft.note.trim() || undefined,
+        injected_at: capitalDraft.date,
+      });
+      toast.success("Modal tambahan disimpan");
+      setCapitalModalOpen(false);
+      setCapitalDraft({ amount: "", source: "Owner", note: "", date: "" });
+      refetchCapital();
+    } catch (e: any) {
+      toast.error(e?.message || "Gagal simpan modal");
+    } finally {
+      setSavingCapital(false);
+    }
+  };
+
+  const deleteCapital = async (id: string, amount: number) => {
+    if (!confirm(`Hapus setoran modal ${$(amount)}?`)) return;
+    try {
+      await capitalApi.delete(id);
+      toast.success("Setoran modal dihapus");
+      refetchCapital();
+    } catch (e: any) {
+      toast.error(e?.message || "Gagal hapus");
+    }
+  };
 
   const saveOpening = async () => {
     const v = parseFloat(openingInput) || 0;
@@ -121,7 +191,7 @@ export function CashflowTab() {
   // Implikasi: Saldo Akhir di laporan ini = Saldo Awal + Pendapatan − Operasional.
   // Bukan saldo cash actual di laci (yang juga harus dikurangi bayar supplier).
   // Per request owner: ini "operating cash flow" view, bukan "true cash position".
-  const { ledger, totalIn, totalOut, totalInvoicePaid, salesDays } = useMemo(() => {
+  const { ledger, totalIn, totalOut, totalInvoicePaid, totalCapital, salesDays } = useMemo(() => {
     // Map: date YYYY-MM-DD → { salesTotal, salesCount, salesOrders[] }
     const salesByDay = new Map<string, { total: number; count: number; orders: typeof orders }>();
     orders.forEach(o => {
@@ -166,11 +236,13 @@ export function CashflowTab() {
     expenseRows.forEach(e => allDates.add(e.expense_date));
     invoiceRows.forEach(i => allDates.add(i.paidAt!.slice(0, 10)));
     refundRows.forEach(r => allDates.add(r.createdAt.slice(0, 10)));
+    capitalEntries.forEach(c => allDates.add(c.injectedAt));
 
     const sortedDates = Array.from(allDates).sort();
     let runningIn = 0;
     let runningOut = 0;
     let runningInvoicePaid = 0;
+    let runningCapital = 0;
     let salesDaysCount = 0;
 
     for (const date of sortedDates) {
@@ -235,6 +307,24 @@ export function CashflowTab() {
         });
         runningOut += r.amount;
       }
+
+      // Capital injections per hari — MASUK runningCapital, increment balance,
+      // tapi TIDAK masuk runningIn (supaya Selisih operasional tetap "sales -
+      // expense" tanpa modal). Tampil di ledger sebagai +amount.
+      const cRows = capitalEntries
+        .filter(c => c.injectedAt === date)
+        .sort((a, b) => a.id.localeCompare(b.id));
+      for (const c of cRows) {
+        const desc = `Tambahan Modal${c.source ? ` · ${c.source}` : ""}${c.note ? ` · ${c.note}` : ""}`;
+        rawRows.push({
+          dateStr: date,
+          description: desc,
+          in: c.amount,
+          type: "capital",
+          capitalId: c.id,
+        });
+        runningCapital += c.amount;
+      }
     }
 
     // Convert ke LedgerRow dengan running balance — invoice rows tidak
@@ -249,6 +339,8 @@ export function CashflowTab() {
       type: "opening",
     });
     rawRows.forEach((row, idx) => {
+      // Capital tetap increment balance (real cash IN). Invoice tetap skip
+      // (Bu Santi: faktur ≠ pengeluaran operasional).
       if (row.type !== "invoice") {
         balance += (row.in || 0) - (row.out || 0);
       }
@@ -260,12 +352,16 @@ export function CashflowTab() {
       totalIn: runningIn,
       totalOut: runningOut,
       totalInvoicePaid: runningInvoicePaid,
+      totalCapital: runningCapital,
       salesDays: salesDaysCount,
     };
-  }, [orders, expenses, invoices, refunds, monthStart, monthEnd, openingBalance]);
+  }, [orders, expenses, invoices, refunds, capitalEntries, monthStart, monthEnd, openingBalance]);
 
   const selisih = totalIn - totalOut;
-  const saldoAkhir = openingBalance + selisih;
+  // Saldo akhir = Saldo Awal + Selisih operasional + Tambahan Modal.
+  // Capital ditreat sebagai +IN ke kas tapi TIDAK dihitung sebagai "selisih"
+  // operasional (karena bukan profit, tapi setoran owner).
+  const saldoAkhir = openingBalance + selisih + totalCapital;
 
   // Aggregate untuk "nilai stok" + "utang faktur belum lunas" — info tambahan
   const unpaidInvoicesValue = useMemo(
@@ -367,10 +463,52 @@ export function CashflowTab() {
           <p className={`font-display text-2xl font-black ${selisih >= 0 ? th.acc : "text-[#BE123C] dark:text-[#FB7185]"}`}>
             {selisih >= 0 ? "+" : ""}{$(selisih)}
           </p>
+          {totalCapital > 0 && (
+            <p className={`text-sm mt-2 ${th.txm}`}>
+              + Tambahan Modal: <strong className={th.acc}>{$(totalCapital)}</strong>
+            </p>
+          )}
           <p className={`text-xs mt-2 ${th.txf}`}>
             Saldo akhir (= modal bulan berikutnya): <strong className={th.tx}>{$(saldoAkhir)}</strong>
           </p>
         </div>
+      </div>
+
+      {/* Tambahan Modal — setoran owner di luar penjualan. Card dengan
+          tombol "+ Tambah Modal" untuk admin. List entries inline + delete. */}
+      <div className={`rounded-2xl border p-4 ${th.bdr} ${th.card2}`}>
+        <div className="flex items-center justify-between gap-2 mb-2">
+          <div className="min-w-0">
+            <p className={`text-base font-extrabold inline-flex items-center gap-2 ${th.tx}`}>
+              <Wallet size={18} strokeWidth={2.4} className={th.acc} />
+              Tambahan Modal Bulan Ini
+            </p>
+            <p className={`text-sm mt-0.5 ${th.txm}`}>
+              Setoran owner di luar penjualan (tambah modal, pinjaman, dll).
+            </p>
+          </div>
+          {canWrite && (
+            <button
+              onClick={() => {
+                const todayStr = new Date().toISOString().slice(0, 10);
+                setCapitalDraft({ amount: "", source: "Owner", note: "", date: todayStr });
+                setCapitalModalOpen(true);
+              }}
+              className="shrink-0 px-4 py-2.5 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48] inline-flex items-center gap-1.5">
+              <Plus size={16} strokeWidth={2.6} /> Tambah Modal
+            </button>
+          )}
+        </div>
+        {capitalEntries.length === 0 ? (
+          <p className={`text-sm ${th.txf} mt-2`}>Belum ada setoran modal bulan ini.</p>
+        ) : (
+          <>
+            <p className={`font-display text-2xl font-black mt-1 ${th.acc}`}>
+              +{$(totalCapital)}
+            </p>
+            <p className={`text-sm ${th.txm}`}>{capitalEntries.length} setoran</p>
+          </>
+        )}
       </div>
 
       {/* Info tambahan: Bayar Supplier — bukan pengeluaran operasional,
@@ -439,6 +577,18 @@ export function CashflowTab() {
                           {row.type === "invoice" && (
                             <span className={`ml-1.5 text-xs ${th.txf} italic`}>(tidak masuk selisih)</span>
                           )}
+                          {row.type === "capital" && (
+                            <span className={`ml-1.5 text-xs ${th.acc} italic`}>(setoran owner)</span>
+                          )}
+                          {row.type === "capital" && canWrite && row.capitalId && (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); deleteCapital(row.capitalId!, row.in || 0); }}
+                              aria-label="Hapus setoran"
+                              title="Hapus setoran"
+                              className="ml-2 align-middle inline-flex items-center justify-center w-6 h-6 rounded bg-[#FCE4EC] text-[#BE123C] active:scale-90 transition-transform">
+                              <Trash2 size={11} strokeWidth={2.6} />
+                            </button>
+                          )}
                           {isExpandable && (
                             <span className="inline-flex items-center ml-1 align-middle">
                               {isExpanded ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
@@ -476,6 +626,74 @@ export function CashflowTab() {
           </div>
         </div>
       )}
+
+      {/* Modal tambah setoran modal owner */}
+      <Modal open={capitalModalOpen} onClose={() => setCapitalModalOpen(false)} title="Tambah Modal">
+        <div className="space-y-3.5">
+          <div>
+            <p className={`text-sm font-semibold mb-1.5 ${th.txm}`}>Nominal</p>
+            <div className="flex items-center gap-2">
+              <span className={`text-base ${th.txm}`}>Rp</span>
+              <input
+                autoFocus
+                type="number"
+                min="1"
+                value={capitalDraft.amount}
+                onChange={e => setCapitalDraft({ ...capitalDraft, amount: e.target.value })}
+                placeholder="10.000.000"
+                className={`flex-1 px-3 py-3 text-base rounded-xl border ${th.inp}`} />
+            </div>
+          </div>
+          <div>
+            <p className={`text-sm font-semibold mb-1.5 ${th.txm}`}>Tanggal Setoran</p>
+            <input
+              type="date"
+              value={capitalDraft.date}
+              onChange={e => setCapitalDraft({ ...capitalDraft, date: e.target.value })}
+              className={`w-full px-3 py-3 text-base rounded-xl border ${th.inp}`} />
+          </div>
+          <div>
+            <p className={`text-sm font-semibold mb-1.5 ${th.txm}`}>Sumber</p>
+            <div className="flex gap-1.5 flex-wrap mb-2">
+              {["Owner", "Pinjaman Bank", "Investor", "Lainnya"].map(opt => (
+                <button
+                  key={opt}
+                  onClick={() => setCapitalDraft({ ...capitalDraft, source: opt })}
+                  className={`px-3 py-2 rounded-lg text-sm font-bold border ${
+                    capitalDraft.source === opt
+                      ? "bg-gradient-to-r from-[#FB7185] to-[#E11D48] text-white border-transparent"
+                      : `${th.bdr} ${th.txm}`
+                  }`}>
+                  {opt}
+                </button>
+              ))}
+            </div>
+            <input
+              value={capitalDraft.source}
+              onChange={e => setCapitalDraft({ ...capitalDraft, source: e.target.value })}
+              placeholder="Sumber dana"
+              className={`w-full px-3 py-2.5 text-sm rounded-xl border ${th.inp}`} />
+          </div>
+          <div>
+            <p className={`text-sm font-semibold mb-1.5 ${th.txm}`}>Catatan (opsional)</p>
+            <input
+              value={capitalDraft.note}
+              onChange={e => setCapitalDraft({ ...capitalDraft, note: e.target.value })}
+              placeholder="Untuk tambah stok awal bulan"
+              className={`w-full px-3 py-3 text-base rounded-xl border ${th.inp}`} />
+          </div>
+          <div className="flex gap-2 pt-1">
+            <button onClick={() => setCapitalModalOpen(false)}
+              className={`flex-1 py-3 rounded-xl text-sm font-bold border ${th.bdr} ${th.txm}`}>
+              Batal
+            </button>
+            <button onClick={saveCapital} disabled={savingCapital}
+              className="flex-1 py-3 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48] disabled:opacity-40">
+              {savingCapital ? "Menyimpan…" : "Simpan"}
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }
