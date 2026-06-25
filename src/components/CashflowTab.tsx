@@ -33,7 +33,7 @@ interface LedgerRow {
   in?: number;
   out?: number;
   balance: number;
-  type: "opening" | "sales" | "expense" | "invoice" | "refund" | "capital";
+  type: "opening" | "sales" | "expense" | "invoice" | "refund" | "capital" | "drawing";
   detail?: { name: string; amount: number }[]; // for drill-down (sales/refund)
   capitalId?: string; // untuk inline delete capital injection
 }
@@ -41,6 +41,8 @@ interface LedgerRow {
 interface CapitalEntry {
   id: string;
   amount: number;
+  /** 'injection' = setoran modal (+saldo), 'drawing' = prive (-saldo). */
+  type: "injection" | "drawing";
   source: string;
   note: string;
   injectedAt: string; // YYYY-MM-DD
@@ -80,10 +82,19 @@ export function CashflowTab() {
   const [openingInput, setOpeningInput] = useState("");
   const [savingOpening, setSavingOpening] = useState(false);
 
-  // ── Capital injections (Tambahan Modal Owner) ────────────────────────
+  // ── Capital injections + drawings (Modal + Prive) ─────────────────────
+  // Same table `capital_injections`, beda kolom `type`:
+  //   'injection' = setoran owner ke kas toko (+saldo)
+  //   'drawing'   = prive: penarikan owner dari kas (-saldo)
   const [capitalEntries, setCapitalEntries] = useState<CapitalEntry[]>([]);
   const [capitalModalOpen, setCapitalModalOpen] = useState(false);
-  const [capitalDraft, setCapitalDraft] = useState({ amount: "", source: "Owner", note: "", date: "" });
+  const [capitalDraft, setCapitalDraft] = useState<{
+    amount: string;
+    type: "injection" | "drawing";
+    source: string;
+    note: string;
+    date: string;
+  }>({ amount: "", type: "injection", source: "Owner", note: "", date: "" });
   const [savingCapital, setSavingCapital] = useState(false);
 
   const refetchCapital = () => {
@@ -95,6 +106,7 @@ export function CashflowTab() {
         setCapitalEntries((res.body || []).map(r => ({
           id: r.id,
           amount: r.amount,
+          type: r.type === "drawing" ? "drawing" : "injection",
           source: r.source || "",
           note: r.note || "",
           injectedAt: r.injected_at.slice(0, 10),
@@ -130,26 +142,28 @@ export function CashflowTab() {
     try {
       await capitalApi.create({
         amount: amt,
+        type: capitalDraft.type,
         source: capitalDraft.source.trim() || undefined,
         note: capitalDraft.note.trim() || undefined,
         injected_at: capitalDraft.date,
       });
-      toast.success("Modal tambahan disimpan");
+      toast.success(capitalDraft.type === "drawing" ? "Prive disimpan" : "Modal tambahan disimpan");
       setCapitalModalOpen(false);
-      setCapitalDraft({ amount: "", source: "Owner", note: "", date: "" });
+      setCapitalDraft({ amount: "", type: "injection", source: "Owner", note: "", date: "" });
       refetchCapital();
     } catch (e: any) {
-      toast.error(e?.message || "Gagal simpan modal");
+      toast.error(e?.message || "Gagal simpan");
     } finally {
       setSavingCapital(false);
     }
   };
 
-  const deleteCapital = async (id: string, amount: number) => {
-    if (!confirm(`Hapus setoran modal ${$(amount)}?`)) return;
+  const deleteCapital = async (id: string, amount: number, type: "injection" | "drawing") => {
+    const label = type === "drawing" ? "prive" : "setoran modal";
+    if (!confirm(`Hapus ${label} ${$(amount)}?`)) return;
     try {
       await capitalApi.delete(id);
-      toast.success("Setoran modal dihapus");
+      toast.success(`${type === "drawing" ? "Prive" : "Setoran modal"} dihapus`);
       refetchCapital();
     } catch (e: any) {
       toast.error(e?.message || "Gagal hapus");
@@ -191,7 +205,7 @@ export function CashflowTab() {
   // Implikasi: Saldo Akhir di laporan ini = Saldo Awal + Pendapatan − Operasional.
   // Bukan saldo cash actual di laci (yang juga harus dikurangi bayar supplier).
   // Per request owner: ini "operating cash flow" view, bukan "true cash position".
-  const { ledger, totalIn, totalOut, totalInvoicePaid, totalCapital, salesDays } = useMemo(() => {
+  const { ledger, totalIn, totalOut, totalInvoicePaid, totalCapital, totalDrawing, salesDays } = useMemo(() => {
     // Map: date YYYY-MM-DD → { salesTotal, salesCount, salesOrders[] }
     const salesByDay = new Map<string, { total: number; count: number; orders: typeof orders }>();
     orders.forEach(o => {
@@ -243,6 +257,7 @@ export function CashflowTab() {
     let runningOut = 0;
     let runningInvoicePaid = 0;
     let runningCapital = 0;
+    let runningDrawing = 0;
     let salesDaysCount = 0;
 
     for (const date of sortedDates) {
@@ -308,22 +323,34 @@ export function CashflowTab() {
         runningOut += r.amount;
       }
 
-      // Capital injections per hari — MASUK runningCapital, increment balance,
-      // tapi TIDAK masuk runningIn (supaya Selisih operasional tetap "sales -
-      // expense" tanpa modal). Tampil di ledger sebagai +amount.
+      // Capital movements per hari — TIDAK masuk runningIn/Out (supaya Selisih
+      // operasional tetap "sales - expense"). Injection = +saldo, Drawing
+      // (prive) = -saldo. Both increment running balance directly.
       const cRows = capitalEntries
         .filter(c => c.injectedAt === date)
         .sort((a, b) => a.id.localeCompare(b.id));
       for (const c of cRows) {
-        const desc = `Tambahan Modal${c.source ? ` · ${c.source}` : ""}${c.note ? ` · ${c.note}` : ""}`;
-        rawRows.push({
-          dateStr: date,
-          description: desc,
-          in: c.amount,
-          type: "capital",
-          capitalId: c.id,
-        });
-        runningCapital += c.amount;
+        if (c.type === "drawing") {
+          const desc = `Prive${c.source ? ` · ${c.source}` : ""}${c.note ? ` · ${c.note}` : ""}`;
+          rawRows.push({
+            dateStr: date,
+            description: desc,
+            out: c.amount,
+            type: "drawing",
+            capitalId: c.id,
+          });
+          runningDrawing += c.amount;
+        } else {
+          const desc = `Tambahan Modal${c.source ? ` · ${c.source}` : ""}${c.note ? ` · ${c.note}` : ""}`;
+          rawRows.push({
+            dateStr: date,
+            description: desc,
+            in: c.amount,
+            type: "capital",
+            capitalId: c.id,
+          });
+          runningCapital += c.amount;
+        }
       }
     }
 
@@ -353,15 +380,16 @@ export function CashflowTab() {
       totalOut: runningOut,
       totalInvoicePaid: runningInvoicePaid,
       totalCapital: runningCapital,
+      totalDrawing: runningDrawing,
       salesDays: salesDaysCount,
     };
   }, [orders, expenses, invoices, refunds, capitalEntries, monthStart, monthEnd, openingBalance]);
 
   const selisih = totalIn - totalOut;
-  // Saldo akhir = Saldo Awal + Selisih operasional + Tambahan Modal.
-  // Capital ditreat sebagai +IN ke kas tapi TIDAK dihitung sebagai "selisih"
-  // operasional (karena bukan profit, tapi setoran owner).
-  const saldoAkhir = openingBalance + selisih + totalCapital;
+  // Saldo akhir = Saldo Awal + Selisih operasional + Tambahan Modal − Prive.
+  // Capital movements TIDAK dihitung sebagai "selisih" operasional (bukan
+  // profit/loss, tapi pergerakan kas owner).
+  const saldoAkhir = openingBalance + selisih + totalCapital - totalDrawing;
 
   // Aggregate untuk "nilai stok" + "utang faktur belum lunas" — info tambahan
   const unpaidInvoicesValue = useMemo(
@@ -468,47 +496,73 @@ export function CashflowTab() {
               + Tambahan Modal: <strong className={th.acc}>{$(totalCapital)}</strong>
             </p>
           )}
+          {totalDrawing > 0 && (
+            <p className={`text-sm mt-1 ${th.txm}`}>
+              − Prive: <strong className="text-[#BE123C] dark:text-[#FB7185]">{$(totalDrawing)}</strong>
+            </p>
+          )}
           <p className={`text-xs mt-2 ${th.txf}`}>
             Saldo akhir (= modal bulan berikutnya): <strong className={th.tx}>{$(saldoAkhir)}</strong>
           </p>
         </div>
       </div>
 
-      {/* Tambahan Modal — setoran owner di luar penjualan. Card dengan
-          tombol "+ Tambah Modal" untuk admin. List entries inline + delete. */}
+      {/* Pergerakan Modal Owner — setoran (Tambah Modal) + penarikan (Prive).
+          Same table di BE, beda kolom `type`. 2 tombol untuk admin. */}
       <div className={`rounded-2xl border p-4 ${th.bdr} ${th.card2}`}>
-        <div className="flex items-center justify-between gap-2 mb-2">
+        <div className="flex items-start justify-between gap-2 mb-3 flex-wrap">
           <div className="min-w-0">
             <p className={`text-base font-extrabold inline-flex items-center gap-2 ${th.tx}`}>
               <Wallet size={18} strokeWidth={2.4} className={th.acc} />
-              Tambahan Modal Bulan Ini
+              Modal & Prive Bulan Ini
             </p>
             <p className={`text-sm mt-0.5 ${th.txm}`}>
-              Setoran owner di luar penjualan (tambah modal, pinjaman, dll).
+              Tambahan Modal = setoran owner ke kas. Prive = penarikan owner dari kas.
             </p>
           </div>
           {canWrite && (
-            <button
-              onClick={() => {
-                const todayStr = new Date().toISOString().slice(0, 10);
-                setCapitalDraft({ amount: "", source: "Owner", note: "", date: todayStr });
-                setCapitalModalOpen(true);
-              }}
-              className="shrink-0 px-4 py-2.5 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48] inline-flex items-center gap-1.5">
-              <Plus size={16} strokeWidth={2.6} /> Tambah Modal
-            </button>
+            <div className="flex gap-1.5 shrink-0">
+              <button
+                onClick={() => {
+                  const todayStr = new Date().toISOString().slice(0, 10);
+                  setCapitalDraft({ amount: "", type: "injection", source: "Owner", note: "", date: todayStr });
+                  setCapitalModalOpen(true);
+                }}
+                className="px-3 py-2.5 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48] inline-flex items-center gap-1.5">
+                <Plus size={16} strokeWidth={2.6} /> Tambah Modal
+              </button>
+              <button
+                onClick={() => {
+                  const todayStr = new Date().toISOString().slice(0, 10);
+                  setCapitalDraft({ amount: "", type: "drawing", source: "Owner", note: "", date: todayStr });
+                  setCapitalModalOpen(true);
+                }}
+                className={`px-3 py-2.5 rounded-xl text-sm font-bold border inline-flex items-center gap-1.5 ${th.bdr} text-[#BE123C] dark:text-[#FB7185]`}>
+                <Plus size={16} strokeWidth={2.6} /> Tambah Prive
+              </button>
+            </div>
           )}
         </div>
-        {capitalEntries.length === 0 ? (
-          <p className={`text-sm ${th.txf} mt-2`}>Belum ada setoran modal bulan ini.</p>
-        ) : (
-          <>
-            <p className={`font-display text-2xl font-black mt-1 ${th.acc}`}>
+        <div className="grid grid-cols-2 gap-3">
+          <div className={`p-3 rounded-xl ${th.elev}`}>
+            <p className={`text-xs ${th.txm}`}>Tambahan Modal</p>
+            <p className={`font-display text-xl font-black mt-0.5 ${totalCapital > 0 ? th.acc : th.txf}`}>
               +{$(totalCapital)}
             </p>
-            <p className={`text-sm ${th.txm}`}>{capitalEntries.length} setoran</p>
-          </>
-        )}
+            <p className={`text-xs ${th.txf}`}>
+              {capitalEntries.filter(c => c.type === "injection").length} setoran
+            </p>
+          </div>
+          <div className={`p-3 rounded-xl ${th.elev}`}>
+            <p className={`text-xs ${th.txm}`}>Prive (Penarikan)</p>
+            <p className={`font-display text-xl font-black mt-0.5 ${totalDrawing > 0 ? "text-[#BE123C] dark:text-[#FB7185]" : th.txf}`}>
+              −{$(totalDrawing)}
+            </p>
+            <p className={`text-xs ${th.txf}`}>
+              {capitalEntries.filter(c => c.type === "drawing").length} penarikan
+            </p>
+          </div>
+        </div>
       </div>
 
       {/* Info tambahan: Bayar Supplier — bukan pengeluaran operasional,
@@ -580,11 +634,18 @@ export function CashflowTab() {
                           {row.type === "capital" && (
                             <span className={`ml-1.5 text-xs ${th.acc} italic`}>(setoran owner)</span>
                           )}
-                          {row.type === "capital" && canWrite && row.capitalId && (
+                          {row.type === "drawing" && (
+                            <span className={`ml-1.5 text-xs italic text-[#BE123C] dark:text-[#FB7185]`}>(prive owner)</span>
+                          )}
+                          {(row.type === "capital" || row.type === "drawing") && canWrite && row.capitalId && (
                             <button
-                              onClick={(e) => { e.stopPropagation(); deleteCapital(row.capitalId!, row.in || 0); }}
-                              aria-label="Hapus setoran"
-                              title="Hapus setoran"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const amt = row.in || row.out || 0;
+                                deleteCapital(row.capitalId!, amt, row.type === "drawing" ? "drawing" : "injection");
+                              }}
+                              aria-label="Hapus"
+                              title="Hapus"
                               className="ml-2 align-middle inline-flex items-center justify-center w-6 h-6 rounded bg-[#FCE4EC] text-[#BE123C] active:scale-90 transition-transform">
                               <Trash2 size={11} strokeWidth={2.6} />
                             </button>
@@ -627,9 +688,19 @@ export function CashflowTab() {
         </div>
       )}
 
-      {/* Modal tambah setoran modal owner */}
-      <Modal open={capitalModalOpen} onClose={() => setCapitalModalOpen(false)} title="Tambah Modal">
+      {/* Modal tambah setoran modal / prive owner — type pre-set saat button click */}
+      <Modal
+        open={capitalModalOpen}
+        onClose={() => setCapitalModalOpen(false)}
+        title={capitalDraft.type === "drawing" ? "Tambah Prive (Penarikan)" : "Tambah Modal (Setoran)"}>
         <div className="space-y-3.5">
+          <div className={`p-3 rounded-xl ${capitalDraft.type === "drawing" ? "bg-[#FCE4EC] dark:bg-[#BE123C]/15" : th.accBg}`}>
+            <p className={`text-sm font-bold ${capitalDraft.type === "drawing" ? "text-[#BE123C] dark:text-[#FB7185]" : th.acc}`}>
+              {capitalDraft.type === "drawing"
+                ? "Prive = owner tarik uang dari kas (mengurangi saldo)"
+                : "Tambahan Modal = owner setor uang ke kas (menambah saldo)"}
+            </p>
+          </div>
           <div>
             <p className={`text-sm font-semibold mb-1.5 ${th.txm}`}>Nominal</p>
             <div className="flex items-center gap-2">

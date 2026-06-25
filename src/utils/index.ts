@@ -14,6 +14,41 @@ export function formatTime(d: string, lang: "en" | "id" = "en") {
   const locale = lang === "id" ? "id-ID" : "en";
   return new Date(d).toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" });
 }
+
+/**
+ * Format relative time untuk feed/audit view — Bu Santi-friendly bahasa
+ * harian (bukan "10:30" doang tapi konteks "berapa lama tadi").
+ *
+ *   < 1 menit       → "baru saja"
+ *   < 60 menit      → "5 menit lalu"
+ *   hari ini > 1jam → "Hari ini 10:30"
+ *   kemarin         → "Kemarin 14:00"
+ *   < 7 hari        → "3 hari lalu"
+ *   sisanya         → "12 Jun 14:00"
+ */
+export function formatTimeRelative(iso: string, lang: "en" | "id" = "id"): string {
+  const t = new Date(iso).getTime();
+  const now = Date.now();
+  const diffMs = now - t;
+  const diffMin = Math.floor(diffMs / 60_000);
+  const isID = lang === "id";
+
+  if (diffMs < 60_000) return isID ? "baru saja" : "just now";
+  if (diffMin < 60) return isID ? `${diffMin} menit lalu` : `${diffMin}m ago`;
+
+  const d = new Date(iso);
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const dDate = new Date(d); dDate.setHours(0, 0, 0, 0);
+  const dayDiff = Math.round((today.getTime() - dDate.getTime()) / 86_400_000);
+
+  const hhmm = d.toLocaleTimeString(isID ? "id-ID" : "en", { hour: "2-digit", minute: "2-digit" });
+
+  if (dayDiff === 0) return isID ? `Hari ini ${hhmm}` : `Today ${hhmm}`;
+  if (dayDiff === 1) return isID ? `Kemarin ${hhmm}` : `Yesterday ${hhmm}`;
+  if (dayDiff > 1 && dayDiff < 7) return isID ? `${dayDiff} hari lalu` : `${dayDiff}d ago`;
+
+  return `${d.toLocaleDateString(isID ? "id-ID" : "en", { day: "numeric", month: "short" })} ${hhmm}`;
+}
 export function genId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
 
 /**

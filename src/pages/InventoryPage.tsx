@@ -11,7 +11,7 @@ import { SearchableSelect } from "@/components/SearchableSelect";
 import { useThemeClasses } from "@/hooks/useThemeClasses";
 import { useDebounce } from "@/hooks/useDebounce";
 import { usePageFetch } from "@/hooks/usePageFetch";
-import { formatCurrency as $, formatTime, formatDate, genId, genBatchNumber, calcDueDate, printBarcodeLabel, printBarcodeLabels } from "@/utils";
+import { formatCurrency as $, formatTime, formatTimeRelative, formatDate, genId, genBatchNumber, calcDueDate, printBarcodeLabel, printBarcodeLabels } from "@/utils";
 import { exportProducts } from "@/utils/export";
 import { getDateRange, type DateRange, type CustomRange } from "@/utils/dateRange";
 import { productApi } from "@/api";
@@ -20,10 +20,10 @@ import toast from "react-hot-toast";
 import {
   Package, Plus, ChevronDown, ArrowDownCircle, ArrowUpCircle, Barcode,
   LayoutGrid, AlertTriangle, Truck, Check, Receipt, Pencil, Download, Search, Printer, Trash2,
-  Sliders, Gift, Tag,
+  Sliders, Gift, Tag, Activity, RefreshCw,
 } from "lucide-react";
 
-type InventoryTab = "overview" | "stockIn" | "stockOut" | "expiry" | "invoices" | "suppliers" | "redeem" | "memberPricing";
+type InventoryTab = "overview" | "movements" | "expiry" | "invoices" | "suppliers" | "redeem" | "memberPricing";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function getDateLabel(dateStr: string, t: Record<string, any>): string {
@@ -68,13 +68,15 @@ async function fetchNextSku(
 }
 
 export function InventoryPage() {
+  // Polling 30s — tab "Pergerakan Stok" jadi feed live (gak perlu refresh manual).
+  // Bu Santi langsung lihat pergerakan baru saat ada penjualan / stok ditambah.
   usePageFetch([
     { key: "products",   fetch: () => useProductStore.getState().fetchProducts() },
     { key: "suppliers",  fetch: () => useSupplierStore.getState().fetchSuppliers() },
     { key: "batches",    fetch: () => useBatchStore.getState().fetchBatches() },
     { key: "movements",  fetch: () => useInventoryStore.getState().fetchMovements() },
     { key: "categories", fetch: () => useCategoryStore.getState().fetchCategories() },
-  ]);
+  ], { pollMs: 30_000 });
   const th = useThemeClasses();
   const { t, lang } = useLangStore();
   const { categories, addCategory } = useCategoryStore();
@@ -157,8 +159,7 @@ export function InventoryPage() {
   // Tab definitions
   const tabs: { id: InventoryTab; label: string; icon: React.ReactNode }[] = [
     { id: "overview", label: t.invOverview as string, icon: <LayoutGrid size={14} /> },
-    { id: "stockIn", label: t.invStockIn as string, icon: <ArrowDownCircle size={14} /> },
-    { id: "stockOut", label: t.invStockOut as string, icon: <ArrowUpCircle size={14} /> },
+    { id: "movements", label: lang === "id" ? "Pergerakan Stok" : "Stock Activity", icon: <Activity size={14} /> },
     { id: "expiry", label: t.invExpiry as string, icon: <AlertTriangle size={14} /> },
     { id: "invoices", label: lang === "id" ? "Catat Faktur Barang Masuk" : "Stock-In Invoices", icon: <Receipt size={14} /> },
     { id: "suppliers", label: t.invSuppliers as string, icon: <Truck size={14} /> },
@@ -458,95 +459,66 @@ export function InventoryPage() {
     );
   };
 
-  // Tab-specific show-all state
-  const [showAllIn, setShowAllIn] = useState(false);
-  const [showAllOut, setShowAllOut] = useState(false);
-
-  // Filter untuk tab Barang Masuk/Keluar — audit view (no modal,
-  // semua input via Faktur / Edit Produk / Sesuaikan Stok).
+  // Tab Pergerakan Stok — feed style gabungan in+out (Bu Santi 25 Jun 2026:
+  // "ga mau filter tanggal, gabung saja"). Date filter dihapus karena Bu Santi
+  // (orang tua) bingung dengan default "Bulan Ini" yang kelihatan kosong di
+  // awal bulan. Sekarang feed newest-first scroll, plus type filter chip
+  // (Semua/Masuk/Keluar) yang opsional.
   const [movementProductFilter, setMovementProductFilter] = useState("");
-  const [movementDateRange, setMovementDateRange] = useState<DateRange>("month");
-  const [movementCustomRange, setMovementCustomRange] = useState<CustomRange>({ from: "", to: "" });
-  const [stockInSupplierFilter, setStockInSupplierFilter] = useState<string>(""); // "" = semua, "__none__" = tanpa pemasok
-  const [stockOutReasonFilter, setStockOutReasonFilter] = useState<string>(""); // "" = semua
+  const [movementsTypeFilter, setMovementsTypeFilter] = useState<"all" | "in" | "out">("all");
+  const [movementsVisibleCount, setMovementsVisibleCount] = useState(30);
 
-  const dateBounds = useMemo(() => {
-    return getDateRange(movementDateRange, movementCustomRange);
-  }, [movementDateRange, movementCustomRange]);
+  // Feed pergerakan stok — gabungan in+out, sorted newest first. Filter
+  // product opsional (kalau dipakai). Type filter via chip toggle.
+  const feedMovements = useMemo(() => {
+    let list = movements.slice();
+    if (movementProductFilter) {
+      list = list.filter(m => m.productId === movementProductFilter);
+    }
+    if (movementsTypeFilter !== "all") {
+      list = list.filter(m => m.type === movementsTypeFilter);
+    }
+    list.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    return list;
+  }, [movements, movementProductFilter, movementsTypeFilter]);
 
-  const applyDateFilter = (list: StockMovement[]) => {
-    if (!dateBounds) return list;
-    return list.filter(m => {
+  // Stats hari ini — visible di hero card, kasih sinyal "ada pergerakan hari
+  // ini". Pakai date bounds today saja (00:00 - 23:59 local time WIB).
+  const todayStats = useMemo(() => {
+    const today = new Date();
+    const startToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    let todayIn = 0, todayOut = 0, todayCount = 0;
+    for (const m of movements) {
+      if (movementProductFilter && m.productId !== movementProductFilter) continue;
       const d = new Date(m.createdAt);
-      return d >= dateBounds.start && d <= dateBounds.end;
-    });
+      if (d < startToday) continue;
+      todayCount += 1;
+      if (m.type === "in") todayIn += m.quantity;
+      else todayOut += m.quantity;
+    }
+    return { todayIn, todayOut, todayCount };
+  }, [movements, movementProductFilter]);
+
+  // Reason → bahasa natural untuk Bu Santi. Bukan "sale" tapi "Terjual ke
+  // kasir", bukan "opname" tapi "Koreksi opname", dst.
+  const reasonNatural = (m: StockMovement): string => {
+    const r = (m.reason || "").toLowerCase();
+    if (m.type === "in") {
+      if (r === "restock") return "Stok masuk dari pemasok";
+      if (r === "initial") return "Stok awal saat produk dibuat";
+      if (r === "refund") return "Stok dikembalikan (refund)";
+      return "Stok ditambah";
+    }
+    if (r === "sale") return "Terjual ke kasir";
+    if (r === "repack") return "Repack jadi kemasan kecil";
+    if (r === "lost") return "Hilang / dicuri";
+    if (r === "damaged") return "Rusak / kedaluwarsa";
+    if (r === "opname") return "Koreksi opname";
+    if (r === "sample") return "Sample / promo";
+    if (r === "cancel") return "Dibatalkan";
+    if (r === "refund") return "Refund customer";
+    return m.note || "Stok dikurangi";
   };
-
-  const filterByProduct = (list: StockMovement[]) => {
-    if (!movementProductFilter) return list;
-    return list.filter(m => m.productId === movementProductFilter);
-  };
-
-  const stockInMovements = useMemo(() => {
-    let list = movements.filter(m => m.type === "in");
-    list = filterByProduct(list);
-    list = applyDateFilter(list);
-    if (stockInSupplierFilter === "__none__") {
-      list = list.filter(m => !m.supplierId);
-    } else if (stockInSupplierFilter) {
-      list = list.filter(m => m.supplierId === stockInSupplierFilter);
-    }
-    return list;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [movements, movementProductFilter, dateBounds, stockInSupplierFilter]);
-
-  const stockOutMovements = useMemo(() => {
-    let list = movements.filter(m => m.type === "out");
-    list = filterByProduct(list);
-    list = applyDateFilter(list);
-    if (stockOutReasonFilter) {
-      list = list.filter(m => (m.reason || "") === stockOutReasonFilter);
-    }
-    return list;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [movements, movementProductFilter, dateBounds, stockOutReasonFilter]);
-
-  // Breakdown by reason untuk tab Barang Keluar — visual bar chart proporsi.
-  const stockOutBreakdown = useMemo(() => {
-    // Hitung dari OUT yang sudah di-filter date/product (tapi belum reason),
-    // supaya bar tetap reflect periode tapi tidak self-filter saat user pilih reason.
-    let baseList = movements.filter(m => m.type === "out");
-    baseList = filterByProduct(baseList);
-    baseList = applyDateFilter(baseList);
-
-    const totals: Record<string, number> = {};
-    let grand = 0;
-    for (const m of baseList) {
-      const r = m.reason || "other";
-      totals[r] = (totals[r] || 0) + m.quantity;
-      grand += m.quantity;
-    }
-    if (grand === 0) return { total: 0, items: [] };
-    const REASON_LABELS: Record<string, string> = {
-      sale: "Penjualan", repack: "Repack", lost: "Hilang", damaged: "Rusak",
-      opname: "Opname", sample: "Sample", cancel: "Batal", refund: "Refund",
-      other: "Lainnya",
-    };
-    const items = Object.entries(totals)
-      .map(([key, qty]) => ({ key, label: REASON_LABELS[key] || key, qty, pct: qty / grand * 100 }))
-      .sort((a, b) => b.qty - a.qty);
-    return { total: grand, items };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [movements, movementProductFilter, dateBounds]);
-
-  // Summary qty untuk produk yang sedang di-filter — info cepat di header tab.
-  const movementSummary = useMemo(() => {
-    if (!movementProductFilter) return null;
-    const inQty = stockInMovements.reduce((s, m) => s + m.quantity, 0);
-    const outQty = stockOutMovements.reduce((s, m) => s + m.quantity, 0);
-    const product = products.find(p => p.id === movementProductFilter);
-    return { inQty, outQty, productName: product?.nameId || product?.name || "" };
-  }, [movementProductFilter, stockInMovements, stockOutMovements, products]);
 
   const getDaysUntilExpiry = (dateStr: string) => {
     const now = new Date();
@@ -914,188 +886,141 @@ export function InventoryPage() {
       )}
 
       {/* ======= STOCK IN / FAKTUR MASUK TAB ======= */}
-      {activeTab === "stockIn" && (
+      {activeTab === "movements" && (
         <>
-          {/* Info: barang masuk auto-tercatat dari Edit Produk/Sesuaikan Stok */}
-          <div className={`rounded-[18px] border p-3.5 ${th.card2} ${th.bdr}`}>
-            <p className={`text-xs ${th.txm}`}>
-              <strong className={th.tx}>Audit barang masuk.</strong> Catat barang masuk lewat:
-            </p>
-            <ul className={`text-xs mt-1 space-y-0.5 ${th.txm}`}>
-              <li>• <strong className={th.tx}>Edit Produk → Tambah Stok Baru</strong> (cepat, dengan ED)</li>
-              <li>• <strong className={th.tx}>Sesuaikan Stok</strong> (koreksi opname / repack)</li>
-            </ul>
-            {canWrite && (
-              <button
-                onClick={() => setActiveTab("invoices")}
-                className={`mt-2.5 text-xs font-bold inline-flex items-center gap-1 ${th.acc} underline`}>
-                <Receipt size={11} strokeWidth={2.8} /> Catat juga faktur pembelian dari pemasok →
-              </button>
-            )}
-          </div>
-
-          {/* Filter toolbar */}
-          <div className={`rounded-[18px] border p-3.5 ${th.card} ${th.bdr} space-y-2`}>
-            <div className="flex flex-wrap items-center gap-2">
-              <select value={movementDateRange} onChange={e => setMovementDateRange(e.target.value as DateRange)}
-                className={`px-2.5 py-1.5 text-xs font-bold rounded-lg border ${th.inp}`}>
-                <option value="today">Hari Ini</option>
-                <option value="yesterday">Kemarin</option>
-                <option value="week">Minggu Ini</option>
-                <option value="month">Bulan Ini</option>
-                <option value="all">Semua</option>
-                <option value="custom">Pilih Tanggal</option>
-              </select>
-              <select value={stockInSupplierFilter} onChange={e => setStockInSupplierFilter(e.target.value)}
-                className={`px-2.5 py-1.5 text-xs font-bold rounded-lg border ${th.inp}`}>
-                <option value="">Semua Pemasok</option>
-                <option value="__none__">— Tanpa pemasok</option>
-                {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </select>
-            </div>
-            {movementDateRange === "custom" && (
-              <div className="flex items-center gap-2">
-                <input type="date" value={movementCustomRange.from} max={movementCustomRange.to || undefined}
-                  onChange={e => setMovementCustomRange(r => ({ ...r, from: e.target.value }))}
-                  className={`px-2.5 py-1.5 text-xs font-bold rounded-lg border ${th.inp}`} />
-                <span className={`text-xs ${th.txm}`}>s/d</span>
-                <input type="date" value={movementCustomRange.to} min={movementCustomRange.from || undefined}
-                  onChange={e => setMovementCustomRange(r => ({ ...r, to: e.target.value }))}
-                  className={`px-2.5 py-1.5 text-xs font-bold rounded-lg border ${th.inp}`} />
-              </div>
-            )}
-            <SearchableSelect
-              value={movementProductFilter}
-              onChange={setMovementProductFilter}
-              options={products.map(p => ({ id: p.id, label: `${lang === "id" ? p.nameId : p.name} (${p.sku})` }))}
-              placeholder={lang === "id" ? "Filter produk (opsional)…" : "Filter product (optional)…"}
-            />
-          </div>
-
-          {/* Summary box */}
-          <div className={`rounded-[18px] border p-3.5 ${th.card} ${th.bdr}`}>
-            <p className={`text-xs font-semibold uppercase tracking-wider ${th.txm}`}>Total Periode</p>
-            <p className={`font-display text-2xl font-black mt-1 leading-none ${th.acc}`} style={{ fontVariationSettings: '"wght" 900' }}>
-              +{stockInMovements.reduce((s, m) => s + m.quantity, 0)}
-            </p>
-            <p className={`text-xs mt-1 ${th.txf}`}>
-              {stockInMovements.length} catatan
-              {movementSummary && <> · <strong className={th.tx}>{movementSummary.productName}</strong></>}
+          {/* Auto-refresh banner — sinyal "sistem hidup" untuk Bu Santi.
+              Polling 30s di-handle via usePageFetch pollMs:30_000 di atas. */}
+          <div className={`rounded-[18px] border p-3 ${th.card2} ${th.bdr} flex items-center gap-2`}>
+            <RefreshCw size={14} className={`${th.acc} shrink-0`} />
+            <p className={`text-sm ${th.txm}`}>
+              <strong className={th.tx}>Update otomatis tiap 30 detik.</strong> Setiap penjualan di kasir atau perubahan stok akan langsung tampil di sini.
             </p>
           </div>
 
-          <div className={`rounded-[22px] border overflow-hidden ${th.card} ${th.bdr}`}>
-            <div className={`px-5 py-3.5 border-b ${th.bdr}`}>
-              <p className={`text-sm font-extrabold tracking-tight ${th.tx}`}>Riwayat Barang Masuk</p>
-            </div>
-            {renderMovementList(stockInMovements, showAllIn, setShowAllIn, stockInMovements.length)}
-          </div>
-        </>
-      )}
-
-      {/* ======= STOCK OUT TAB ======= */}
-      {activeTab === "stockOut" && (
-        <>
-          {/* Info: barang keluar auto dari Penjualan & Sesuaikan Stok */}
-          <div className={`rounded-[18px] border p-3.5 ${th.card2} ${th.bdr}`}>
-            <p className={`text-xs ${th.txm}`}>
-              <strong className={th.tx}>Audit barang keluar.</strong> Tercatat otomatis dari:
-            </p>
-            <ul className={`text-xs mt-1 space-y-0.5 ${th.txm}`}>
-              <li>• <strong className={th.tx}>Penjualan POS</strong> (Reason: Penjualan)</li>
-              <li>• <strong className={th.tx}>Sesuaikan Stok</strong> (Repack, Hilang, Rusak, Opname, Sample, dll)</li>
-            </ul>
-          </div>
-
-          {/* Filter toolbar */}
-          <div className={`rounded-[18px] border p-3.5 ${th.card} ${th.bdr} space-y-2`}>
-            <div className="flex flex-wrap items-center gap-2">
-              <select value={movementDateRange} onChange={e => setMovementDateRange(e.target.value as DateRange)}
-                className={`px-2.5 py-1.5 text-xs font-bold rounded-lg border ${th.inp}`}>
-                <option value="today">Hari Ini</option>
-                <option value="yesterday">Kemarin</option>
-                <option value="week">Minggu Ini</option>
-                <option value="month">Bulan Ini</option>
-                <option value="all">Semua</option>
-                <option value="custom">Pilih Tanggal</option>
-              </select>
-              <select value={stockOutReasonFilter} onChange={e => setStockOutReasonFilter(e.target.value)}
-                className={`px-2.5 py-1.5 text-xs font-bold rounded-lg border ${th.inp}`}>
-                <option value="">Semua Alasan</option>
-                <option value="sale">Penjualan</option>
-                <option value="repack">Repack</option>
-                <option value="lost">Hilang</option>
-                <option value="damaged">Rusak</option>
-                <option value="opname">Opname</option>
-                <option value="sample">Sample</option>
-                <option value="cancel">Batal</option>
-                <option value="refund">Refund</option>
-                <option value="other">Lainnya</option>
-              </select>
-            </div>
-            {movementDateRange === "custom" && (
-              <div className="flex items-center gap-2">
-                <input type="date" value={movementCustomRange.from} max={movementCustomRange.to || undefined}
-                  onChange={e => setMovementCustomRange(r => ({ ...r, from: e.target.value }))}
-                  className={`px-2.5 py-1.5 text-xs font-bold rounded-lg border ${th.inp}`} />
-                <span className={`text-xs ${th.txm}`}>s/d</span>
-                <input type="date" value={movementCustomRange.to} min={movementCustomRange.from || undefined}
-                  onChange={e => setMovementCustomRange(r => ({ ...r, to: e.target.value }))}
-                  className={`px-2.5 py-1.5 text-xs font-bold rounded-lg border ${th.inp}`} />
-              </div>
-            )}
-            <SearchableSelect
-              value={movementProductFilter}
-              onChange={setMovementProductFilter}
-              options={products.map(p => ({ id: p.id, label: `${lang === "id" ? p.nameId : p.name} (${p.sku})` }))}
-              placeholder={lang === "id" ? "Filter produk (opsional)…" : "Filter product (optional)…"}
-            />
-          </div>
-
-          {/* Summary + breakdown chart */}
-          <div className={`rounded-[18px] border p-3.5 ${th.card} ${th.bdr}`}>
-            <p className={`text-xs font-semibold uppercase tracking-wider ${th.txm}`}>Total Periode</p>
-            <p className="font-display text-2xl font-black mt-1 leading-none text-[#BE123C] dark:text-[#FB7185]" style={{ fontVariationSettings: '"wght" 900' }}>
-              −{stockOutMovements.reduce((s, m) => s + m.quantity, 0)}
-            </p>
-            <p className={`text-xs mt-1 ${th.txf}`}>
-              {stockOutMovements.length} catatan
-              {movementSummary && <> · <strong className={th.tx}>{movementSummary.productName}</strong></>}
-            </p>
-            {/* Breakdown bar — proporsi reason */}
-            {stockOutBreakdown.total > 0 && (
-              <div className="mt-3">
-                <div className={`flex h-2 rounded-full overflow-hidden ${th.elev}`}>
-                  {stockOutBreakdown.items.map((it, idx) => (
-                    <div key={it.key}
-                      title={`${it.label}: ${it.qty} (${it.pct.toFixed(0)}%)`}
-                      style={{ width: `${it.pct}%` }}
-                      className={`h-full ${
-                        it.key === "sale" ? "bg-[#E11D48]" :
-                        it.key === "repack" ? "bg-[#FB7185]" :
-                        it.key === "lost" ? "bg-[#BE123C]" :
-                        it.key === "damaged" ? "bg-[#9F1239]" :
-                        it.key === "opname" ? "bg-[#FFB5C0]" :
-                        idx % 2 === 0 ? "bg-[#FFD1DB]" : "bg-[#C4504A]"
-                      }`} />
-                  ))}
+          {/* Hero hari ini — Bu Santi langsung lihat aktivitas hari ini.
+              2 stat besar: masuk vs keluar. Empty kalau belum ada gerakan. */}
+          <div className={`rounded-[22px] border p-4 ${th.card} ${th.bdr}`}>
+            <p className={`text-xs font-bold uppercase tracking-wider mb-3 ${th.txm}`}>Hari Ini</p>
+            {todayStats.todayCount === 0 ? (
+              <p className={`text-base ${th.txm}`}>Belum ada pergerakan hari ini.</p>
+            ) : (
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex items-center gap-3">
+                  <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${th.dark ? "bg-[#E11D48]/15" : "bg-[#FFE4E9]"}`}>
+                    <ArrowDownCircle size={22} className={th.acc} />
+                  </div>
+                  <div>
+                    <p className={`font-display text-2xl font-black ${th.acc}`} style={{ fontVariationSettings: '"wght" 900' }}>
+                      +{todayStats.todayIn}
+                    </p>
+                    <p className={`text-sm ${th.txm}`}>masuk</p>
+                  </div>
                 </div>
-                <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1.5">
-                  {stockOutBreakdown.items.map(it => (
-                    <span key={it.key} className={`text-xs ${th.txm}`}>
-                      <strong className={th.tx}>{it.label}</strong> {it.pct.toFixed(0)}%
-                    </span>
-                  ))}
+                <div className="flex items-center gap-3">
+                  <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${th.dark ? "bg-[#C4504A]/15" : "bg-[#FCE4EC]"}`}>
+                    <ArrowUpCircle size={22} className="text-[#C4504A]" />
+                  </div>
+                  <div>
+                    <p className="font-display text-2xl font-black text-[#BE123C] dark:text-[#FB7185]" style={{ fontVariationSettings: '"wght" 900' }}>
+                      −{todayStats.todayOut}
+                    </p>
+                    <p className={`text-sm ${th.txm}`}>keluar</p>
+                  </div>
                 </div>
               </div>
             )}
           </div>
 
-          <div className={`rounded-[22px] border overflow-hidden ${th.card} ${th.bdr}`}>
-            <div className={`px-5 py-3.5 border-b ${th.bdr}`}>
-              <p className={`text-sm font-extrabold tracking-tight ${th.tx}`}>Riwayat Barang Keluar</p>
+          {/* Chip toggle Semua/Masuk/Keluar + product filter opsional */}
+          <div className={`rounded-[18px] border p-3 ${th.card} ${th.bdr} space-y-2.5`}>
+            <div className="flex gap-1.5">
+              {([
+                { key: "all" as const, label: "Semua" },
+                { key: "in" as const, label: "Masuk" },
+                { key: "out" as const, label: "Keluar" },
+              ]).map(opt => (
+                <button
+                  key={opt.key}
+                  onClick={() => { setMovementsTypeFilter(opt.key); setMovementsVisibleCount(30); }}
+                  className={`flex-1 min-h-[40px] rounded-xl text-sm font-bold transition-all ${
+                    movementsTypeFilter === opt.key
+                      ? "text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48]"
+                      : `border ${th.bdr} ${th.txm}`
+                  }`}>
+                  {opt.label}
+                </button>
+              ))}
             </div>
-            {renderMovementList(stockOutMovements, showAllOut, setShowAllOut, stockOutMovements.length)}
+            <SearchableSelect
+              value={movementProductFilter}
+              onChange={setMovementProductFilter}
+              options={products.map(p => ({ id: p.id, label: `${lang === "id" ? p.nameId : p.name} (${p.sku})` }))}
+              placeholder={lang === "id" ? "Cari produk tertentu (opsional)…" : "Find specific product (optional)…"}
+            />
+          </div>
+
+          {/* Feed pergerakan — newest first, no date filter, scroll for more */}
+          <div className={`rounded-[22px] border overflow-hidden ${th.card} ${th.bdr}`}>
+            <div className={`px-5 py-3.5 border-b ${th.bdr} flex items-center justify-between`}>
+              <p className={`text-base font-extrabold tracking-tight inline-flex items-center gap-2 ${th.tx}`}>
+                <Activity size={16} className={th.acc} /> Pergerakan Stok
+              </p>
+              <p className={`text-sm ${th.txm}`}>
+                {feedMovements.length} catatan
+              </p>
+            </div>
+            {feedMovements.length === 0 ? (
+              <div className={`py-12 text-center ${th.txm}`}>
+                <Activity size={40} className="mx-auto opacity-20 mb-3" />
+                <p className="text-base font-bold mb-1">Belum ada pergerakan</p>
+                <p className="text-sm">
+                  {movementsTypeFilter === "in"
+                    ? "Tambah stok via Edit Produk untuk catat di sini."
+                    : movementsTypeFilter === "out"
+                    ? "Setiap penjualan di Kasir otomatis tercatat di sini."
+                    : "Aktivitas barang masuk dan keluar akan muncul di sini secara otomatis."}
+                </p>
+              </div>
+            ) : (
+              <>
+                {feedMovements.slice(0, movementsVisibleCount).map((m, idx) => {
+                  const prod = products.find(p => p.id === m.productId);
+                  const isIn = m.type === "in";
+                  return (
+                    <div
+                      key={m.id}
+                      onClick={() => setDetailProductId(m.productId)}
+                      className={`flex items-start gap-3 px-5 py-3.5 cursor-pointer active:opacity-70 ${idx > 0 ? `border-t ${th.bdrSoft}` : ""}`}>
+                      <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 ${
+                        isIn
+                          ? (th.dark ? "bg-[#E11D48]/15" : "bg-[#FFE4E9]")
+                          : (th.dark ? "bg-[#C4504A]/15" : "bg-[#FCE4EC]")
+                      }`}>
+                        {isIn ? <ArrowDownCircle size={18} className={th.acc} /> : <ArrowUpCircle size={18} className="text-[#C4504A]" />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-base font-bold truncate ${th.tx}`}>
+                          {lang === "id" ? prod?.nameId : prod?.name}
+                          <span className={`ml-2 font-display font-black ${isIn ? th.acc : "text-[#BE123C] dark:text-[#FB7185]"}`}>
+                            {isIn ? "+" : "−"}{m.quantity}
+                          </span>
+                        </p>
+                        <p className={`text-sm mt-0.5 ${th.txm}`}>
+                          {reasonNatural(m)} · {formatTimeRelative(m.createdAt, "id")}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
+                {movementsVisibleCount < feedMovements.length && (
+                  <button
+                    onClick={() => setMovementsVisibleCount(c => c + 30)}
+                    className={`w-full py-4 text-base font-bold ${th.acc} border-t ${th.bdrSoft}`}>
+                    Lihat lebih banyak ({feedMovements.length - movementsVisibleCount} lagi)
+                  </button>
+                )}
+              </>
+            )}
           </div>
         </>
       )}
