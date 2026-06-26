@@ -662,7 +662,10 @@ export function CashflowTab() {
                         <td className={`px-3 py-2 text-right font-bold ${row.out ? (row.type === "invoice" ? `${th.txm} line-through` : "text-[#BE123C] dark:text-[#FB7185]") : th.txf}`}>
                           {row.out ? `−${$(row.out)}` : "—"}
                         </td>
-                        <td className={`px-3 py-2 text-right font-bold ${th.tx}`}>{$(row.balance)}</td>
+                        <td className={`px-3 py-2 text-right font-bold ${row.balance < 0 ? "text-[#BE123C] dark:text-[#FB7185]" : th.tx}`}>
+                          {$(row.balance)}
+                          {row.balance < 0 && <span className="ml-1 text-xs font-normal">(minus)</span>}
+                        </td>
                       </tr>
                       {isExpanded && row.detail && (
                         <tr key={`${row.no}-detail`} className={th.elev}>
