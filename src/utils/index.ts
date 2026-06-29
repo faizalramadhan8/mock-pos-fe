@@ -61,7 +61,16 @@ export function formatTimeRelative(iso: string, lang: "en" | "id" = "id"): strin
   if (dayDiff === 1) return isID ? `Kemarin ${hhmm}` : `Yesterday ${hhmm}`;
   if (dayDiff > 1 && dayDiff < 7) return isID ? `${dayDiff} hari lalu` : `${dayDiff}d ago`;
 
-  return `${d.toLocaleDateString(isID ? "id-ID" : "en", { day: "numeric", month: "short" })} ${hhmm}`;
+  // Fallback untuk > 7 hari: pakai bulan full Indonesian (konsisten dengan
+  // formatDateDMY) supaya Bu Santi gak bingung "Jun" itu Juni atau June.
+  if (isID) {
+    const months = [
+      "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+      "Juli", "Agustus", "September", "Oktober", "November", "Desember",
+    ];
+    return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()} ${hhmm}`;
+  }
+  return `${d.toLocaleDateString("en", { day: "numeric", month: "short", year: "numeric" })} ${hhmm}`;
 }
 export function genId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
 

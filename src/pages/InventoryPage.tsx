@@ -11,7 +11,7 @@ import { SearchableSelect } from "@/components/SearchableSelect";
 import { useThemeClasses } from "@/hooks/useThemeClasses";
 import { useDebounce } from "@/hooks/useDebounce";
 import { usePageFetch } from "@/hooks/usePageFetch";
-import { formatCurrency as $, formatTime, formatTimeRelative, formatDate, genId, genBatchNumber, calcDueDate, printBarcodeLabel, printBarcodeLabels } from "@/utils";
+import { formatCurrency as $, formatTime, formatTimeRelative, formatDate, formatDateDMY, genId, genBatchNumber, calcDueDate, printBarcodeLabel, printBarcodeLabels } from "@/utils";
 import { exportProducts } from "@/utils/export";
 import { getDateRange, type DateRange, type CustomRange } from "@/utils/dateRange";
 import { productApi } from "@/api";
@@ -493,6 +493,54 @@ export function InventoryPage() {
     list.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
     return list;
   }, [movements, movementProductFilter, movementsTypeFilter, movementDateBounds]);
+
+  // Aggregate feedMovements per (product + dateYMD + type + reason). Per
+  // request Bu Santi 29 Jun 2026: "ga mau -1 -1 -1, mau nya count". Mis. 5x
+  // sale produk X hari ini jadi 1 baris "−5 (5 transaksi)" bukan 5 baris "-1".
+  interface FeedGroup {
+    key: string;
+    productId: string;
+    productName: string;
+    dateYMD: string;
+    type: "in" | "out";
+    reason: string;
+    qty: number;
+    count: number;
+    lastCreatedAt: string;
+    sampleMovement: StockMovement; // untuk akses note/supplierId
+  }
+  const feedGroups = useMemo<FeedGroup[]>(() => {
+    const map = new Map<string, FeedGroup>();
+    for (const m of feedMovements) {
+      const dateYMD = m.createdAt.slice(0, 10);
+      const reasonKey = m.reason || (m.type === "in" ? "in_default" : "out_default");
+      const key = `${m.productId}|${dateYMD}|${m.type}|${reasonKey}`;
+      const g = map.get(key);
+      if (g) {
+        g.qty += m.quantity;
+        g.count += 1;
+        if (m.createdAt > g.lastCreatedAt) {
+          g.lastCreatedAt = m.createdAt;
+          g.sampleMovement = m;
+        }
+      } else {
+        const prod = products.find(p => p.id === m.productId);
+        map.set(key, {
+          key,
+          productId: m.productId,
+          productName: prod ? (lang === "id" ? prod.nameId : prod.name) : "",
+          dateYMD,
+          type: m.type,
+          reason: m.reason || "",
+          qty: m.quantity,
+          count: 1,
+          lastCreatedAt: m.createdAt,
+          sampleMovement: m,
+        });
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => b.lastCreatedAt.localeCompare(a.lastCreatedAt));
+  }, [feedMovements, products, lang]);
 
   // Stats hari ini — visible di hero card, kasih sinyal "ada pergerakan hari
   // ini". Pakai date bounds today saja (00:00 - 23:59 local time WIB).
@@ -1004,10 +1052,13 @@ export function InventoryPage() {
                 <Activity size={16} className={th.acc} /> Pergerakan Stok
               </p>
               <p className={`text-sm ${th.txm}`}>
-                {feedMovements.length} catatan
+                {feedGroups.length} aktivitas
+                {feedMovements.length !== feedGroups.length && (
+                  <span className={`ml-1 ${th.txf}`}>({feedMovements.length} catatan)</span>
+                )}
               </p>
             </div>
-            {feedMovements.length === 0 ? (
+            {feedGroups.length === 0 ? (
               <div className={`py-12 text-center ${th.txm}`}>
                 <Activity size={40} className="mx-auto opacity-20 mb-3" />
                 <p className="text-base font-bold mb-1">Belum ada pergerakan</p>
@@ -1021,13 +1072,12 @@ export function InventoryPage() {
               </div>
             ) : (
               <>
-                {feedMovements.slice(0, movementsVisibleCount).map((m, idx) => {
-                  const prod = products.find(p => p.id === m.productId);
-                  const isIn = m.type === "in";
+                {feedGroups.slice(0, movementsVisibleCount).map((g, idx) => {
+                  const isIn = g.type === "in";
                   return (
                     <div
-                      key={m.id}
-                      onClick={() => setDetailProductId(m.productId)}
+                      key={g.key}
+                      onClick={() => setDetailProductId(g.productId)}
                       className={`flex items-start gap-3 px-5 py-3.5 cursor-pointer active:opacity-70 ${idx > 0 ? `border-t ${th.bdrSoft}` : ""}`}>
                       <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 ${
                         isIn
@@ -1038,23 +1088,28 @@ export function InventoryPage() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className={`text-base font-bold truncate ${th.tx}`}>
-                          {lang === "id" ? prod?.nameId : prod?.name}
+                          {g.productName}
                           <span className={`ml-2 font-display font-black ${isIn ? th.acc : "text-[#BE123C] dark:text-[#FB7185]"}`}>
-                            {isIn ? "+" : "−"}{m.quantity}
+                            {isIn ? "+" : "−"}{g.qty}
                           </span>
+                          {g.count > 1 && (
+                            <span className={`ml-1.5 text-sm font-semibold ${th.txm}`}>
+                              ({g.count} transaksi)
+                            </span>
+                          )}
                         </p>
                         <p className={`text-sm mt-0.5 ${th.txm}`}>
-                          {reasonNatural(m)} · {formatTimeRelative(m.createdAt, "id")}
+                          {reasonNatural(g.sampleMovement)} · {formatTimeRelative(g.lastCreatedAt, "id")}
                         </p>
                       </div>
                     </div>
                   );
                 })}
-                {movementsVisibleCount < feedMovements.length && (
+                {movementsVisibleCount < feedGroups.length && (
                   <button
                     onClick={() => setMovementsVisibleCount(c => c + 30)}
                     className={`w-full py-4 text-base font-bold ${th.acc} border-t ${th.bdrSoft}`}>
-                    Lihat lebih banyak ({feedMovements.length - movementsVisibleCount} lagi)
+                    Lihat lebih banyak ({feedGroups.length - movementsVisibleCount} lagi)
                   </button>
                 )}
               </>
@@ -1687,7 +1742,7 @@ export function InventoryPage() {
                 </div>
                 {lastInMovement ? (
                   <p className={`text-xs ${th.txm}`}>
-                    Terakhir masuk: <b className={th.tx}>{formatDate(lastInMovement.createdAt)}</b> · +{lastInMovement.quantity} {p.unit}
+                    Terakhir masuk: <b className={th.tx}>{formatDateDMY(lastInMovement.createdAt)}</b> · +{lastInMovement.quantity} {p.unit}
                   </p>
                 ) : (
                   <p className={`text-xs ${th.txf}`}>Belum ada riwayat barang masuk.</p>
