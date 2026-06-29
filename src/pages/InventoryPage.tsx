@@ -1099,7 +1099,7 @@ export function InventoryPage() {
                           )}
                         </p>
                         <p className={`text-sm mt-0.5 ${th.txm}`}>
-                          {reasonNatural(g.sampleMovement)} · {formatTimeRelative(g.lastCreatedAt, "id")}
+                          {reasonNatural(g.sampleMovement)} · {formatDateDMY(g.lastCreatedAt)} · {formatTime(g.lastCreatedAt, "id")}
                         </p>
                       </div>
                     </div>
