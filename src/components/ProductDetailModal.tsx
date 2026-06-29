@@ -69,7 +69,8 @@ export function ProductDetailModal({ productId, onClose }: ProductDetailModalPro
   }, [product, movements]);
 
   // Aggregate per (tanggal YMD + type + reason). Setiap group jadi 1 row.
-  // Sorting: tanggal terbaru duluan, in sebelum out di hari yang sama.
+  // Plus running balance (sisa stok setelah movement terakhir di group) —
+  // banking statement style untuk Bu Santi mental model "abis ini stok jadi berapa".
   interface MovementGroup {
     key: string;
     dateYMD: string;
@@ -81,9 +82,23 @@ export function ProductDetailModal({ productId, onClose }: ProductDetailModalPro
     lastNote: string;   // note dari movement terakhir (untuk display kalau cuma 1 trx)
     supplierId?: string; // dipakai display supplier kalau ada
     lastCreatedAt: string; // timestamp paling baru di group (untuk ordering)
+    balanceAfter: number;  // sisa stok setelah movement terakhir di group ini
   }
   const groupedMovements = useMemo(() => {
+    // Build running balance backward dari products.stock saat ini, traverse
+    // movements oldest→newest. Hasil: map movementId → balance setelah movement.
+    const chrono = [...allProductMovements].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    const currentStock = product?.stock ?? 0;
+    const totalDelta = chrono.reduce((s, m) => s + (m.type === "in" ? m.quantity : -m.quantity), 0);
+    let running = currentStock - totalDelta;
+    const balanceByMovementId = new Map<string, number>();
+    for (const m of chrono) {
+      running += (m.type === "in" ? m.quantity : -m.quantity);
+      balanceByMovementId.set(m.id, running);
+    }
+
     const groups = new Map<string, MovementGroup>();
+    let lastMovementIdByGroup = new Map<string, string>();
     for (const m of allProductMovements) {
       const dateYMD = m.createdAt.slice(0, 10);
       const reasonKey = m.reason || (m.type === "in" ? "in_default" : "out_default");
@@ -93,6 +108,7 @@ export function ProductDetailModal({ productId, onClose }: ProductDetailModalPro
         qty: 0, count: 0, totalValue: 0, lastNote: "",
         supplierId: m.supplierId,
         lastCreatedAt: m.createdAt,
+        balanceAfter: 0,
       };
       g.qty += m.quantity;
       g.count += 1;
@@ -100,17 +116,24 @@ export function ProductDetailModal({ productId, onClose }: ProductDetailModalPro
       if (m.createdAt > g.lastCreatedAt) {
         g.lastCreatedAt = m.createdAt;
         g.lastNote = m.note || "";
+        lastMovementIdByGroup.set(key, m.id);
       } else if (!g.lastNote) {
         g.lastNote = m.note || "";
+        if (!lastMovementIdByGroup.has(key)) lastMovementIdByGroup.set(key, m.id);
       }
       groups.set(key, g);
+    }
+    // Assign balanceAfter dari movement terakhir di group
+    for (const [key, g] of groups) {
+      const lastMid = lastMovementIdByGroup.get(key);
+      g.balanceAfter = lastMid ? (balanceByMovementId.get(lastMid) ?? 0) : 0;
     }
     return Array.from(groups.values()).sort((a, b) => {
       if (a.dateYMD !== b.dateYMD) return b.dateYMD.localeCompare(a.dateYMD);
       if (a.type !== b.type) return a.type === "in" ? -1 : 1;
       return b.lastCreatedAt.localeCompare(a.lastCreatedAt);
     });
-  }, [allProductMovements]);
+  }, [allProductMovements, product]);
 
   // Toggle "Lihat semua" — default false, tampilkan 5 group terbaru. Reset
   // saat produk berganti supaya tidak carry-over state ke produk lain.
@@ -465,6 +488,17 @@ export function ProductDetailModal({ productId, onClose }: ProductDetailModalPro
                       {formatDateDMY(g.dateYMD)}
                       {sup ? ` · ${sup.name}` : ""}
                       {g.count === 1 && g.lastNote ? ` · ${g.lastNote}` : ""}
+                    </p>
+                    <p className={`text-xs mt-0.5 font-semibold inline-flex items-center gap-1 ${
+                      g.balanceAfter <= 0 ? "text-[#BE123C] dark:text-[#FB7185]"
+                      : g.balanceAfter <= (product?.minStock ?? 0) ? "text-[#BE123C] dark:text-[#FB7185]"
+                      : th.tx
+                    }`}>
+                      <span className={th.txf}>→ Sisa stok:</span>
+                      <span className="font-display font-black">{g.balanceAfter}</span>
+                      <span className={th.txm}>{product?.unit || ""}</span>
+                      {g.balanceAfter <= 0 && <span className="font-bold">(habis)</span>}
+                      {g.balanceAfter > 0 && g.balanceAfter <= (product?.minStock ?? 0) && <span className="font-bold">(menipis)</span>}
                     </p>
                   </div>
                 </div>

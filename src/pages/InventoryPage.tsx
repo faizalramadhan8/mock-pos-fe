@@ -494,6 +494,33 @@ export function InventoryPage() {
     return list;
   }, [movements, movementProductFilter, movementsTypeFilter, movementDateBounds]);
 
+  // Running balance map per movementId → stok setelah movement itu. Per
+  // request Bu Santi 29 Jun 2026: "ga ngerti tambah/kurang tanpa tau sisa
+  // stok" — banking statement pattern. Backward-derive dari products.stock
+  // saat ini, traverse chronological.
+  const balanceAfterByMovementId = useMemo(() => {
+    const map = new Map<string, number>();
+    // Group movements by product, urut kronologis (oldest first)
+    const byProduct = new Map<string, StockMovement[]>();
+    for (const m of movements) {
+      const arr = byProduct.get(m.productId) || [];
+      arr.push(m);
+      byProduct.set(m.productId, arr);
+    }
+    for (const [pid, arr] of byProduct) {
+      arr.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+      const prod = products.find(p => p.id === pid);
+      const currentStock = prod?.stock ?? 0;
+      const totalDelta = arr.reduce((s, m) => s + (m.type === "in" ? m.quantity : -m.quantity), 0);
+      let running = currentStock - totalDelta; // stok awal sebelum movement pertama
+      for (const m of arr) {
+        running += (m.type === "in" ? m.quantity : -m.quantity);
+        map.set(m.id, running);
+      }
+    }
+    return map;
+  }, [movements, products]);
+
   // Aggregate feedMovements per (product + dateYMD + type + reason). Per
   // request Bu Santi 29 Jun 2026: "ga mau -1 -1 -1, mau nya count". Mis. 5x
   // sale produk X hari ini jadi 1 baris "−5 (5 transaksi)" bukan 5 baris "-1".
@@ -1074,6 +1101,13 @@ export function InventoryPage() {
               <>
                 {feedGroups.slice(0, movementsVisibleCount).map((g, idx) => {
                   const isIn = g.type === "in";
+                  // Sisa stok setelah movement terakhir di group. Bu Santi
+                  // mental model "banking statement" — selalu tampil "saldo".
+                  const balanceAfter = balanceAfterByMovementId.get(g.sampleMovement.id);
+                  const prod = products.find(p => p.id === g.productId);
+                  const minStock = prod?.minStock ?? 0;
+                  const isLow = balanceAfter !== undefined && balanceAfter <= minStock && balanceAfter > 0;
+                  const isEmpty = balanceAfter !== undefined && balanceAfter <= 0;
                   return (
                     <div
                       key={g.key}
@@ -1101,6 +1135,19 @@ export function InventoryPage() {
                         <p className={`text-sm mt-0.5 ${th.txm}`}>
                           {reasonNatural(g.sampleMovement)} · {formatDateDMY(g.lastCreatedAt)} · {formatTime(g.lastCreatedAt, "id")}
                         </p>
+                        {balanceAfter !== undefined && (
+                          <p className={`text-sm mt-1 font-semibold inline-flex items-center gap-1 ${
+                            isEmpty ? "text-[#BE123C] dark:text-[#FB7185]"
+                            : isLow ? "text-[#BE123C] dark:text-[#FB7185]"
+                            : th.tx
+                          }`}>
+                            <span className={th.txf}>→ Sisa stok:</span>
+                            <span className="font-display font-black">{balanceAfter}</span>
+                            <span className={th.txm}>{prod?.unit || ""}</span>
+                            {isEmpty && <span className="text-xs font-bold">(habis)</span>}
+                            {!isEmpty && isLow && <span className="text-xs font-bold">(menipis)</span>}
+                          </p>
+                        )}
                       </div>
                     </div>
                   );
