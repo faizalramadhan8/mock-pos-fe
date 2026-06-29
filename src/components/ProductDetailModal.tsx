@@ -6,7 +6,7 @@ import {
   useCategoryStore, useSupplierStore, useAuthStore, useLangStore,
 } from "@/stores";
 import { useThemeClasses } from "@/hooks/useThemeClasses";
-import { formatCurrency as $, formatDate, formatDateDMY, printBarcodeLabel } from "@/utils";
+import { formatCurrency as $, formatDate, formatDateDMY, formatTime, printBarcodeLabel } from "@/utils";
 import { ArrowDownCircle, ArrowUpCircle, Printer } from "lucide-react";
 import { productApi, type ProductPriceHistoryRes } from "@/api/products";
 
@@ -128,10 +128,11 @@ export function ProductDetailModal({ productId, onClose }: ProductDetailModalPro
       const lastMid = lastMovementIdByGroup.get(key);
       g.balanceAfter = lastMid ? (balanceByMovementId.get(lastMid) ?? 0) : 0;
     }
+    // Sort: hari terbaru di atas, dalam hari kronologis ASC (banking style)
+    // supaya saldo linear top→bottom. Per Bu Santi 29 Jun 2026.
     return Array.from(groups.values()).sort((a, b) => {
       if (a.dateYMD !== b.dateYMD) return b.dateYMD.localeCompare(a.dateYMD);
-      if (a.type !== b.type) return a.type === "in" ? -1 : 1;
-      return b.lastCreatedAt.localeCompare(a.lastCreatedAt);
+      return a.lastCreatedAt.localeCompare(b.lastCreatedAt);
     });
   }, [allProductMovements, product]);
 
@@ -485,7 +486,7 @@ export function ProductDetailModal({ productId, onClose }: ProductDetailModalPro
                       )}
                     </div>
                     <p className={`text-xs ${th.txf} mt-0.5`}>
-                      {formatDateDMY(g.dateYMD)}
+                      {formatDateDMY(g.dateYMD)} · {formatTime(g.lastCreatedAt, "id")}
                       {sup ? ` · ${sup.name}` : ""}
                       {g.count === 1 && g.lastNote ? ` · ${g.lastNote}` : ""}
                     </p>
@@ -496,7 +497,6 @@ export function ProductDetailModal({ productId, onClose }: ProductDetailModalPro
                     }`}>
                       <span className={th.txf}>→ Sisa stok:</span>
                       <span className="font-display font-black">{g.balanceAfter}</span>
-                      <span className={th.txm}>{product?.unit || ""}</span>
                       {g.balanceAfter <= 0 && <span className="font-bold">(habis)</span>}
                       {g.balanceAfter > 0 && g.balanceAfter <= (product?.minStock ?? 0) && <span className="font-bold">(menipis)</span>}
                     </p>

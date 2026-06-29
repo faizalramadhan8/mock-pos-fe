@@ -566,7 +566,14 @@ export function InventoryPage() {
         });
       }
     }
-    return Array.from(map.values()).sort((a, b) => b.lastCreatedAt.localeCompare(a.lastCreatedAt));
+    // Sort: hari terbaru di atas, dalam hari kronologis ASC (pagi → malam).
+    // Banking statement style — saldo naik/turun linear top→bottom dalam day.
+    // Per request Bu Santi 29 Jun 2026: "yg nambah di atas yg kurang di bawah
+    // bikin bingung, kenapa sisa 1 padahal udah terjual".
+    return Array.from(map.values()).sort((a, b) => {
+      if (a.dateYMD !== b.dateYMD) return b.dateYMD.localeCompare(a.dateYMD);
+      return a.lastCreatedAt.localeCompare(b.lastCreatedAt);
+    });
   }, [feedMovements, products, lang]);
 
   // Stats hari ini — visible di hero card, kasih sinyal "ada pergerakan hari
@@ -1099,59 +1106,94 @@ export function InventoryPage() {
               </div>
             ) : (
               <>
-                {feedGroups.slice(0, movementsVisibleCount).map((g, idx) => {
-                  const isIn = g.type === "in";
-                  // Sisa stok setelah movement terakhir di group. Bu Santi
-                  // mental model "banking statement" — selalu tampil "saldo".
-                  const balanceAfter = balanceAfterByMovementId.get(g.sampleMovement.id);
-                  const prod = products.find(p => p.id === g.productId);
-                  const minStock = prod?.minStock ?? 0;
-                  const isLow = balanceAfter !== undefined && balanceAfter <= minStock && balanceAfter > 0;
-                  const isEmpty = balanceAfter !== undefined && balanceAfter <= 0;
-                  return (
-                    <div
-                      key={g.key}
-                      onClick={() => setDetailProductId(g.productId)}
-                      className={`flex items-start gap-3 px-5 py-3.5 cursor-pointer active:opacity-70 ${idx > 0 ? `border-t ${th.bdrSoft}` : ""}`}>
-                      <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 ${
-                        isIn
-                          ? (th.dark ? "bg-[#E11D48]/15" : "bg-[#FFE4E9]")
-                          : (th.dark ? "bg-[#C4504A]/15" : "bg-[#FCE4EC]")
-                      }`}>
-                        {isIn ? <ArrowDownCircle size={18} className={th.acc} /> : <ArrowUpCircle size={18} className="text-[#C4504A]" />}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className={`text-base font-bold truncate ${th.tx}`}>
-                          {g.productName}
-                          <span className={`ml-2 font-display font-black ${isIn ? th.acc : "text-[#BE123C] dark:text-[#FB7185]"}`}>
-                            {isIn ? "+" : "−"}{g.qty}
-                          </span>
-                          {g.count > 1 && (
-                            <span className={`ml-1.5 text-sm font-semibold ${th.txm}`}>
-                              ({g.count} transaksi)
-                            </span>
-                          )}
+                {(() => {
+                  // Group rows by dateYMD for section header rendering.
+                  // Newest day at top, within day chronological ASC (pagi→malam)
+                  // supaya saldo naik/turun linear top→bottom (banking style).
+                  const visibleGroups = feedGroups.slice(0, movementsVisibleCount);
+                  const sections: { dateYMD: string; rows: typeof visibleGroups }[] = [];
+                  for (const g of visibleGroups) {
+                    const last = sections[sections.length - 1];
+                    if (last && last.dateYMD === g.dateYMD) {
+                      last.rows.push(g);
+                    } else {
+                      sections.push({ dateYMD: g.dateYMD, rows: [g] });
+                    }
+                  }
+                  const todayYMD = new Date().toISOString().slice(0, 10);
+                  const yesterdayD = new Date(); yesterdayD.setDate(yesterdayD.getDate() - 1);
+                  const yesterdayYMD = yesterdayD.toISOString().slice(0, 10);
+                  const dayLabel = (ymd: string) => {
+                    if (ymd === todayYMD) return `Hari Ini · ${formatDateDMY(ymd)}`;
+                    if (ymd === yesterdayYMD) return `Kemarin · ${formatDateDMY(ymd)}`;
+                    return formatDateDMY(ymd);
+                  };
+                  return sections.map((section, sIdx) => (
+                    <div key={section.dateYMD}>
+                      <div className={`px-5 py-2.5 ${th.elev} ${sIdx > 0 ? `border-t ${th.bdr}` : ""}`}>
+                        <p className={`text-sm font-extrabold uppercase tracking-wider ${th.acc}`}>
+                          {dayLabel(section.dateYMD)}
                         </p>
-                        <p className={`text-sm mt-0.5 ${th.txm}`}>
-                          {reasonNatural(g.sampleMovement)} · {formatDateDMY(g.lastCreatedAt)} · {formatTime(g.lastCreatedAt, "id")}
-                        </p>
-                        {balanceAfter !== undefined && (
-                          <p className={`text-sm mt-1 font-semibold inline-flex items-center gap-1 ${
-                            isEmpty ? "text-[#BE123C] dark:text-[#FB7185]"
-                            : isLow ? "text-[#BE123C] dark:text-[#FB7185]"
-                            : th.tx
-                          }`}>
-                            <span className={th.txf}>→ Sisa stok:</span>
-                            <span className="font-display font-black">{balanceAfter}</span>
-                            <span className={th.txm}>{prod?.unit || ""}</span>
-                            {isEmpty && <span className="text-xs font-bold">(habis)</span>}
-                            {!isEmpty && isLow && <span className="text-xs font-bold">(menipis)</span>}
-                          </p>
-                        )}
                       </div>
+                      {section.rows.map((g, rIdx) => {
+                        const isIn = g.type === "in";
+                        const balanceAfter = balanceAfterByMovementId.get(g.sampleMovement.id);
+                        const prod = products.find(p => p.id === g.productId);
+                        const minStock = prod?.minStock ?? 0;
+                        const isLow = balanceAfter !== undefined && balanceAfter <= minStock && balanceAfter > 0;
+                        const isEmpty = balanceAfter !== undefined && balanceAfter <= 0;
+                        return (
+                          <div
+                            key={g.key}
+                            onClick={() => setDetailProductId(g.productId)}
+                            className={`flex items-start gap-3 px-5 py-3.5 cursor-pointer active:opacity-70 ${rIdx > 0 ? `border-t ${th.bdrSoft}` : ""}`}>
+                            {/* Jam besar di kiri — prominent timestamp */}
+                            <div className="shrink-0 w-14 text-right">
+                              <p className={`font-display font-bold text-base ${th.tx}`}>
+                                {formatTime(g.lastCreatedAt, "id")}
+                              </p>
+                            </div>
+                            <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 ${
+                              isIn
+                                ? (th.dark ? "bg-[#E11D48]/15" : "bg-[#FFE4E9]")
+                                : (th.dark ? "bg-[#C4504A]/15" : "bg-[#FCE4EC]")
+                            }`}>
+                              {isIn ? <ArrowDownCircle size={18} className={th.acc} /> : <ArrowUpCircle size={18} className="text-[#C4504A]" />}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className={`text-base font-bold truncate ${th.tx}`}>
+                                {g.productName}
+                                <span className={`ml-2 font-display font-black ${isIn ? th.acc : "text-[#BE123C] dark:text-[#FB7185]"}`}>
+                                  {isIn ? "+" : "−"}{g.qty}
+                                </span>
+                                {g.count > 1 && (
+                                  <span className={`ml-1.5 text-sm font-semibold ${th.txm}`}>
+                                    ({g.count} transaksi)
+                                  </span>
+                                )}
+                              </p>
+                              <p className={`text-sm mt-0.5 ${th.txm}`}>
+                                {reasonNatural(g.sampleMovement)}
+                              </p>
+                              {balanceAfter !== undefined && (
+                                <p className={`text-sm mt-1 font-semibold inline-flex items-center gap-1 ${
+                                  isEmpty ? "text-[#BE123C] dark:text-[#FB7185]"
+                                  : isLow ? "text-[#BE123C] dark:text-[#FB7185]"
+                                  : th.tx
+                                }`}>
+                                  <span className={th.txf}>→ Sisa stok:</span>
+                                  <span className="font-display font-black">{balanceAfter}</span>
+                                  {isEmpty && <span className="text-xs font-bold">(habis)</span>}
+                                  {!isEmpty && isLow && <span className="text-xs font-bold">(menipis)</span>}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
-                  );
-                })}
+                  ));
+                })()}
                 {movementsVisibleCount < feedGroups.length && (
                   <button
                     onClick={() => setMovementsVisibleCount(c => c + 30)}
