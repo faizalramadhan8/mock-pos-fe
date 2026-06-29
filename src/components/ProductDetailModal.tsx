@@ -6,8 +6,7 @@ import {
   useCategoryStore, useSupplierStore, useAuthStore, useLangStore,
 } from "@/stores";
 import { useThemeClasses } from "@/hooks/useThemeClasses";
-import { formatCurrency as $, formatDate, formatTime, printBarcodeLabel } from "@/utils";
-import { getDateRange, type DateRange, type CustomRange } from "@/utils/dateRange";
+import { formatCurrency as $, formatDate, formatDateDMY, printBarcodeLabel } from "@/utils";
 import { ArrowDownCircle, ArrowUpCircle, Printer } from "lucide-react";
 import { productApi, type ProductPriceHistoryRes } from "@/api/products";
 
@@ -57,49 +56,73 @@ export function ProductDetailModal({ productId, onClose }: ProductDetailModalPro
     [product, batches]
   );
 
-  // Filter periode untuk Pergerakan Terakhir — default "all" supaya owner
-  // lihat full history per produk. Reset saat ganti produk.
-  const [dateRange, setDateRange] = useState<DateRange>("all");
-  const [customRange, setCustomRange] = useState<CustomRange>({ from: "", to: "" });
-  useEffect(() => {
-    setDateRange("all");
-    setCustomRange({ from: "", to: "" });
-  }, [product?.id]);
+  // Per request Bu Santi 29 Jun 2026: hapus filter tanggal di Pergerakan
+  // Terakhir + aggregate per (tanggal + alasan) supaya tidak tampil "-1 -1
+  // -1 -1" untuk tiap penjualan. Group format: "29/06/2026 · Terjual ke
+  // kasir · -10 (10 transaksi)" — 1 row agregat.
 
-  const customError = dateRange === "custom" && (
-    !customRange.from || !customRange.to
-      ? "Pilih tanggal awal dan akhir."
-      : new Date(customRange.from) > new Date(customRange.to)
-        ? "Tanggal awal tidak boleh setelah tanggal akhir."
-        : ""
-  );
-
-  // Semua movement untuk produk (sorted by date desc — newest first), lalu
-  // filter by date range. Dipakai untuk display + summary.
+  // Semua movement untuk produk, sorted newest first.
   const allProductMovements = useMemo(() => {
     if (!product) return [];
-    const list = [...movements.filter(m => m.productId === product.id)]
+    return [...movements.filter(m => m.productId === product.id)]
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-    if (customError) return list;
-    const range = getDateRange(dateRange, customRange);
-    if (!range) return list;
-    return list.filter(m => {
-      const d = new Date(m.createdAt);
-      return d >= range.start && d <= range.end;
-    });
-  }, [product, movements, dateRange, customRange, customError]);
+  }, [product, movements]);
 
-  // Toggle "Lihat semua" — default false, tampilkan 5 latest. Reset saat
-  // produk berganti supaya tidak carry-over state ke produk lain.
+  // Aggregate per (tanggal YMD + type + reason). Setiap group jadi 1 row.
+  // Sorting: tanggal terbaru duluan, in sebelum out di hari yang sama.
+  interface MovementGroup {
+    key: string;
+    dateYMD: string;
+    type: "in" | "out";
+    reason: string;
+    qty: number;        // total qty (signed implicit via type)
+    count: number;      // jumlah transaksi yang ke-aggregate
+    totalValue: number; // sum unit_price × qty (untuk display rupiah)
+    lastNote: string;   // note dari movement terakhir (untuk display kalau cuma 1 trx)
+    supplierId?: string; // dipakai display supplier kalau ada
+    lastCreatedAt: string; // timestamp paling baru di group (untuk ordering)
+  }
+  const groupedMovements = useMemo(() => {
+    const groups = new Map<string, MovementGroup>();
+    for (const m of allProductMovements) {
+      const dateYMD = m.createdAt.slice(0, 10);
+      const reasonKey = m.reason || (m.type === "in" ? "in_default" : "out_default");
+      const key = `${dateYMD}|${m.type}|${reasonKey}|${m.supplierId || ""}`;
+      const g = groups.get(key) || {
+        key, dateYMD, type: m.type, reason: m.reason || "",
+        qty: 0, count: 0, totalValue: 0, lastNote: "",
+        supplierId: m.supplierId,
+        lastCreatedAt: m.createdAt,
+      };
+      g.qty += m.quantity;
+      g.count += 1;
+      g.totalValue += (m.unitPrice || 0) * m.quantity;
+      if (m.createdAt > g.lastCreatedAt) {
+        g.lastCreatedAt = m.createdAt;
+        g.lastNote = m.note || "";
+      } else if (!g.lastNote) {
+        g.lastNote = m.note || "";
+      }
+      groups.set(key, g);
+    }
+    return Array.from(groups.values()).sort((a, b) => {
+      if (a.dateYMD !== b.dateYMD) return b.dateYMD.localeCompare(a.dateYMD);
+      if (a.type !== b.type) return a.type === "in" ? -1 : 1;
+      return b.lastCreatedAt.localeCompare(a.lastCreatedAt);
+    });
+  }, [allProductMovements]);
+
+  // Toggle "Lihat semua" — default false, tampilkan 5 group terbaru. Reset
+  // saat produk berganti supaya tidak carry-over state ke produk lain.
   const [showAllMovements, setShowAllMovements] = useState(false);
   useEffect(() => { setShowAllMovements(false); }, [product?.id]);
 
-  const recentMovements = useMemo(() =>
-    showAllMovements ? allProductMovements : allProductMovements.slice(0, 5),
-    [allProductMovements, showAllMovements]
+  const recentMovementGroups = useMemo(() =>
+    showAllMovements ? groupedMovements : groupedMovements.slice(0, 5),
+    [groupedMovements, showAllMovements]
   );
 
-  // Summary qty in vs out untuk audit selisih cepat (filtered by range).
+  // Summary qty in vs out — tetap dipakai untuk header summary line.
   const movementSummary = useMemo(() => {
     let totalIn = 0, totalOut = 0;
     for (const m of allProductMovements) {
@@ -339,24 +362,42 @@ export function ProductDetailModal({ productId, onClose }: ProductDetailModalPro
         ) : (
           <div className="space-y-2">
             {productBatches.slice(0, 5).map(batch => {
-              const days = Math.ceil((new Date(batch.expiryDate).getTime() - now) / (1000 * 60 * 60 * 24));
-              const isExpired = days <= 0;
-              const isUrgent = days > 0 && days <= 14;
+              // Guard: expiryDate bisa empty/invalid untuk produk non-perishable
+              // atau historical data tanpa ED. Tampilkan fallback "Tanpa ED"
+              // bukan "NaN hari" + "Invalid Date" (yang bikin Bu Santi bingung).
+              const expDate = batch.expiryDate ? new Date(batch.expiryDate) : null;
+              const hasValidED = expDate && !isNaN(expDate.getTime());
+              const days = hasValidED
+                ? Math.ceil((expDate!.getTime() - now) / (1000 * 60 * 60 * 24))
+                : null;
+              const isExpired = days !== null && days <= 0;
+              const isUrgent = days !== null && days > 0 && days <= 14;
               return (
                 <div key={batch.id} className={`flex items-center justify-between py-1.5 border-b last:border-0 ${th.bdrSoft}`}>
                   <div>
                     <p className={`text-xs font-mono ${th.txm}`}>{batch.batchNumber}</p>
-                    <p className={`text-xs ${th.txf}`}>{batch.quantity} {product.unit} · {t.expires} {formatDate(batch.expiryDate)}</p>
+                    <p className={`text-xs ${th.txf}`}>
+                      {batch.quantity} {product.unit}
+                      {hasValidED
+                        ? <> · {t.expires} {formatDate(batch.expiryDate)}</>
+                        : <> · Tanpa ED</>}
+                    </p>
                   </div>
-                  <span className={`text-xs font-bold px-2 py-0.5 rounded-md ${
-                    isExpired
-                      ? (th.dark ? "bg-[#BE123C]/15 text-[#BE123C]" : "bg-[#FCE4EC] text-[#BE123C]")
-                      : isUrgent
-                        ? (th.dark ? "bg-[#FB7185]/15 text-[#FB7185]" : "bg-[#FFE4E9] text-[#E11D48]")
-                        : (th.dark ? "bg-[#E11D48]/15 text-[#E11D48]" : "bg-[#F0F8EC] text-[#E11D48]")
-                  }`}>
-                    {isExpired ? (t.expired as string) : `${days} ${t.days}`}
-                  </span>
+                  {hasValidED ? (
+                    <span className={`text-xs font-bold px-2 py-0.5 rounded-md ${
+                      isExpired
+                        ? (th.dark ? "bg-[#BE123C]/15 text-[#BE123C]" : "bg-[#FCE4EC] text-[#BE123C]")
+                        : isUrgent
+                          ? (th.dark ? "bg-[#FB7185]/15 text-[#FB7185]" : "bg-[#FFE4E9] text-[#E11D48]")
+                          : (th.dark ? "bg-[#E11D48]/15 text-[#E11D48]" : "bg-[#F0F8EC] text-[#E11D48]")
+                    }`}>
+                      {isExpired ? (t.expired as string) : `${days} ${t.days}`}
+                    </span>
+                  ) : (
+                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-md ${th.elev} ${th.txf}`}>
+                      —
+                    </span>
+                  )}
                 </div>
               );
             })}
@@ -367,8 +408,8 @@ export function ProductDetailModal({ productId, onClose }: ProductDetailModalPro
         )}
       </div>
 
-      {/* Recent Movements — dengan toggle "Lihat semua" + summary in/out
-          + filter periode untuk audit selisih per produk per range. */}
+      {/* Recent Movements — aggregated per (tanggal + alasan) supaya tidak
+          tampil "-1 -1 -1 -1" per individual sale. Plus toggle "Lihat semua". */}
       <div className={`rounded-2xl border p-4 mb-3 ${th.bdr} ${th.card2}`}>
         <div className="flex items-center justify-between mb-2.5 gap-2 flex-wrap">
           <p className={`text-xs font-bold uppercase tracking-wider ${th.txf}`}>
@@ -386,81 +427,58 @@ export function ProductDetailModal({ productId, onClose }: ProductDetailModalPro
           )}
         </div>
 
-        {/* Filter periode — sama pola dengan Laporan/Pengeluaran/Faktur. */}
-        <div className="flex flex-wrap items-center gap-2 mb-3">
-          <select value={dateRange} onChange={e => setDateRange(e.target.value as DateRange)}
-            className={`px-2.5 py-1.5 text-xs font-bold rounded-lg border ${th.inp}`}>
-            <option value="today">Hari Ini</option>
-            <option value="yesterday">Kemarin</option>
-            <option value="week">Minggu Ini</option>
-            <option value="month">Bulan Ini</option>
-            <option value="all">Semua</option>
-            <option value="custom">Pilih Tanggal</option>
-          </select>
-          {dateRange === "custom" && (
-            <>
-              <input type="date" value={customRange.from} max={customRange.to || undefined}
-                onChange={e => setCustomRange(r => ({ ...r, from: e.target.value }))}
-                aria-label="Tanggal awal"
-                className={`px-2.5 py-1.5 text-xs font-bold rounded-lg border ${th.inp}`} />
-              <span className={`text-xs ${th.txm}`}>s/d</span>
-              <input type="date" value={customRange.to} min={customRange.from || undefined}
-                onChange={e => setCustomRange(r => ({ ...r, to: e.target.value }))}
-                aria-label="Tanggal akhir"
-                className={`px-2.5 py-1.5 text-xs font-bold rounded-lg border ${th.inp}`} />
-            </>
-          )}
-        </div>
-        {customError && (
-          <p role="alert" className={`text-xs font-bold mb-2 ${th.dark ? "text-[#FB7185]" : "text-[#BE123C]"}`}>
-            {customError}
-          </p>
-        )}
-        {recentMovements.length === 0 ? (
-          <p className={`text-xs ${th.txf}`}>
-            {dateRange === "all"
-              ? (t.noRecentMovements as string)
-              : "Tidak ada pergerakan di periode ini. Coba ubah filter."}
-          </p>
+        {/* Filter periode DIHAPUS per request Bu Santi 29 Jun 2026 — list
+            jadi feed agregat per (tanggal + alasan). Bu Santi: "ga mau lihat
+            -1 -1 -1, mau nya count". */}
+        {recentMovementGroups.length === 0 ? (
+          <p className={`text-xs ${th.txf}`}>{t.noRecentMovements as string}</p>
         ) : (
           <div className="space-y-2">
-            {recentMovements.map(m => {
-              const sup = m.supplierId ? suppliers.find(s => s.id === m.supplierId) : null;
-              const reasonInfo = REASON_BADGE[m.reason || ""] ?? REASON_BADGE.default;
+            {recentMovementGroups.map(g => {
+              const sup = g.supplierId ? suppliers.find(s => s.id === g.supplierId) : null;
+              const reasonInfo = REASON_BADGE[g.reason] ?? REASON_BADGE.default;
+              const isIn = g.type === "in";
               return (
-                <div key={m.id} className={`flex items-start gap-2 py-2 border-b last:border-0 ${th.bdrSoft}`}>
-                  {m.type === "in"
+                <div key={g.key} className={`flex items-start gap-2 py-2 border-b last:border-0 ${th.bdrSoft}`}>
+                  {isIn
                     ? <ArrowDownCircle size={14} className="shrink-0 mt-0.5 text-[#E11D48]" />
                     : <ArrowUpCircle size={14} className="shrink-0 mt-0.5 text-[#BE123C]" />
                   }
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5 flex-wrap">
-                      <p className={`text-xs font-bold ${th.tx}`}>
-                        {m.type === "in" ? "+" : "-"}{m.quantity}
+                      <p className={`text-sm font-bold ${th.tx}`}>
+                        {isIn ? "+" : "−"}{g.qty}
                       </p>
                       <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${th.dark ? reasonInfo.darkClass : reasonInfo.lightClass}`}>
                         {reasonInfo.label}
                       </span>
-                      {m.unitPrice > 0 && (
-                        <span className={`text-xs ${th.txm}`}>· {$(m.unitPrice * m.quantity)}</span>
+                      {g.count > 1 && (
+                        <span className={`text-xs font-semibold ${th.txm}`}>
+                          ({g.count} transaksi)
+                        </span>
+                      )}
+                      {g.totalValue > 0 && (
+                        <span className={`text-xs ${th.txm}`}>· {$(g.totalValue)}</span>
                       )}
                     </div>
-                    <p className={`text-xs truncate ${th.txf} mt-0.5`}>
-                      {m.note}{sup ? ` · ${sup.name}` : ""} · {formatDate(m.createdAt)} {formatTime(m.createdAt)}
+                    <p className={`text-xs ${th.txf} mt-0.5`}>
+                      {formatDateDMY(g.dateYMD)}
+                      {sup ? ` · ${sup.name}` : ""}
+                      {g.count === 1 && g.lastNote ? ` · ${g.lastNote}` : ""}
                     </p>
                   </div>
                 </div>
               );
             })}
-            {allProductMovements.length > 5 && (
+            {groupedMovements.length > 5 && (
               <button
                 type="button"
                 onClick={() => setShowAllMovements(v => !v)}
                 className={`w-full min-h-[44px] mt-2 text-sm font-bold rounded-xl ${th.accBg} ${th.acc}`}
               >
                 {showAllMovements
-                  ? `Sembunyikan (tampil ${allProductMovements.length})`
-                  : `Lihat semua (${allProductMovements.length - 5} lagi)`}
+                  ? `Sembunyikan (tampil ${groupedMovements.length})`
+                  : `Lihat semua (${groupedMovements.length - 5} lagi)`}
               </button>
             )}
           </div>

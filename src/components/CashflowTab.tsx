@@ -244,11 +244,12 @@ export function CashflowTab() {
     type RawRow = Omit<LedgerRow, "no" | "balance">;
     const rawRows: RawRow[] = [];
 
-    // Collect all dates yang punya event
+    // Collect all dates yang punya event yang TAMPIL di ledger.
+    // Invoice tidak include — sudah dihapus dari ledger row (Bu Santi 27 Jun),
+    // total cuma di summary card.
     const allDates = new Set<string>();
     salesByDay.forEach((_, k) => allDates.add(k));
     expenseRows.forEach(e => allDates.add(e.expense_date));
-    invoiceRows.forEach(i => allDates.add(i.paidAt!.slice(0, 10)));
     refundRows.forEach(r => allDates.add(r.createdAt.slice(0, 10)));
     capitalEntries.forEach(c => allDates.add(c.injectedAt));
 
@@ -292,21 +293,13 @@ export function CashflowTab() {
         runningOut += e.amount;
       }
 
-      // Invoice paid per hari — TIDAK masuk runningOut (Bu Santi: faktur
-      // bukan pengeluaran operasional). Tetap tampil di ledger sebagai
-      // info dengan styling lebih muted supaya jelas "tidak dihitung".
-      const iRows = invoiceRows
-        .filter(i => i.paidAt!.slice(0, 10) === date)
-        .sort((a, b) => (a.paidAt || "").localeCompare(b.paidAt || ""));
+      // Invoice paid per hari — TIDAK masuk ledger row (Bu Santi 27 Jun 2026:
+      // "agak ribet saya membacanya, kalau hanya info sebaiknya dihapus saja").
+      // Total bayar supplier tetap muncul di summary card "Bayar Supplier Bulan
+      // Ini" sebagai info ringkas, tapi tidak per-row di ledger.
+      const iRows = invoiceRows.filter(i => i.paidAt!.slice(0, 10) === date);
       for (const i of iRows) {
-        rawRows.push({
-          dateStr: date,
-          description: `Bayar faktur ${i.invoiceNumber || i.id.slice(0, 8)} · ${i.supplierName || ""}`.trim(),
-          out: i.totalAmount,
-          type: "invoice",
-        });
         runningInvoicePaid += i.totalAmount;
-        // tidak runningOut += i.totalAmount;
       }
 
       // Refunds per hari
@@ -565,19 +558,10 @@ export function CashflowTab() {
         </div>
       </div>
 
-      {/* Info tambahan: Bayar Supplier — bukan pengeluaran operasional,
-          tapi tetap perlu tampil supaya owner aware cash out untuk stok. */}
-      {totalInvoicePaid > 0 && (
-        <div className={`rounded-2xl border p-3 ${th.card2} ${th.bdr} flex items-start gap-2`}>
-          <Info size={14} className={`${th.txm} mt-0.5 shrink-0`} />
-          <div className="flex-1">
-            <p className={`text-xs font-bold ${th.tx}`}>Bayar Supplier Bulan Ini</p>
-            <p className={`text-xs mt-0.5 ${th.txm}`}>
-              <strong className={th.tx}>{$(totalInvoicePaid)}</strong> — pembelian stok, tidak masuk hitungan Pengeluaran/Selisih.
-            </p>
-          </div>
-        </div>
-      )}
+      {/* Card "Bayar Supplier Bulan Ini" dihapus 29 Jun 2026 per Bu Santi:
+          bayar supplier dicatat manual via tab Pengeluaran (kategori "Bayar X")
+          supaya MASUK hitungan Selisih. Tab Catat Faktur cuma untuk track utang
+          (jatuh tempo + status lunas), tidak berpengaruh ke Arus Kas. */}
 
       {/* Utang faktur belum lunas — liability info, tidak masuk hitungan. */}
       {unpaidInvoicesCount > 0 && (

@@ -459,17 +459,23 @@ export function InventoryPage() {
     );
   };
 
-  // Tab Pergerakan Stok — feed style gabungan in+out (Bu Santi 25 Jun 2026:
-  // "ga mau filter tanggal, gabung saja"). Date filter dihapus karena Bu Santi
-  // (orang tua) bingung dengan default "Bulan Ini" yang kelihatan kosong di
-  // awal bulan. Sekarang feed newest-first scroll, plus type filter chip
-  // (Semua/Masuk/Keluar) yang opsional.
+  // Tab Pergerakan Stok — feed style gabungan in+out + filter tanggal.
+  // 25 Jun 2026 awalnya filter tanggal dihapus (gabung jadi 1 tab feed),
+  // tapi 29 Jun 2026 Bu Santi clarify: filter yg dihapus harusnya di
+  // Product Detail "Pergerakan Terakhir", bukan di tab utama ini. Restore.
   const [movementProductFilter, setMovementProductFilter] = useState("");
   const [movementsTypeFilter, setMovementsTypeFilter] = useState<"all" | "in" | "out">("all");
   const [movementsVisibleCount, setMovementsVisibleCount] = useState(30);
+  const [movementDateRange, setMovementDateRange] = useState<DateRange>("all");
+  const [movementCustomRange, setMovementCustomRange] = useState<CustomRange>({ from: "", to: "" });
+
+  // Date bounds memo — derive Date objects dari dateRange + customRange.
+  const movementDateBounds = useMemo(() => {
+    return getDateRange(movementDateRange, movementCustomRange);
+  }, [movementDateRange, movementCustomRange]);
 
   // Feed pergerakan stok — gabungan in+out, sorted newest first. Filter
-  // product opsional (kalau dipakai). Type filter via chip toggle.
+  // product opsional, type via chip toggle, plus date range filter.
   const feedMovements = useMemo(() => {
     let list = movements.slice();
     if (movementProductFilter) {
@@ -478,9 +484,15 @@ export function InventoryPage() {
     if (movementsTypeFilter !== "all") {
       list = list.filter(m => m.type === movementsTypeFilter);
     }
+    if (movementDateBounds) {
+      list = list.filter(m => {
+        const d = new Date(m.createdAt);
+        return d >= movementDateBounds.start && d <= movementDateBounds.end;
+      });
+    }
     list.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
     return list;
-  }, [movements, movementProductFilter, movementsTypeFilter]);
+  }, [movements, movementProductFilter, movementsTypeFilter, movementDateBounds]);
 
   // Stats hari ini — visible di hero card, kasih sinyal "ada pergerakan hari
   // ini". Pakai date bounds today saja (00:00 - 23:59 local time WIB).
@@ -931,7 +943,7 @@ export function InventoryPage() {
             )}
           </div>
 
-          {/* Chip toggle Semua/Masuk/Keluar + product filter opsional */}
+          {/* Chip toggle + date filter + product filter opsional */}
           <div className={`rounded-[18px] border p-3 ${th.card} ${th.bdr} space-y-2.5`}>
             <div className="flex gap-1.5">
               {([
@@ -950,6 +962,32 @@ export function InventoryPage() {
                   {opt.label}
                 </button>
               ))}
+            </div>
+            {/* Date filter — restore 29 Jun 2026 per Bu Santi clarify. */}
+            <div className="flex flex-wrap items-center gap-2">
+              <select value={movementDateRange} onChange={e => { setMovementDateRange(e.target.value as DateRange); setMovementsVisibleCount(30); }}
+                aria-label="Filter periode"
+                className={`px-3 py-2 text-sm font-bold rounded-lg border ${th.inp}`}>
+                <option value="today">Hari Ini</option>
+                <option value="yesterday">Kemarin</option>
+                <option value="week">Minggu Ini</option>
+                <option value="month">Bulan Ini</option>
+                <option value="all">Semua</option>
+                <option value="custom">Pilih Tanggal</option>
+              </select>
+              {movementDateRange === "custom" && (
+                <>
+                  <input type="date" value={movementCustomRange.from} max={movementCustomRange.to || undefined}
+                    onChange={e => setMovementCustomRange(r => ({ ...r, from: e.target.value }))}
+                    aria-label="Tanggal awal"
+                    className={`px-3 py-2 text-sm font-bold rounded-lg border ${th.inp}`} />
+                  <span className={`text-sm ${th.txm}`}>s/d</span>
+                  <input type="date" value={movementCustomRange.to} min={movementCustomRange.from || undefined}
+                    onChange={e => setMovementCustomRange(r => ({ ...r, to: e.target.value }))}
+                    aria-label="Tanggal akhir"
+                    className={`px-3 py-2 text-sm font-bold rounded-lg border ${th.inp}`} />
+                </>
+              )}
             </div>
             <SearchableSelect
               value={movementProductFilter}

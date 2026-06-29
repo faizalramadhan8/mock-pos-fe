@@ -10,6 +10,20 @@ export function formatDate(d: string, lang: "en" | "id" = "en") {
   const locale = lang === "id" ? "id-ID" : "en";
   return new Date(d).toLocaleDateString(locale, { day: "numeric", month: "short" });
 }
+
+/**
+ * Format tanggal: "4 Juni 2026" (Indonesian, bulan full).
+ * Per request Bu Santi 29 Jun 2026 untuk laporan faktur — owner perlu
+ * lihat bulan jelas dengan nama Indonesian, bukan singkatan "Jun".
+ */
+export function formatDateDMY(d: string): string {
+  const date = new Date(d);
+  const months = [
+    "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+    "Juli", "Agustus", "September", "Oktober", "November", "Desember",
+  ];
+  return `${date.getDate()} ${months[date.getMonth()]} ${date.getFullYear()}`;
+}
 export function formatTime(d: string, lang: "en" | "id" = "en") {
   const locale = lang === "id" ? "id-ID" : "en";
   return new Date(d).toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" });

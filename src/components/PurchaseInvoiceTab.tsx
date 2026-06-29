@@ -3,7 +3,7 @@ import { Modal } from "./Modal";
 import { SearchableSelect } from "./SearchableSelect";
 import { useProductStore, useSupplierStore, usePurchaseInvoiceStore, useAuthStore, useLangStore } from "@/stores";
 import { useThemeClasses } from "@/hooks/useThemeClasses";
-import { formatCurrency as $, formatDate, calcDueDate } from "@/utils";
+import { formatCurrency as $, formatDate, formatDateDMY, calcDueDate } from "@/utils";
 import { getDateRange, type DateRange, type CustomRange } from "@/utils/dateRange";
 import { PAYMENT_TERMS_OPTIONS, PAYMENT_TERMS_LABELS, INVENTORY_WRITE_ROLES } from "@/constants";
 import type { PaymentTerms, PurchaseInvoice } from "@/types";
@@ -144,13 +144,15 @@ export function PurchaseInvoiceTab() {
           {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
         </select>
         <select value={dateRange} onChange={e => setDateRange(e.target.value as DateRange)}
+          aria-label="Filter berdasarkan jatuh tempo"
+          title="Filter berdasarkan jatuh tempo"
           className={`px-3 py-2 text-sm font-bold rounded-xl border ${th.inp}`}>
-          <option value="today">Hari Ini</option>
-          <option value="yesterday">Kemarin</option>
-          <option value="week">Minggu Ini</option>
-          <option value="month">Bulan Ini</option>
+          <option value="today">Jatuh Tempo: Hari Ini</option>
+          <option value="yesterday">Jatuh Tempo: Kemarin</option>
+          <option value="week">Jatuh Tempo: Minggu Ini</option>
+          <option value="month">Jatuh Tempo: Bulan Ini</option>
           <option value="all">Semua</option>
-          <option value="custom">Pilih Tanggal</option>
+          <option value="custom">Jatuh Tempo: Pilih Tanggal</option>
         </select>
         {dateRange === "custom" && (
           <>
@@ -208,9 +210,9 @@ export function PurchaseInvoiceTab() {
                       </span>
                     </div>
                     <p className={`text-xs mt-1 ${th.txm}`}>
-                      {inv.items.length} item · {formatDate(inv.invoiceDate, lang)}
+                      {inv.items.length} item · {formatDateDMY(inv.invoiceDate)}
                       {inv.dueDate && (
-                        <> · jatuh tempo {formatDate(inv.dueDate, lang)} ({PAYMENT_TERMS_LABELS[inv.paymentTerms]})</>
+                        <> · jatuh tempo {formatDateDMY(inv.dueDate)} ({PAYMENT_TERMS_LABELS[inv.paymentTerms]})</>
                       )}
                     </p>
                   </div>
@@ -267,7 +269,7 @@ export function PurchaseInvoiceTab() {
           <Modal open={!!confirmDeleteId} onClose={() => setConfirmDeleteId(null)} title="Hapus Faktur?">
             <div className="flex flex-col gap-3">
               <p className={`text-sm ${th.tx}`}>
-                Faktur dari <b>{sup?.name || "supplier"}</b> tanggal <b>{formatDate(inv.invoiceDate)}</b>
+                Faktur dari <b>{sup?.name || "supplier"}</b> tanggal <b>{formatDateDMY(inv.invoiceDate)}</b>
                 {" "}senilai <b>{$(inv.totalAmount)}</b> akan dihapus.
               </p>
               <div className={`rounded-xl border px-3 py-2.5 text-xs flex items-start gap-2 ${th.dark ? "border-[#BE123C]/40 bg-[#3A1F2A]/40 text-[#FB7185]" : "border-[#BE123C]/30 bg-[#FCE4EC] text-[#BE123C]"}`}>
@@ -325,11 +327,11 @@ function DetailModal({ invoice, onClose, onMarkPaid, onEdit, onDelete, canWrite 
                 <p className={`text-xs font-mono mt-0.5 ${th.txm}`}>No. {invoice.invoiceNumber}</p>
               )}
               <p className={`text-xs mt-2 ${th.txm}`}>
-                Tanggal faktur: {formatDate(invoice.invoiceDate, lang)}
+                Tanggal faktur: {formatDateDMY(invoice.invoiceDate)}
               </p>
               {invoice.dueDate && (
                 <p className={`text-xs mt-0.5 ${overdue ? "text-[#BE123C] font-bold" : th.txm}`}>
-                  Jatuh tempo: {formatDate(invoice.dueDate, lang)}
+                  Jatuh tempo: {formatDateDMY(invoice.dueDate)}
                   {overdue && ` · LEWAT TEMPO`}
                 </p>
               )}
