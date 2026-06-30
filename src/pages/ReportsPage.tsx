@@ -806,23 +806,16 @@ function ProfitLossView({ pl, th, lang }: { pl: ProfitLossRes | null; th: ThemeC
     return () => { cancelled = true; };
   }, [pl?.from, pl?.to]);
 
-  // Net Profit setelah prive di-include (revenue − cogs − expense − drawing).
-  const adjustedNet = (pl?.net_profit || 0) - totalDrawing;
+  // Saldo Laba/Rugi (cash basis, klop dengan Arus Kas):
+  //   Pendapatan + Modal − Pengeluaran − Prive
+  // Bu Santi 30 Jun 2026: COGS dihapus, Gain dilihat di Dashboard saja.
+  const adjustedNet = (pl?.revenue || 0) + totalInjection - (pl?.expense_total || 0) - totalDrawing;
 
   const revenueDisplay = useCountUp(pl?.revenue || 0);
-  const cogsDisplay = useCountUp(pl?.cogs || 0);
-  const grossDisplay = useCountUp(pl?.gross_profit || 0);
   const expenseDisplay = useCountUp(pl?.expense_total || 0);
   const driveDisplay = useCountUp(totalDrawing);
   const injectionDisplay = useCountUp(totalInjection);
   const netDisplay = useCountUp(adjustedNet);
-  // Owner request: hapus "Bayar Supplier (Faktur lunas)" dari Arus Kas.
-  // Semua pembayaran ke supplier sekarang dicatat sebagai Pengeluaran (kategori
-  // "Bayar X"). Jadi cash_out = expense_total saja (tidak include supplier_paid
-  // supaya tidak double-count kalau owner pakai dua jalur).
-  const displayCashOut = pl?.expense_total || 0;
-  const displayCashDiff = (pl?.revenue || 0) - displayCashOut;
-  const cashOutDisplay = useCountUp(displayCashOut);
 
   if (!pl) {
     return (
@@ -841,12 +834,12 @@ function ProfitLossView({ pl, th, lang }: { pl: ProfitLossRes | null; th: ThemeC
 
   return (
     <div className="flex flex-col gap-3">
-      {/* Untung Bersih hero — warna mengikuti positif/negatif */}
+      {/* Saldo Laba/Rugi hero — cash basis, klop dengan Arus Kas tab.
+          Untuk lihat margin/gain (COGS based), Bu Santi cek di Dashboard
+          "Laporan Keuangan". */}
       <div className={`rounded-3xl border p-5 bg-bakery-stripe ${th.bdr} ${th.card2} relative overflow-hidden`}>
         <p className={`text-xs font-black uppercase tracking-wider mb-1.5 ${th.acc}`}>
-          {netPositive
-            ? (lang === "id" ? "Untung Bersih" : "Net Profit")
-            : (lang === "id" ? "Rugi Bersih" : "Net Loss")}
+          {lang === "id" ? "Saldo Laba/Rugi" : "Balance"}
         </p>
         <p className={`font-display text-3xl sm:text-4xl font-black tracking-tight ${
           netPositive ? th.acc : (th.dark ? "text-[#FB7185]" : "text-[#BE123C]")
@@ -882,30 +875,22 @@ function ProfitLossView({ pl, th, lang }: { pl: ProfitLossRes | null; th: ThemeC
           </p>
         </div>
 
-        {/* Modal Barang (HPP) */}
-        <div className={`px-4 py-3 flex items-baseline justify-between gap-3 border-t ${th.bdrSoft}`}>
-          <div className="min-w-0">
-            <p className={`font-bold text-sm ${th.tx}`}>
-              − {lang === "id" ? "Modal Barang Terjual" : "Cost of Goods Sold"}
-            </p>
-            <p className={`text-xs ${th.txf}`}>
-              {lang === "id" ? "Harga modal barang yang sudah laku" : "Purchase cost of items sold"}
+        {/* Tambahan Modal Owner — penambah uang masuk. Auto dari Arus Kas. */}
+        {totalInjection > 0 && (
+          <div className={`px-4 py-3 flex items-baseline justify-between gap-3 border-t ${th.bdrSoft}`}>
+            <div className="min-w-0">
+              <p className={`font-bold text-sm ${th.tx}`}>
+                + {lang === "id" ? "Tambahan Modal Owner" : "Owner Capital Injection"}
+              </p>
+              <p className={`text-xs ${th.txf}`}>
+                {lang === "id" ? "Otomatis dari input di Arus Kas" : "Auto from Cash Flow input"}
+              </p>
+            </div>
+            <p className={`font-display font-bold text-base ${th.tx}`}>
+              Rp {injectionDisplay.toLocaleString("id-ID")}
             </p>
           </div>
-          <p className={`font-display font-bold text-base ${th.txm}`}>
-            Rp {cogsDisplay.toLocaleString("id-ID")}
-          </p>
-        </div>
-
-        {/* Laba Kotor */}
-        <div className={`px-4 py-3 flex items-baseline justify-between gap-3 border-t ${th.bdrSoft} ${th.elev}`}>
-          <p className={`font-bold text-sm ${th.tx}`}>
-            = {lang === "id" ? "Laba Kotor" : "Gross Profit"}
-          </p>
-          <p className={`font-display font-bold text-base ${th.acc}`}>
-            Rp {grossDisplay.toLocaleString("id-ID")}
-          </p>
-        </div>
+        )}
 
         {/* Pengeluaran total */}
         <div className={`px-4 py-3 flex items-baseline justify-between gap-3 border-t ${th.bdrSoft}`}>
@@ -951,23 +936,20 @@ function ProfitLossView({ pl, th, lang }: { pl: ProfitLossRes | null; th: ThemeC
           </div>
         )}
 
-        {/* Untung Bersih final */}
+        {/* Saldo Laba/Rugi final */}
         <div className={`px-4 py-4 flex items-center justify-between gap-3 border-t-2 ${
           netPositive
             ? (th.dark ? "border-[#FB7185] bg-[#3A1F2A]/40" : "border-[#E11D48] bg-[#FFF4F6]")
             : (th.dark ? "border-[#BE123C] bg-[#3A1F2A]/40" : "border-[#BE123C] bg-[#FCE4EC]/40")
         }`}>
           <div className="flex items-center gap-2">
-            {/* Trend icon: accessibility (color-not-only) — untung naik, rugi turun. */}
             {netPositive
               ? <TrendingUp size={18} className={th.acc} aria-hidden />
               : <TrendingDown size={18} className={th.dark ? "text-[#FB7185]" : "text-[#BE123C]"} aria-hidden />}
             <p className={`font-black text-base uppercase tracking-wider ${
               netPositive ? th.acc : (th.dark ? "text-[#FB7185]" : "text-[#BE123C]")
             }`}>
-              = {netPositive
-                ? (lang === "id" ? "Untung Bersih" : "Net Profit")
-                : (lang === "id" ? "Rugi Bersih" : "Net Loss")}
+              = {lang === "id" ? "Saldo Laba/Rugi" : "Balance"}
             </p>
           </div>
           <p className={`font-display font-black text-lg ${
@@ -978,124 +960,10 @@ function ProfitLossView({ pl, th, lang }: { pl: ProfitLossRes | null; th: ThemeC
         </div>
       </div>
 
-      {/* ─── Arus Kas (cash basis view) ─────────────────────────────────────
-          Beda dari Laba Rugi di atas (accrual). Ini hitung uang real yang
-          keluar masuk di periode — termasuk bayar supplier (faktur lunas),
-          bukan cuma modal barang yang sudah laku. Yang sehari-hari owner
-          rasakan di kantong/rekening. */}
-      <div className={`rounded-2xl border overflow-hidden ${th.bdr} ${th.card2}`}>
-        <div className={`px-4 py-3 border-b ${th.bdrSoft}`}>
-          <p className={`text-xs font-black uppercase tracking-wider ${th.txf}`}>
-            {lang === "id" ? "Arus Kas Periode Ini" : "Cash Flow This Period"}
-          </p>
-          <p className={`text-xs mt-0.5 ${th.txf}`}>
-            {lang === "id"
-              ? "Uang real yang masuk-keluar (beda dari Laba Rugi di atas)"
-              : "Actual cash in/out (different from P/L above)"}
-          </p>
-        </div>
-
-        {/* Uang Masuk */}
-        <div className="px-4 py-3 flex items-baseline justify-between gap-3">
-          <p className={`font-bold text-sm ${th.tx}`}>
-            {lang === "id" ? "Uang Masuk (Penjualan)" : "Cash In (Sales)"}
-          </p>
-          <p className={`font-display font-bold text-base ${th.tx}`}>
-            Rp {revenueDisplay.toLocaleString("id-ID")}
-          </p>
-        </div>
-
-        {/* Uang Keluar — single row, gabung semua dari kategori Pengeluaran
-            (termasuk Bayar Supplier yang sekarang di-track sebagai kategori). */}
-        <div className={`px-4 py-3 flex items-baseline justify-between gap-3 border-t ${th.bdrSoft}`}>
-          <p className={`font-bold text-sm ${th.tx}`}>
-            {lang === "id" ? "Uang Keluar (Pengeluaran)" : "Cash Out (Expenses)"}
-          </p>
-          <p className={`font-display font-bold text-base ${th.txm}`}>
-            Rp {cashOutDisplay.toLocaleString("id-ID")}
-          </p>
-        </div>
-
-        {/* Tambahan Modal — setoran owner ke kas. Auto dari Arus Kas input. */}
-        {totalInjection > 0 && (
-          <div className={`px-4 py-3 flex items-baseline justify-between gap-3 border-t ${th.bdrSoft}`}>
-            <div className="min-w-0">
-              <p className={`font-bold text-sm ${th.tx}`}>
-                + {lang === "id" ? "Tambahan Modal Owner" : "Owner Capital Injection"}
-              </p>
-              <p className={`text-xs ${th.txf}`}>
-                {lang === "id" ? "Otomatis dari input di Arus Kas" : "Auto from Cash Flow input"}
-              </p>
-            </div>
-            <p className={`font-display font-bold text-base ${th.tx}`}>
-              Rp {injectionDisplay.toLocaleString("id-ID")}
-            </p>
-          </div>
-        )}
-
-        {/* Prive — penarikan owner. Auto dari Arus Kas input. */}
-        {totalDrawing > 0 && (
-          <div className={`px-4 py-3 flex items-baseline justify-between gap-3 border-t ${th.bdrSoft}`}>
-            <div className="min-w-0">
-              <p className={`font-bold text-sm ${th.tx}`}>
-                − {lang === "id" ? "Prive (Penarikan Owner)" : "Owner Drawing"}
-              </p>
-              <p className={`text-xs ${th.txf}`}>
-                {lang === "id" ? "Otomatis dari input di Arus Kas" : "Auto from Cash Flow input"}
-              </p>
-            </div>
-            <p className={`font-display font-bold text-base ${th.txm}`}>
-              Rp {driveDisplay.toLocaleString("id-ID")}
-            </p>
-          </div>
-        )}
-
-        {/* Selisih Kas — include modal injection + prive supaya klop dengan
-            Saldo Akhir di Arus Kas tab (Bu Santi 30 Jun 2026 "harus klop"). */}
-        {(() => {
-          const cashDiffWithPrive = displayCashDiff + totalInjection - totalDrawing;
-          const isPositive = cashDiffWithPrive >= 0;
-          return (
-            <div className={`px-4 py-4 flex items-center justify-between gap-3 border-t-2 ${
-              isPositive
-                ? (th.dark ? "border-[#FB7185] bg-[#3A1F2A]/40" : "border-[#E11D48] bg-[#FFF4F6]")
-                : (th.dark ? "border-[#BE123C] bg-[#3D1F2C]/40" : "border-[#BE123C] bg-[#FCE4EC]/40")
-            }`}>
-              <div className="flex items-center gap-2 min-w-0">
-                {isPositive
-                  ? <TrendingUp size={18} className={th.acc} aria-hidden />
-                  : <TrendingDown size={18} className={th.dark ? "text-[#FB7185]" : "text-[#BE123C]"} aria-hidden />}
-                <div className="min-w-0">
-                  <p className={`font-black text-base uppercase tracking-wider ${
-                    isPositive ? th.acc : (th.dark ? "text-[#FB7185]" : "text-[#BE123C]")
-                  }`}>
-                    {lang === "id" ? "Selisih Kas" : "Cash Diff"}
-                  </p>
-                  <p className={`text-xs ${th.txf}`}>
-                    {(() => {
-                      const parts = [
-                        lang === "id" ? "Uang Masuk − Uang Keluar" : "Cash In − Cash Out",
-                      ];
-                      if (totalInjection > 0) parts.push(lang === "id" ? "+ Modal" : "+ Capital");
-                      if (totalDrawing > 0) parts.push(lang === "id" ? "− Prive" : "− Drawing");
-                      return parts.join(" ");
-                    })()}
-                  </p>
-                </div>
-              </div>
-              <p className={`font-display font-black text-lg ${
-                isPositive ? th.acc : (th.dark ? "text-[#FB7185]" : "text-[#BE123C]")
-              }`}>
-                Rp {cashDiffWithPrive.toLocaleString("id-ID")}
-              </p>
-            </div>
-          );
-        })()}
-
-        {/* Info "Faktur tempo belum lunas" dihapus per owner request — bikin
-            ribet dibaca. Owner cek outstanding faktur langsung di Stok →
-            Catat Faktur Barang Masuk (filter status Belum Lunas). */}
-      </div>
+      {/* Section "Arus Kas Periode Ini" dihapus 30 Jun 2026 — sekarang
+          breakdown utama sudah cash basis (tidak ada COGS), jadi redundant.
+          Untuk lihat Gain (HPP based), Bu Santi cek Dashboard "Laporan
+          Keuangan". */}
 
       {/* Glossary singkat — buka untuk owner yang gak tahu istilah */}
       <details className={`rounded-2xl border p-4 ${th.bdr} ${th.card2}`}>
