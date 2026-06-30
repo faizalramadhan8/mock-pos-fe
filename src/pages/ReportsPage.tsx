@@ -8,6 +8,7 @@ import { exportOrders, exportOrderReport } from "@/utils/export";
 import { getDateRange, type DateRange, type CustomRange } from "@/utils/dateRange";
 import { orderApi, type OrderAggregateResponse } from "@/api/orders";
 import { expenseApi, type ProfitLossRes } from "@/api/expenses";
+import { capitalApi } from "@/api/capital";
 import { BakeryLogo } from "@/components/icons";
 import { Package, Users, Wallet, BookOpen, ChevronDown, ChevronUp, TrendingUp, TrendingDown, Minus, Download, Info, Tag } from "lucide-react";
 import { CashflowTab } from "@/components/CashflowTab";
@@ -780,12 +781,41 @@ export function ReportsPage() {
 
 // ProfitLossView — full Laporan Laba Rugi UI. Diisolasi sebagai komponen
 // terpisah supaya ReportsPage tetap manageable.
+//
+// Per request Bu Santi 30 Jun 2026: Prive (penarikan owner kas) yang di-input
+// di Arus Kas harus juga di-include sebagai Pengeluaran di Laba Rugi, supaya
+// Untung/Rugi Bersih konsisten dengan Arus Kas. COGS + Laba Kotor tetap ada
+// (format accrual standar tidak diubah).
 function ProfitLossView({ pl, th, lang }: { pl: ProfitLossRes | null; th: ThemeClasses; lang: "en" | "id" }) {
+  // Fetch capital injections (modal) + drawings (prive) periode pl.from→pl.to.
+  // Injection masuk Arus Kas Periode Ini sebagai PENAMBAH, prive sebagai
+  // pengurang. Supaya Selisih Kas klop dengan Saldo Akhir di Arus Kas tab.
+  const [totalDrawing, setTotalDrawing] = useState(0);
+  const [totalInjection, setTotalInjection] = useState(0);
+  useEffect(() => {
+    if (!pl?.from || !pl?.to) { setTotalDrawing(0); setTotalInjection(0); return; }
+    let cancelled = false;
+    capitalApi.list(pl.from, pl.to)
+      .then(res => {
+        if (cancelled) return;
+        const rows = res.body || [];
+        setTotalDrawing(rows.filter(r => r.type === "drawing").reduce((s, r) => s + r.amount, 0));
+        setTotalInjection(rows.filter(r => r.type === "injection").reduce((s, r) => s + r.amount, 0));
+      })
+      .catch(() => { if (!cancelled) { setTotalDrawing(0); setTotalInjection(0); } });
+    return () => { cancelled = true; };
+  }, [pl?.from, pl?.to]);
+
+  // Net Profit setelah prive di-include (revenue − cogs − expense − drawing).
+  const adjustedNet = (pl?.net_profit || 0) - totalDrawing;
+
   const revenueDisplay = useCountUp(pl?.revenue || 0);
   const cogsDisplay = useCountUp(pl?.cogs || 0);
   const grossDisplay = useCountUp(pl?.gross_profit || 0);
   const expenseDisplay = useCountUp(pl?.expense_total || 0);
-  const netDisplay = useCountUp(pl?.net_profit || 0);
+  const driveDisplay = useCountUp(totalDrawing);
+  const injectionDisplay = useCountUp(totalInjection);
+  const netDisplay = useCountUp(adjustedNet);
   // Owner request: hapus "Bayar Supplier (Faktur lunas)" dari Arus Kas.
   // Semua pembayaran ke supplier sekarang dicatat sebagai Pengeluaran (kategori
   // "Bayar X"). Jadi cash_out = expense_total saja (tidak include supplier_paid
@@ -793,7 +823,6 @@ function ProfitLossView({ pl, th, lang }: { pl: ProfitLossRes | null; th: ThemeC
   const displayCashOut = pl?.expense_total || 0;
   const displayCashDiff = (pl?.revenue || 0) - displayCashOut;
   const cashOutDisplay = useCountUp(displayCashOut);
-  const cashDiffDisplay = useCountUp(displayCashDiff);
 
   if (!pl) {
     return (
@@ -808,7 +837,7 @@ function ProfitLossView({ pl, th, lang }: { pl: ProfitLossRes | null; th: ThemeC
     );
   }
 
-  const netPositive = pl.net_profit >= 0;
+  const netPositive = adjustedNet >= 0;
 
   return (
     <div className="flex flex-col gap-3">
@@ -903,6 +932,25 @@ function ProfitLossView({ pl, th, lang }: { pl: ProfitLossRes | null; th: ThemeC
           </div>
         ))}
 
+        {/* Prive — penarikan owner dari kas. Auto-fetched dari Arus Kas
+            (single input, dual display). Bu Santi 30 Jun 2026: cegah ribet
+            input 2x. */}
+        {totalDrawing > 0 && (
+          <div className={`px-4 py-3 flex items-baseline justify-between gap-3 border-t ${th.bdrSoft}`}>
+            <div className="min-w-0">
+              <p className={`font-bold text-sm ${th.tx}`}>
+                − {lang === "id" ? "Prive (Penarikan Owner)" : "Owner Drawing"}
+              </p>
+              <p className={`text-xs ${th.txf}`}>
+                {lang === "id" ? "Otomatis dari input di Arus Kas" : "Auto from Cash Flow input"}
+              </p>
+            </div>
+            <p className={`font-display font-bold text-base ${th.txm}`}>
+              Rp {driveDisplay.toLocaleString("id-ID")}
+            </p>
+          </div>
+        )}
+
         {/* Untung Bersih final */}
         <div className={`px-4 py-4 flex items-center justify-between gap-3 border-t-2 ${
           netPositive
@@ -968,34 +1016,81 @@ function ProfitLossView({ pl, th, lang }: { pl: ProfitLossRes | null; th: ThemeC
           </p>
         </div>
 
-        {/* Selisih Kas */}
-        <div className={`px-4 py-4 flex items-center justify-between gap-3 border-t-2 ${
-          displayCashDiff >= 0
-            ? (th.dark ? "border-[#FB7185] bg-[#3A1F2A]/40" : "border-[#E11D48] bg-[#FFF4F6]")
-            : (th.dark ? "border-[#BE123C] bg-[#3D1F2C]/40" : "border-[#BE123C] bg-[#FCE4EC]/40")
-        }`}>
-          <div className="flex items-center gap-2 min-w-0">
-            {/* Trend icon: accessibility (color-not-only). */}
-            {displayCashDiff >= 0
-              ? <TrendingUp size={18} className={th.acc} aria-hidden />
-              : <TrendingDown size={18} className={th.dark ? "text-[#FB7185]" : "text-[#BE123C]"} aria-hidden />}
+        {/* Tambahan Modal — setoran owner ke kas. Auto dari Arus Kas input. */}
+        {totalInjection > 0 && (
+          <div className={`px-4 py-3 flex items-baseline justify-between gap-3 border-t ${th.bdrSoft}`}>
             <div className="min-w-0">
-              <p className={`font-black text-base uppercase tracking-wider ${
-                displayCashDiff >= 0 ? th.acc : (th.dark ? "text-[#FB7185]" : "text-[#BE123C]")
-              }`}>
-                {lang === "id" ? "Selisih Kas" : "Cash Diff"}
+              <p className={`font-bold text-sm ${th.tx}`}>
+                + {lang === "id" ? "Tambahan Modal Owner" : "Owner Capital Injection"}
               </p>
               <p className={`text-xs ${th.txf}`}>
-                {lang === "id" ? "Uang Masuk − Uang Keluar" : "Cash In − Cash Out"}
+                {lang === "id" ? "Otomatis dari input di Arus Kas" : "Auto from Cash Flow input"}
               </p>
             </div>
+            <p className={`font-display font-bold text-base ${th.tx}`}>
+              Rp {injectionDisplay.toLocaleString("id-ID")}
+            </p>
           </div>
-          <p className={`font-display font-black text-lg ${
-            displayCashDiff >= 0 ? th.acc : (th.dark ? "text-[#FB7185]" : "text-[#BE123C]")
-          }`}>
-            Rp {cashDiffDisplay.toLocaleString("id-ID")}
-          </p>
-        </div>
+        )}
+
+        {/* Prive — penarikan owner. Auto dari Arus Kas input. */}
+        {totalDrawing > 0 && (
+          <div className={`px-4 py-3 flex items-baseline justify-between gap-3 border-t ${th.bdrSoft}`}>
+            <div className="min-w-0">
+              <p className={`font-bold text-sm ${th.tx}`}>
+                − {lang === "id" ? "Prive (Penarikan Owner)" : "Owner Drawing"}
+              </p>
+              <p className={`text-xs ${th.txf}`}>
+                {lang === "id" ? "Otomatis dari input di Arus Kas" : "Auto from Cash Flow input"}
+              </p>
+            </div>
+            <p className={`font-display font-bold text-base ${th.txm}`}>
+              Rp {driveDisplay.toLocaleString("id-ID")}
+            </p>
+          </div>
+        )}
+
+        {/* Selisih Kas — include modal injection + prive supaya klop dengan
+            Saldo Akhir di Arus Kas tab (Bu Santi 30 Jun 2026 "harus klop"). */}
+        {(() => {
+          const cashDiffWithPrive = displayCashDiff + totalInjection - totalDrawing;
+          const isPositive = cashDiffWithPrive >= 0;
+          return (
+            <div className={`px-4 py-4 flex items-center justify-between gap-3 border-t-2 ${
+              isPositive
+                ? (th.dark ? "border-[#FB7185] bg-[#3A1F2A]/40" : "border-[#E11D48] bg-[#FFF4F6]")
+                : (th.dark ? "border-[#BE123C] bg-[#3D1F2C]/40" : "border-[#BE123C] bg-[#FCE4EC]/40")
+            }`}>
+              <div className="flex items-center gap-2 min-w-0">
+                {isPositive
+                  ? <TrendingUp size={18} className={th.acc} aria-hidden />
+                  : <TrendingDown size={18} className={th.dark ? "text-[#FB7185]" : "text-[#BE123C]"} aria-hidden />}
+                <div className="min-w-0">
+                  <p className={`font-black text-base uppercase tracking-wider ${
+                    isPositive ? th.acc : (th.dark ? "text-[#FB7185]" : "text-[#BE123C]")
+                  }`}>
+                    {lang === "id" ? "Selisih Kas" : "Cash Diff"}
+                  </p>
+                  <p className={`text-xs ${th.txf}`}>
+                    {(() => {
+                      const parts = [
+                        lang === "id" ? "Uang Masuk − Uang Keluar" : "Cash In − Cash Out",
+                      ];
+                      if (totalInjection > 0) parts.push(lang === "id" ? "+ Modal" : "+ Capital");
+                      if (totalDrawing > 0) parts.push(lang === "id" ? "− Prive" : "− Drawing");
+                      return parts.join(" ");
+                    })()}
+                  </p>
+                </div>
+              </div>
+              <p className={`font-display font-black text-lg ${
+                isPositive ? th.acc : (th.dark ? "text-[#FB7185]" : "text-[#BE123C]")
+              }`}>
+                Rp {cashDiffWithPrive.toLocaleString("id-ID")}
+              </p>
+            </div>
+          );
+        })()}
 
         {/* Info "Faktur tempo belum lunas" dihapus per owner request — bikin
             ribet dibaca. Owner cek outstanding faktur langsung di Stok →
