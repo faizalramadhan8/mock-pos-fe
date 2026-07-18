@@ -1,5 +1,4 @@
-import { useState, useEffect } from "react";
-import type { Order } from "@/types";
+import { useState } from "react";
 import { Modal } from "./Modal";
 import { ProductImage } from "./ProductImage";
 import { ProductDetailModal } from "./ProductDetailModal";
@@ -43,55 +42,7 @@ export function OrderDetailModal({ orderId, onClose }: OrderDetailModalProps) {
   const canRefund = user && ["superadmin", "admin", "cashier"].includes(user.role);
   const canEditPayment = user && ["superadmin", "admin"].includes(user.role);
 
-  // Path B (Bu Santi 19 Jul 2026): kalau order tidak ada di store recent 500
-  // (mis. dibuka dari OrdersPage range fetch bulan lama), fetch by ID dari BE.
-  const orderFromStore = orderId ? orders.find(o => o.id === orderId) : null;
-  const [orderFetched, setOrderFetched] = useState<Order | null>(null);
-  useEffect(() => {
-    if (!orderId || orderFromStore) {
-      setOrderFetched(null);
-      return;
-    }
-    let cancelled = false;
-    orderApi.getById(orderId)
-      .then(res => {
-        if (cancelled || !res.body) return;
-        // Reuse store mapper via minimal manual convert. Structure sama.
-        const o: Order = {
-          id: res.body.id,
-          items: (res.body.items || []).map((it: any) => ({
-            id: it.id, productId: it.product_id, name: it.name,
-            quantity: it.quantity, unitType: it.unit_type, unitPrice: it.unit_price,
-            purchasePrice: it.purchase_price, regularPrice: it.regular_price,
-            discountType: it.discount_type, discountValue: it.discount_value,
-            discountAmount: it.discount_amount,
-            redeemedWithPoints: it.redeemed_with_points, priceSource: it.price_source,
-            tierId: it.tier_id, paketCount: it.paket_count, extraCount: it.extra_count,
-            redeemableItemId: it.redeemable_item_id,
-          })),
-          payments: res.body.payments as any,
-          subtotal: res.body.subtotal, ppnRate: res.body.ppn_rate, ppn: res.body.ppn,
-          total: res.body.total, payment: res.body.payment as any, status: res.body.status as any,
-          customer: res.body.customer || "", customerPhone: res.body.customer_phone,
-          memberId: res.body.member_id,
-          member: res.body.member ? { id: res.body.member.id, name: res.body.member.name, phone: res.body.member.phone } : undefined,
-          memberSavings: res.body.member_savings || 0,
-          pointsUsed: res.body.points_used || 0, pointsEarned: res.body.points_earned || 0,
-          createdBy: res.body.created_by, createdAt: res.body.created_at,
-          paymentProof: res.body.payment_proof,
-          orderDiscountType: res.body.order_discount_type as any,
-          orderDiscountValue: res.body.order_discount_value,
-          orderDiscount: res.body.order_discount,
-          paymentsEditedAt: res.body.payments_edited_at || undefined,
-          paymentsEditedBy: res.body.payments_edited_by || undefined,
-          paymentsEditedReason: res.body.payments_edited_reason || undefined,
-        };
-        setOrderFetched(o);
-      })
-      .catch(err => { if (!cancelled) console.error("OrderDetailModal fetchById failed", err); });
-    return () => { cancelled = true; };
-  }, [orderId, orderFromStore]);
-  const order = orderFromStore || orderFetched;
+  const order = orderId ? orders.find(o => o.id === orderId) : null;
 
   if (!order) return null;
 

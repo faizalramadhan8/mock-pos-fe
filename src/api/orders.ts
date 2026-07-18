@@ -115,26 +115,10 @@ export interface RefundRes {
 }
 
 export const orderApi = {
-  // Path B enhanced (Bu Santi 19 Jul 2026): dukung from/to date range, cursor
-  // keyset pagination, and substring search. BE default limit 500 (max 2000).
-  //
-  // Backward compat: legacy caller tanpa cursor/from/to tetap dapat 500 recent.
-  //
-  // Response.meta.next_cursor bisa dipakai untuk load more halaman berikut.
-  getAll: (params?: {
-    status?: string;
-    from?: string;
-    to?: string;
-    cursor?: string;
-    search?: string;
-    limit?: number;
-  }) => {
+  getAll: (params?: { status?: string; page?: number; limit?: number }) => {
     const q = new URLSearchParams();
     if (params?.status) q.set('status', params.status);
-    if (params?.from) q.set('from', params.from);
-    if (params?.to) q.set('to', params.to);
-    if (params?.cursor) q.set('cursor', params.cursor);
-    if (params?.search) q.set('search', params.search);
+    if (params?.page) q.set('page', String(params.page));
     if (params?.limit) q.set('limit', String(params.limit));
     const qs = q.toString();
     return api.get<OrderRes[]>(`/orders/${qs ? '?' + qs : ''}`);

@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLangStore, useOrderStore, useProductStore, useExpenseStore, usePurchaseInvoiceStore } from "@/stores";
-import type { Order } from "@/types";
 import { useThemeClasses } from "@/hooks/useThemeClasses";
 import { usePageFetch } from "@/hooks/usePageFetch";
 import { useCountUp } from "@/hooks/useCountUp";
@@ -31,23 +30,16 @@ function toYMD(d: Date): string {
 // dengan halaman lain (today/yesterday/week/month/all/custom).
 export function ReportsPage() {
   usePageFetch([
+    { key: "orders", fetch: () => useOrderStore.getState().fetchOrders() },
     // Cashflow tab butuh expenses + invoices untuk aggregate ledger.
     // Refunds di-skip — belum ada bulk fetch endpoint (rare di flow Bu Santi).
     { key: "expenses", fetch: () => useExpenseStore.getState().fetchExpenses() },
     { key: "purchase-invoices", fetch: () => usePurchaseInvoiceStore.getState().fetchInvoices() },
   ]);
-  // Path B (Bu Santi 19 Jul 2026): TIDAK fetch semua orders di sini. Fetch
-  // per date-range via fetchByRange di useEffect di bawah, supaya scale
-  // unlimited (100+ orders/hari × 12 bulan = 40k orders tetap manageable).
   const th = useThemeClasses();
   const { lang } = useLangStore();
+  const orders = useOrderStore(s => s.orders);
   const products = useProductStore(s => s.products);
-  // rangeOrders = orders untuk periode yang dipilih. Auto-fetch saat
-  // dateRange/customRange berubah. Fallback empty array saat loading.
-  const [rangeOrders, setRangeOrders] = useState<Order[]>([]);
-  const [rangeLoading, setRangeLoading] = useState(false);
-  // Subscribe version bump → auto refetch setelah checkout/edit/cancel.
-  const ordersVersion = useOrderStore(s => s.version);
 
   const [tab, setTab] = useState<ReportTab>("cashflow");
   const [dateRange, setDateRange] = useState<DateRange>("month");
@@ -82,30 +74,19 @@ export function ReportsPage() {
     }
   };
 
-  // Path B — auto fetchByRange saat dateRange atau customRange berubah.
-  // rangeOrders = orders untuk periode yang dipilih (dari BE, filtered by
-  // date). Cegah full-list fetch di FE.
-  useEffect(() => {
-    if (customError) return;
-    const range = getDateRange(dateRange, customRange);
-    const from = range ? toYMD(range.start) : "";
-    const to = range ? toYMD(range.end) : "";
-    // dateRange="all" (from="" to="") = tarik semua data dengan cursor loop.
-    // Aman karena fetchByRange auto-cache 30s + BE per-page limit 2000.
-    let cancelled = false;
-    setRangeLoading(true);
-    useOrderStore.getState().fetchByRange(from, to)
-      .then(list => { if (!cancelled) setRangeOrders(list); })
-      .catch(err => { if (!cancelled) { console.error("fetchByRange failed", err); setRangeOrders([]); } })
-      .finally(() => { if (!cancelled) setRangeLoading(false); });
-    return () => { cancelled = true; };
-  }, [dateRange, customRange, customError, ordersVersion]);
-
-  // Filter completed dari rangeOrders (BE sudah filter by date, kita drop
-  // cancelled/refunded).
+  // Filter completed orders saja (cancelled/refunded di-skip).
+  // Dipakai untuk export CSV/Excel/Print + expand item per member.
+  // Untuk ranking + stats besar pakai aggregateData dari BE supaya scalable
+  // (FE-side topProducts/memberStats di-fallback kalau aggregate belum sampai).
   const filteredOrders = useMemo(() => {
-    return rangeOrders.filter(o => o.status === "completed");
-  }, [rangeOrders]);
+    const range = getDateRange(dateRange, customRange);
+    const completed = orders.filter(o => o.status === "completed");
+    if (!range) return completed;
+    return completed.filter(o => {
+      const d = new Date(o.createdAt);
+      return d >= range.start && d <= range.end;
+    });
+  }, [orders, dateRange, customRange]);
 
   // BE-side aggregate. Dipanggil setiap dateRange/customRange berubah.
   // Cegah FE compute dari full orders array (yang bisa kena hardcoded fetch

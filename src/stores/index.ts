@@ -739,13 +739,6 @@ export const useParkedCartStore = create<ParkedCartState>()(
 // ─── Orders ───
 interface OrderState {
   orders: Order[];
-  /**
-   * Path B version counter — increment tiap mutation (create/cancel/mark-paid/
-   * edit/refund). ReportsPage/DashboardPage subscribe ini di useEffect deps
-   * → auto refetch data yang mereka sudah cache lokal setelah checkout,
-   * cegah stale angka. Kombinasi dengan invalidateOrderRangeCache().
-   */
-  version: number;
   fetchOrders: () => Promise<void>;
   addOrder: (order: Order) => Promise<Order>;
   cancelOrder: (id: string) => void;
@@ -757,38 +750,9 @@ interface OrderState {
   resendInvoice: (id: string, bankAccountId?: string) => Promise<void>;
   /** Admin ubah metode pembayaran order completed (Bu Santi 12 Jul 2026). */
   editPayments: (id: string, payments: { method: string; amount: number }[], reason: string) => Promise<void>;
-  /**
-   * Path B (Bu Santi 19 Jul 2026) — fetch orders by date range, return fresh
-   * array TIDAK menimpa `orders`. Untuk Reports/Dashboard yang butuh data
-   * scope wider dari default 500 recent. Cache 30s per (from,to) key untuk
-   * cegah re-fetch bolak-balik saat user switch tab.
-   *
-   * Usage: `const list = await useOrderStore.getState().fetchByRange('2026-07-01', '2026-07-31')`
-   */
-  fetchByRange: (from: string, to: string) => Promise<Order[]>;
-  /**
-   * Path B — fetch page via cursor pagination untuk OrdersPage infinite scroll.
-   * Return {orders, nextCursor}. nextCursor="" berarti end of list.
-   */
-  fetchPage: (opts?: { cursor?: string; status?: string; from?: string; to?: string; search?: string; limit?: number }) => Promise<{ orders: Order[]; nextCursor: string; total: number }>;
 }
-// Path B module-scoped cache untuk fetchByRange (Bu Santi 19 Jul 2026).
-// Keluar dari zustand state supaya cache tidak trigger re-render subscribers.
-// TTL 30s: cukup untuk switch tab back-forth Reports tanpa spam BE.
-// Cache di-invalidate manual saat order Create/MarkAsPaid/Cancel via
-// `invalidateOrderRangeCache()` helper di bawah, sekaligus bump version
-// (subscribed di Reports/Dashboard useEffect deps → auto refetch).
-const fetchByRangeCache = new Map<string, { orders: Order[]; ts: number }>();
-function bumpOrderVersion() {
-  fetchByRangeCache.clear();
-  useOrderStore.setState(s => ({ version: s.version + 1 }));
-}
-// Backward-compat alias.
-export function invalidateOrderRangeCache() { bumpOrderVersion(); }
-
 export const useOrderStore = create<OrderState>((set, get) => ({
   orders: [],
-  version: 0,
   fetchOrders: async () => {
     try {
       // Limit 500 = ~3 minggu Bu Santi (24 trx/hari). Cukup untuk daily
@@ -840,9 +804,6 @@ export const useOrderStore = create<OrderState>((set, get) => ({
       // Refresh products and batches (stock was updated by BE)
       await useProductStore.getState().fetchProducts();
       await useBatchStore.getState().fetchBatches();
-      // Path B: invalidate range cache — Reports/Dashboard bakal refetch
-      // saat next mount / date change. Cegah stale angka setelah checkout.
-      invalidateOrderRangeCache();
       return saved;
     } catch (e: any) {
       // JANGAN silent-fallback (anti-pattern di CLAUDE.md). Throw supaya
@@ -857,7 +818,6 @@ export const useOrderStore = create<OrderState>((set, get) => ({
       set(s => ({ orders: s.orders.map(o => o.id === id ? { ...o, status: "cancelled" as const } : o) }));
       await useProductStore.getState().fetchProducts();
       await useBatchStore.getState().fetchBatches();
-      invalidateOrderRangeCache();
     }).catch((e) => {
       // Fallback: local cancel with manual stock restore
       set(s => {
@@ -875,12 +835,9 @@ export const useOrderStore = create<OrderState>((set, get) => ({
       toast.error(e.message || 'Failed to cancel order');
     });
   },
-  refundOrder: (id) => {
-    invalidateOrderRangeCache();
-    set(s => ({
-      orders: s.orders.map(o => o.id === id ? { ...o, status: "refunded" as const } : o),
-    }));
-  },
+  refundOrder: (id) => set(s => ({
+    orders: s.orders.map(o => o.id === id ? { ...o, status: "refunded" as const } : o),
+  })),
 
   // Pending order actions ──────────────────────────────────────────────
   createPendingOrder: async (order, bankAccountId) => {
@@ -908,7 +865,6 @@ export const useOrderStore = create<OrderState>((set, get) => ({
       });
       const saved = res.body ? mapOrder(res.body) : order;
       set(s => ({ orders: [saved, ...s.orders] }));
-      invalidateOrderRangeCache();
       return saved;
     } catch (e: any) {
       toast.error(e.message || 'Failed to create pending order');
@@ -925,7 +881,6 @@ export const useOrderStore = create<OrderState>((set, get) => ({
       }));
       await useProductStore.getState().fetchProducts();
       await useBatchStore.getState().fetchBatches();
-      invalidateOrderRangeCache();
     } catch (e: any) {
       toast.error(e.message || 'Failed to mark paid');
       throw e;
@@ -939,63 +894,16 @@ export const useOrderStore = create<OrderState>((set, get) => ({
       set(s => ({
         orders: s.orders.map(o => o.id === id && saved ? saved : o),
       }));
-      invalidateOrderRangeCache();
     } catch (e: any) {
       toast.error(e.message || 'Failed to edit payment method');
       throw e;
     }
   },
 
-  // Path B fetchByRange (Bu Santi 19 Jul 2026).
-  // Return fresh array untuk consumer (Reports/Dashboard/Excel), TIDAK
-  // mutate main `orders` store (yang dipakai POS untuk pending list).
-  // Cache 30s per (from,to) key: kalau user switch tab Reports terus balik,
-  // gak refetch. Cache di module scope, bukan zustand state, supaya tidak
-  // trigger re-render subscribers.
-  fetchByRange: async (from, to) => {
-    const key = `${from}_${to}`;
-    const cached = fetchByRangeCache.get(key);
-    const now = Date.now();
-    if (cached && now - cached.ts < 30_000) {
-      return cached.orders;
-    }
-    // BE limit max 2000. Kalau range > 2000 orders, tarik dengan cursor loop.
-    const all: Order[] = [];
-    let cursor = "";
-    for (let page = 0; page < 20; page++) { // safety cap 20 pages (40k orders)
-      const res: any = await orderApi.getAll({ from, to, cursor, limit: 2000 });
-      const rows = (res.body || []).map(mapOrder);
-      all.push(...rows);
-      const nc = res.meta?.next_cursor || "";
-      if (!nc || rows.length === 0) break;
-      cursor = nc;
-    }
-    fetchByRangeCache.set(key, { orders: all, ts: now });
-    return all;
-  },
-
-  fetchPage: async (opts) => {
-    const res: any = await orderApi.getAll({
-      status: opts?.status,
-      from: opts?.from,
-      to: opts?.to,
-      cursor: opts?.cursor,
-      search: opts?.search,
-      limit: opts?.limit || 100,
-    });
-    const orders = (res.body || []).map(mapOrder);
-    return {
-      orders,
-      nextCursor: res.meta?.next_cursor || "",
-      total: res.meta?.total ?? -1,
-    };
-  },
-
   cancelPending: async (id) => {
     try {
       await orderApi.cancelPending(id);
       set(s => ({ orders: s.orders.map(o => o.id === id ? { ...o, status: "cancelled" as const } : o) }));
-      invalidateOrderRangeCache();
     } catch (e: any) {
       toast.error(e.message || 'Failed to cancel');
       throw e;
