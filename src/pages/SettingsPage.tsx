@@ -5,11 +5,12 @@ import { usePageFetch } from "@/hooks/usePageFetch";
 import {
   Sun, Moon, UserPlus, X, Plus, Trash2, Search, Building2,
   Palette, Store, Users, LogOut, Clock, ChevronDown, ChevronUp, Key, Power,
+  Smartphone, Check,
 } from "lucide-react";
 import { genId, formatDate, formatTime, LABEL_PRESETS } from "@/utils";
 import { INDONESIAN_BANKS } from "@/constants";
 import toast from "react-hot-toast";
-import { authApi } from "@/api/auth";
+import { authApi, deviceApi, type DeviceRes } from "@/api/auth";
 import type { Role, BankAccount } from "@/types";
 
 type SettingsTab = "preferences" | "store" | "team" | "activity";
@@ -106,6 +107,29 @@ export function SettingsPage() {
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
   const [newPasswordInput, setNewPasswordInput] = useState("");
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+
+  // Device management — emergency manual approve (WAHA fallback).
+  // Fetched on-demand saat user row di-expand. Cache di state jadi tidak
+  // refetch tiap collapse/expand.
+  const [devicesByUser, setDevicesByUser] = useState<Record<string, DeviceRes[]>>({});
+  const [devicesLoading, setDevicesLoading] = useState<Record<string, boolean>>({});
+  const loadDevices = async (userId: string) => {
+    setDevicesLoading(prev => ({ ...prev, [userId]: true }));
+    try {
+      const res = await deviceApi.listByUser(userId);
+      setDevicesByUser(prev => ({ ...prev, [userId]: res.body || [] }));
+    } catch {
+      setDevicesByUser(prev => ({ ...prev, [userId]: [] }));
+    } finally {
+      setDevicesLoading(prev => ({ ...prev, [userId]: false }));
+    }
+  };
+  useEffect(() => {
+    if (expandedUserId && !(expandedUserId in devicesByUser)) {
+      loadDevices(expandedUserId);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [expandedUserId]);
 
   const handleSave = () => {
     const rate = Math.max(0, Math.min(100, parseFloat(ppnRate) || 0));
@@ -522,6 +546,81 @@ export function SettingsPage() {
                             }} disabled={!newPasswordInput.trim()}
                               className="px-3 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48] disabled:opacity-40">{t.save}</button>
                           </div>
+                        </div>
+
+                        {/* Perangkat Kasir — manual approve untuk fallback
+                            saat WAHA off. Cuma tampil untuk admin/superadmin. */}
+                        <div className={`rounded-xl border p-3 ${th.card2} ${th.bdr}`}>
+                          <div className="flex items-center gap-2 mb-2">
+                            <Smartphone size={12} className={th.txm} />
+                            <p className={`text-xs font-bold ${th.tx}`}>
+                              {lang === "id" ? "Perangkat Kasir" : "Cashier Devices"}
+                            </p>
+                          </div>
+                          {devicesLoading[u.id] ? (
+                            <p className={`text-xs ${th.txf}`}>{lang === "id" ? "Memuat..." : "Loading..."}</p>
+                          ) : (devicesByUser[u.id] || []).length === 0 ? (
+                            <p className={`text-xs ${th.txf}`}>
+                              {lang === "id" ? "Belum ada perangkat terdaftar" : "No registered devices"}
+                            </p>
+                          ) : (
+                            <div className="flex flex-col gap-2">
+                              {(devicesByUser[u.id] || []).map(d => (
+                                <div key={d.id} className={`flex items-center gap-2 rounded-lg border p-2 ${th.bdrSoft}`}>
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-1.5">
+                                      <span className={`text-xs font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${
+                                        d.status === "approved"
+                                          ? (th.dark ? "bg-[#3A1F2A]/60 text-[#FB7185]" : "bg-[#FFE4E9] text-[#E11D48]")
+                                          : d.status === "pending"
+                                          ? (th.dark ? "bg-[#3A1F2A]/40 text-[#FB7185]" : "bg-[#FCE4EC] text-[#BE123C]")
+                                          : (th.dark ? "bg-[#3A1F2A]/40 text-[#C4504A]" : "bg-[#FCE4EC] text-[#C4504A]")
+                                      }`}>
+                                        {d.status === "approved" ? (lang === "id" ? "Disetujui" : "Approved")
+                                          : d.status === "pending" ? (lang === "id" ? "Menunggu" : "Pending")
+                                          : (lang === "id" ? "Ditolak" : "Rejected")}
+                                      </span>
+                                      <p className={`text-xs truncate ${th.tx}`}>
+                                        {formatDate(d.created_at, lang)} {formatTime(d.created_at, lang)}
+                                      </p>
+                                    </div>
+                                    {d.user_agent && <p className={`text-xs truncate ${th.txf}`}>{d.user_agent}</p>}
+                                  </div>
+                                  {d.status === "pending" && (
+                                    <button onClick={async () => {
+                                      try {
+                                        await deviceApi.emergencyApprove(u.id, d.id);
+                                        auditLog("device_approved_manual", user!.id, user!.name, `${u.name} · ${d.id.slice(0, 8)}`);
+                                        toast.success(lang === "id" ? "Perangkat disetujui" : "Device approved");
+                                        loadDevices(u.id);
+                                      } catch {
+                                        toast.error(lang === "id" ? "Gagal menyetujui" : "Failed to approve");
+                                      }
+                                    }} className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-bold text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48]">
+                                      <Check size={12} />
+                                      {lang === "id" ? "Setujui" : "Approve"}
+                                    </button>
+                                  )}
+                                  {d.status === "approved" && (
+                                    <button onClick={async () => {
+                                      if (!confirm(lang === "id" ? "Cabut akses perangkat ini?" : "Revoke this device access?")) return;
+                                      try {
+                                        await deviceApi.revoke(u.id, d.id);
+                                        auditLog("device_revoked", user!.id, user!.name, `${u.name} · ${d.id.slice(0, 8)}`);
+                                        toast.success(lang === "id" ? "Akses dicabut" : "Access revoked");
+                                        loadDevices(u.id);
+                                      } catch {
+                                        toast.error(lang === "id" ? "Gagal mencabut" : "Failed to revoke");
+                                      }
+                                    }} className={`flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-bold border ${th.bdr} text-[#C4504A]`}>
+                                      <Trash2 size={12} />
+                                      {lang === "id" ? "Cabut" : "Revoke"}
+                                    </button>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
 
                         {/* Action buttons */}

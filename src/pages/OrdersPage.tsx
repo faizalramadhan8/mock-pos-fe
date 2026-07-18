@@ -303,7 +303,17 @@ export function OrdersPage() {
               <div className="flex items-center gap-2.5 min-w-0">
                 <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${o.status === "completed" ? "bg-[#E11D48]" : o.status === "pending" ? "bg-[#FB7185]" : o.status === "refunded" ? "bg-[#E11D48]" : "bg-[#C4504A]"}`} />
                 <div className="min-w-0">
-                  <p className={`text-sm font-bold font-mono truncate ${th.tx}`}>{o.id}</p>
+                  <p className={`text-sm font-bold font-mono truncate ${th.tx} flex items-center gap-1.5`}>
+                    {o.id}
+                    {/* Indicator: metode pembayaran pernah diubah. Bu Santi
+                        12 Jul 2026 — audit trail visible di list. */}
+                    {o.paymentsEditedAt && (
+                      <span title="Metode pembayaran pernah diubah"
+                        className={`inline-flex items-center ${th.acc}`} aria-label="Payment method edited">
+                        <Pencil size={11} />
+                      </span>
+                    )}
+                  </p>
                   <p className={`text-sm mt-0.5 ${th.txm} truncate`}>{o.customer} · {formatTime(o.createdAt)}</p>
                 </div>
               </div>

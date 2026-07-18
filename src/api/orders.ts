@@ -44,6 +44,10 @@ export interface OrderRes {
   points_earned?: number;
   created_by: string;
   created_at: string;
+  // Payment edit audit (migration 000045). NULL = never edited.
+  payments_edited_at?: string;
+  payments_edited_by?: string;
+  payments_edited_reason?: string;
 }
 
 export interface AggregateTopProduct {
@@ -196,6 +200,11 @@ export const orderApi = {
     const q = bankAccountId ? `?bank_account_id=${encodeURIComponent(bankAccountId)}` : "";
     return api.post<null>(`/orders/${id}/resend-invoice${q}`, {});
   },
+
+  // Admin/superadmin ubah metode pembayaran order completed (Bu Santi 12 Jul 2026).
+  // Sum(payments.amount) HARUS = order.total. Reason mandatory untuk audit.
+  editPayments: (id: string, payments: { method: string; amount: number }[], reason: string) =>
+    api.patch<OrderRes>(`/orders/${id}/payments`, { payments, reason }),
 };
 
 export const refundApi = {

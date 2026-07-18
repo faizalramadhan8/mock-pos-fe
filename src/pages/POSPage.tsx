@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
-import { useCategoryStore, useProductStore, useCartStore, useOrderStore, useAuthStore, useBatchStore, useLangStore, useSettingsStore, useMemberStore, useAuditStore, useCashSessionStore, useRedeemableStore } from "@/stores";
+import { useCategoryStore, useProductStore, useCartStore, useOrderStore, useAuthStore, useBatchStore, useLangStore, useSettingsStore, useMemberStore, useAuditStore, useCashSessionStore, useRedeemableStore, useParkedCartStore } from "@/stores";
+import { ParkedCartsModal } from "@/components/ParkedCartsModal";
 import { Modal } from "@/components/Modal";
 import { ProductImage } from "@/components/ProductImage";
 import { ProductCard } from "@/components/ProductCard";
@@ -16,7 +17,7 @@ import Barcode from "react-barcode";
 import type { PaymentMethod, UnitType, DiscountType, Product, Order, Member } from "@/types";
 import toast from "react-hot-toast";
 import {
-  Search, ScanLine, ShoppingBag, Minus, Plus, Trash2, ImagePlus, X, UserPlus, Tag, Percent, Wallet, FileText, Printer, Barcode as BarcodeIcon, Clock, Send, AlertCircle, Eye, EyeOff, Gift, Sparkles, TrendingDown,
+  Search, ScanLine, ShoppingBag, Minus, Plus, Trash2, ImagePlus, X, UserPlus, Tag, Percent, Wallet, FileText, Printer, Barcode as BarcodeIcon, Clock, Send, AlertCircle, Eye, EyeOff, Gift, Sparkles, TrendingDown, Bookmark,
 } from "lucide-react";
 
 export function POSPage() {
@@ -31,7 +32,10 @@ export function POSPage() {
     { key: "members",  fetch: () => useMemberStore.getState().fetchMembers() },
     { key: "settings", fetch: () => useSettingsStore.getState().fetchSettings() },
     { key: "redeemable", fetch: () => useRedeemableStore.getState().fetchActive() },
-  ], { pollMs: 30_000 });
+  ], { pollMs: 60_000 });
+  // Polling 30s → 60s per Bu Santi 13 Jul 2026 — reduce BE load 2x. Kasir
+  // masih dapat fresh data via visibilitychange event (tab return focus).
+  // Slow queries orders+products butuh index migration 000046 juga.
   const th = useThemeClasses();
   const { t, lang } = useLangStore();
   const categories = useCategoryStore(s => s.categories);
@@ -129,6 +133,12 @@ export function POSPage() {
   const cancelPendingAction = useOrderStore(s => s.cancelPending);
   const resendInvoiceAction = useOrderStore(s => s.resendInvoice);
   const pendingCount = useOrderStore(s => s.orders.filter(o => o.status === "pending").length);
+  // Parked carts (Bu Santi 12 Jul 2026) — local hold, no WA.
+  const parkedCount = useParkedCartStore(s => s.parked.length);
+  const parkCart = useParkedCartStore(s => s.park);
+  const [parkedListOpen, setParkedListOpen] = useState(false);
+  const [parkNameModalOpen, setParkNameModalOpen] = useState(false);
+  const [parkNameInput, setParkNameInput] = useState("");
   const [selectedBankId, setSelectedBankId] = useState("");
   const [lastOrder, setLastOrder] = useState<Order | null>(null);
   const [detailProductId, setDetailProductId] = useState<string | null>(null);
@@ -990,9 +1000,17 @@ export function POSPage() {
         <div className="flex gap-2">
           <button onClick={() => { clearCart(); if (!isPanel) setCartOpen(false); toast(t.cartCleared as string, { icon: "🗑️" }); }}
             className={`flex-1 py-3 rounded-2xl text-sm font-bold border ${th.bdr} ${th.txm}`}>{t.clear}</button>
+          {/* Parkir cart — local hold. Prompt nama (default "Customer N"). */}
+          <button onClick={() => {
+            setParkNameInput(`Customer ${parkedCount + 1}`);
+            setParkNameModalOpen(true);
+          }}
+            className={`flex-1 py-3 rounded-2xl text-sm font-bold border ${th.bdr} ${th.txm} inline-flex items-center justify-center gap-1`}>
+            <Bookmark size={13} /> Parkir
+          </button>
           <button onClick={() => setPendingOpenModal(true)}
             className={`flex-1 py-3 rounded-2xl text-sm font-bold border-2 border-[#FFB5C0] ${th.acc}`}>
-            Simpan Pending
+            Pending WA
           </button>
           <button onClick={() => setCheckoutOpen(true)}
             className="flex-[2] py-3 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48]">{t.payNow} {$(cartTotal)}</button>
@@ -1098,6 +1116,19 @@ export function POSPage() {
         <button onClick={() => setLabelModalOpen(true)} aria-label="Cetak Label"
           className={`shrink-0 flex items-center justify-center w-11 py-3 rounded-2xl text-xs font-bold border ${th.bdr} ${th.txm}`}>
           <BarcodeIcon size={14} />
+        </button>
+        {/* Parked carts (local hold, tanpa WA). Bu Santi 12 Jul 2026 —
+            beda dari Pending WA di bawah (yang kirim invoice ke customer). */}
+        <button onClick={() => setParkedListOpen(true)}
+          aria-label="Cart Diparkir"
+          title="Cart yang diparkir (disimpan sementara)"
+          className={`relative shrink-0 flex items-center justify-center w-11 py-3 rounded-2xl text-xs font-bold border ${th.bdr} ${parkedCount > 0 ? th.acc : th.txm}`}>
+          <Bookmark size={14} />
+          {parkedCount > 0 && (
+            <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-gradient-to-br from-[#FB7185] to-[#E11D48] text-white text-[10px] font-black flex items-center justify-center leading-none">
+              {parkedCount}
+            </span>
+          )}
         </button>
         {/* Pending orders badge — clock icon with count */}
         <button onClick={() => setPendingListOpen(true)} aria-label="Pesanan Pending"
@@ -2175,6 +2206,41 @@ export function POSPage() {
               </div>
             );
           })()}
+        </div>
+      </Modal>
+
+      {/* Parked carts browser modal — Bu Santi 12 Jul 2026 */}
+      <ParkedCartsModal open={parkedListOpen} onClose={() => setParkedListOpen(false)} />
+
+      {/* Parkir cart naming prompt */}
+      <Modal open={parkNameModalOpen} onClose={() => setParkNameModalOpen(false)} title="Parkir Cart">
+        <div className="flex flex-col gap-3">
+          <p className={`text-xs ${th.txm}`}>
+            Simpan cart saat ini sebagai:
+          </p>
+          <input
+            value={parkNameInput}
+            onChange={e => setParkNameInput(e.target.value)}
+            placeholder={`Customer ${parkedCount + 1}`}
+            autoFocus
+            className={`w-full px-3 py-2.5 text-sm rounded-xl border ${th.inp}`} />
+          <p className={`text-xs ${th.txf}`}>
+            Tip: pakai nama customer supaya mudah dicari. Kalau dikosongkan, otomatis "Customer {parkedCount + 1}".
+          </p>
+          <div className="flex gap-2 mt-1">
+            <button onClick={() => setParkNameModalOpen(false)}
+              className={`flex-1 py-2.5 rounded-xl text-sm font-bold border ${th.bdr} ${th.txm}`}>
+              Batal
+            </button>
+            <button onClick={() => {
+              parkCart(parkNameInput);
+              setParkNameModalOpen(false);
+              setParkNameInput("");
+            }}
+              className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48]">
+              Parkir
+            </button>
+          </div>
         </div>
       </Modal>
     </div>

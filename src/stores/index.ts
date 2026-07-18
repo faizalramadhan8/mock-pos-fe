@@ -83,6 +83,9 @@ const mapOrder = (o: any): Order => ({
   createdAt: o.created_at, createdBy: o.created_by,
   paymentProof: o.payment_proof, orderDiscountType: o.order_discount_type,
   orderDiscountValue: o.order_discount_value, orderDiscount: o.order_discount,
+  paymentsEditedAt: o.payments_edited_at || undefined,
+  paymentsEditedBy: o.payments_edited_by || undefined,
+  paymentsEditedReason: o.payments_edited_reason || undefined,
 });
 
 const mapMovement = (m: any): StockMovement => ({
@@ -656,6 +659,83 @@ export const useCartStore = create<CartState>()(
   )
 );
 
+// ─── Parked Carts (Bu Santi 12 Jul 2026) ──────────────────────────────
+// Skenario: kasir hold cart Customer 1 (masih milih barang) supaya bisa
+// layani Customer 2 dulu, nanti lanjut Customer 1. Beda dari "Pending WA"
+// yang kirim invoice ke customer_phone — parkir cart 100% local (localStorage
+// via zustand persist). Trade-off: hilang kalau tab close/refresh, tapi
+// simple + tanpa BE change.
+interface ParkedCart {
+  id: string;
+  name: string;
+  items: CartItem[];
+  customer: string;
+  customerPhone: string;
+  payment: PaymentMethod;
+  member: ActiveMember | null;
+  orderDiscountType: DiscountType | null;
+  orderDiscountValue: number;
+  createdAt: string;
+}
+interface ParkedCartState {
+  parked: ParkedCart[];
+  park: (name: string) => void;
+  load: (id: string) => void;
+  remove: (id: string) => void;
+  count: () => number;
+}
+export const useParkedCartStore = create<ParkedCartState>()(
+  persist(
+    (set, get) => ({
+      parked: [],
+      park: (name) => {
+        const cart = useCartStore.getState();
+        if (cart.items.length === 0) {
+          toast.error("Cart kosong, tidak ada yang bisa diparkir");
+          return;
+        }
+        const entry: ParkedCart = {
+          id: genId(),
+          name: name.trim() || `Customer ${get().parked.length + 1}`,
+          items: JSON.parse(JSON.stringify(cart.items)),
+          customer: cart.customer,
+          customerPhone: cart.customerPhone,
+          payment: cart.payment,
+          member: cart.member ? { ...cart.member } : null,
+          orderDiscountType: cart.orderDiscountType,
+          orderDiscountValue: cart.orderDiscountValue,
+          createdAt: new Date().toISOString(),
+        };
+        set(s => ({ parked: [entry, ...s.parked] }));
+        cart.clearCart();
+        toast.success(`Cart diparkir sebagai "${entry.name}"`);
+      },
+      load: (id) => {
+        const entry = get().parked.find(p => p.id === id);
+        if (!entry) return;
+        // Restore snapshot ke useCartStore. Pakai setState internal supaya
+        // tidak trigger recompute tier — snapshot sudah punya price final.
+        useCartStore.setState({
+          items: JSON.parse(JSON.stringify(entry.items)),
+          customer: entry.customer,
+          customerPhone: entry.customerPhone,
+          payment: entry.payment,
+          member: entry.member ? { ...entry.member } : null,
+          orderDiscountType: entry.orderDiscountType,
+          orderDiscountValue: entry.orderDiscountValue,
+        });
+        set(s => ({ parked: s.parked.filter(p => p.id !== id) }));
+        toast.success(`Cart "${entry.name}" dimuat`);
+      },
+      remove: (id) => {
+        set(s => ({ parked: s.parked.filter(p => p.id !== id) }));
+      },
+      count: () => get().parked.length,
+    }),
+    { name: "bakeshop-parked-carts", version: 1 }
+  )
+);
+
 // ─── Orders ───
 interface OrderState {
   orders: Order[];
@@ -668,6 +748,8 @@ interface OrderState {
   markAsPaid: (id: string, payments: { method: string; amount: number }[]) => Promise<void>;
   cancelPending: (id: string) => Promise<void>;
   resendInvoice: (id: string, bankAccountId?: string) => Promise<void>;
+  /** Admin ubah metode pembayaran order completed (Bu Santi 12 Jul 2026). */
+  editPayments: (id: string, payments: { method: string; amount: number }[], reason: string) => Promise<void>;
 }
 export const useOrderStore = create<OrderState>((set, get) => ({
   orders: [],
@@ -792,6 +874,19 @@ export const useOrderStore = create<OrderState>((set, get) => ({
       await useBatchStore.getState().fetchBatches();
     } catch (e: any) {
       toast.error(e.message || 'Failed to mark paid');
+      throw e;
+    }
+  },
+
+  editPayments: async (id, payments, reason) => {
+    try {
+      const res = await orderApi.editPayments(id, payments, reason);
+      const saved = res.body ? mapOrder(res.body) : null;
+      set(s => ({
+        orders: s.orders.map(o => o.id === id && saved ? saved : o),
+      }));
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to edit payment method');
       throw e;
     }
   },

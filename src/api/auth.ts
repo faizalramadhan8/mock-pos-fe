@@ -110,3 +110,24 @@ export const userApi = {
 
   delete: (id: string) => api.del(`/users/${id}`),
 };
+
+// Emergency device management (superadmin/admin). Dipakai saat WAHA down atau
+// kasir tidak bisa akses link approve — Bu Santi setujui manual via Settings.
+export interface DeviceRes {
+  id: string;
+  user_id: string;
+  status: 'pending' | 'approved' | 'rejected';
+  name?: string;
+  user_agent?: string;
+  approved_at?: string;
+  last_used_at?: string;
+  created_at: string;
+}
+
+export const deviceApi = {
+  listByUser: (userId: string) => api.get<DeviceRes[]>(`/users/${userId}/devices`),
+  emergencyApprove: (userId: string, deviceId: string) =>
+    api.post(`/users/${userId}/devices/${deviceId}/approve`),
+  revoke: (userId: string, deviceId: string) =>
+    api.del(`/users/${userId}/devices/${deviceId}`),
+};

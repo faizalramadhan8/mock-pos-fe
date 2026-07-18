@@ -4,7 +4,7 @@ export type Role = "superadmin" | "admin" | "cashier" | "staff" | "user";
 export type PaymentMethod = "cash" | "card" | "transfer" | "qris";
 export type OrderStatus = "completed" | "pending" | "cancelled" | "refunded";
 export type DiscountType = "percent" | "fixed";
-export type AuditAction = "order_created" | "order_voided" | "order_refunded" | "stock_adjusted" | "product_added" | "product_edited" | "settings_changed" | "user_registered" | "user_toggled" | "user_deleted" | "password_reset" | "register_opened" | "register_closed";
+export type AuditAction = "order_created" | "order_voided" | "order_refunded" | "stock_adjusted" | "product_added" | "product_edited" | "settings_changed" | "user_registered" | "user_toggled" | "user_deleted" | "password_reset" | "register_opened" | "register_closed" | "device_approved_manual" | "device_revoked" | "payment_method_edited";
 export type UnitType = "individual" | "box";
 export type StockType = "in" | "out";
 export type PageId = "dashboard" | "pos" | "inventory" | "orders" | "reports" | "expenses" | "settings";
@@ -175,6 +175,10 @@ export interface Order {
   orderDiscountType?: DiscountType;
   orderDiscountValue?: number;
   orderDiscount?: number;
+  /** Payment edit audit (Bu Santi 12 Jul 2026). NULL = never edited. */
+  paymentsEditedAt?: string;
+  paymentsEditedBy?: string;
+  paymentsEditedReason?: string;
 }
 
 export interface OrderItem {

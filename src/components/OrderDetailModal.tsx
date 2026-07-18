@@ -5,7 +5,7 @@ import { ProductDetailModal } from "./ProductDetailModal";
 import { useOrderStore, useProductStore, useAuthStore, useLangStore, useRefundStore, useAuditStore } from "@/stores";
 import { useThemeClasses } from "@/hooks/useThemeClasses";
 import { formatCurrency as $, formatDate, formatTime, printReceipt } from "@/utils";
-import { Printer, Ban, RotateCcw, CheckSquare, Square, MessageCircle } from "lucide-react";
+import { Printer, Ban, RotateCcw, CheckSquare, Square, MessageCircle, Edit3 } from "lucide-react";
 import { orderApi } from "@/api/orders";
 import Barcode from "react-barcode";
 import toast from "react-hot-toast";
@@ -32,8 +32,15 @@ export function OrderDetailModal({ orderId, onClose }: OrderDetailModalProps) {
   const [waSending, setWaSending] = useState(false);
   const [refundSelections, setRefundSelections] = useState<Record<number, number>>({});
   const [refundReason, setRefundReason] = useState("");
+  // Edit payment method (admin/superadmin only) — Bu Santi 12 Jul 2026.
+  const [showEditPayment, setShowEditPayment] = useState(false);
+  const [editMethod, setEditMethod] = useState<"cash" | "card" | "transfer" | "qris">("cash");
+  const [editReason, setEditReason] = useState("");
+  const [editSubmitting, setEditSubmitting] = useState(false);
+  const editPayments = useOrderStore(s => s.editPayments);
   const canVoid = user && ["superadmin", "admin", "cashier"].includes(user.role);
   const canRefund = user && ["superadmin", "admin", "cashier"].includes(user.role);
+  const canEditPayment = user && ["superadmin", "admin"].includes(user.role);
 
   const order = orderId ? orders.find(o => o.id === orderId) : null;
 
@@ -344,6 +351,88 @@ export function OrderDetailModal({ orderId, onClose }: OrderDetailModalProps) {
                 className={`flex-1 py-2.5 rounded-xl text-sm font-bold border ${th.bdr} ${th.txm}`}>{t.cancel}</button>
               <button onClick={doRefund} disabled={selectedCount === 0 || !refundReason.trim()}
                 className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white bg-[#E11D48] disabled:opacity-40">{t.confirm}</button>
+            </div>
+          </div>
+        )}
+
+        {/* Edit Payment Method (admin/superadmin) — Bu Santi 12 Jul 2026.
+            Skenario: kasir salah pilih Transfer padahal QRIS. Full replace
+            payments dengan single method = order.total. Audit trail via
+            audit_log + inline paymentsEditedAt/By/Reason di order. */}
+        {order.paymentsEditedAt && (
+          <div className={`mt-3 rounded-2xl border p-3 ${th.dark ? "border-[#FB7185]/30 bg-[#3A1F2A]/30" : "border-[#FFB5C0] bg-[#FFF4F6]"}`}>
+            <div className="flex items-start gap-2">
+              <Edit3 size={12} className={`mt-0.5 shrink-0 ${th.acc}`} />
+              <div className="flex-1 min-w-0">
+                <p className={`text-xs font-bold ${th.tx}`}>
+                  Metode pembayaran pernah diubah
+                </p>
+                <p className={`text-xs mt-0.5 ${th.txm}`}>
+                  {formatDate(order.paymentsEditedAt)} · {formatTime(order.paymentsEditedAt)}
+                  {order.paymentsEditedBy && ` · ${users.find(u => u.id === order.paymentsEditedBy)?.name || order.paymentsEditedBy}`}
+                </p>
+                {order.paymentsEditedReason && (
+                  <p className={`text-xs italic mt-1 ${th.txm}`}>"{order.paymentsEditedReason}"</p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {canEditPayment && order.status === "completed" && !showRefund && !showEditPayment && (
+          <div className="mt-3">
+            <button onClick={() => {
+              setShowEditPayment(true);
+              setEditMethod(order.payment as "cash" | "card" | "transfer" | "qris");
+              setEditReason("");
+            }}
+              className={`w-full flex items-center justify-center gap-1.5 py-2.5 rounded-2xl text-sm font-bold border ${th.bdr} ${th.tx}`}>
+              <Edit3 size={13} /> Ubah Metode Pembayaran
+            </button>
+          </div>
+        )}
+
+        {showEditPayment && (
+          <div className={`mt-4 rounded-2xl border p-4 ${th.dark ? "border-[#FB7185]/30 bg-[#3A1F2A]/30" : "border-[#FFB5C0] bg-[#FFF4F6]"}`}>
+            <p className={`text-sm font-bold mb-3 ${th.acc}`}>Ubah Metode Pembayaran</p>
+            <p className={`text-xs mb-3 ${th.txm}`}>Total order tetap {$(order.total)}. Pilih metode baru:</p>
+            <div className="grid grid-cols-2 gap-2 mb-3">
+              {(["cash", "qris", "transfer", "card"] as const).map(m => (
+                <button key={m} onClick={() => setEditMethod(m)}
+                  className={`py-2.5 rounded-xl text-xs font-bold border ${
+                    editMethod === m
+                      ? "text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48] border-transparent"
+                      : `${th.bdr} ${th.tx}`
+                  }`}>
+                  {m === "cash" ? "Tunai" : m === "qris" ? "QRIS" : m === "transfer" ? "Transfer" : "Kartu"}
+                </button>
+              ))}
+            </div>
+            <label className={`block text-xs font-bold mb-1 ${th.tx}`}>Alasan <span className="text-[#BE123C]">*</span></label>
+            <input value={editReason} onChange={e => setEditReason(e.target.value)}
+              placeholder="Contoh: Kasir salah input metode"
+              className={`w-full px-3 py-2.5 text-sm rounded-xl border ${th.inp}`} />
+            <div className="flex gap-2 mt-3">
+              <button onClick={() => setShowEditPayment(false)} disabled={editSubmitting}
+                className={`flex-1 py-2.5 rounded-xl text-sm font-bold border ${th.bdr} ${th.txm} disabled:opacity-40`}>Batal</button>
+              <button onClick={async () => {
+                if (!editReason.trim() || editSubmitting) return;
+                setEditSubmitting(true);
+                try {
+                  await editPayments(order.id, [{ method: editMethod, amount: order.total }], editReason.trim());
+                  useAuditStore.getState().log("payment_method_edited", user!.id, user!.name, `${order.id} · ${order.payment} → ${editMethod} · ${editReason.trim()}`);
+                  toast.success("Metode pembayaran diubah");
+                  setShowEditPayment(false);
+                  setEditReason("");
+                } catch {
+                  // toast sudah di store
+                } finally {
+                  setEditSubmitting(false);
+                }
+              }} disabled={!editReason.trim() || editSubmitting}
+                className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48] disabled:opacity-40">
+                {editSubmitting ? "Menyimpan…" : "Simpan"}
+              </button>
             </div>
           </div>
         )}
