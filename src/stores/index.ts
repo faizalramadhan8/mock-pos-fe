@@ -755,19 +755,15 @@ export const useOrderStore = create<OrderState>((set, get) => ({
   orders: [],
   fetchOrders: async () => {
     try {
-      // Limit 500 = ~3 minggu Bu Santi (24 trx/hari). Cukup untuk daily
-      // ops (Dashboard "Bulan Ini", POS pending list, Pesanan tab). Reports
-      // date-range wider tetap works — data lengkap tetap dilayani BE,
-      // fetch dedicated dilakukan kalau user pilih range > default.
+      // Limit 100_000 — cover semua orders history Bu Santi (per Jul 2026
+      // ~2000 orders total). Aggressive tinggi supaya Reports/Cashflow
+      // "Bulan Ini" apapun accurate.
       //
-      // Trade-off: hilangkan kasus "buka Reports lihat data > 3 minggu
-      // tanpa refresh" — tetap OK karena Reports auto-refresh on-mount.
-      //
-      // Sebelumnya limit 2000 — dengan 2090 total rows, planner reject
-      // composite index (96% rows), fetch efektif semua data (~40-60MB
-      // preload Items+Payments+Member). Perf jadi berat 700ms-1.4s.
-      // Bu Santi 19 Jul 2026.
-      const res = await orderApi.getAll({ limit: 500 });
+      // Trade-off: query > 1s + heavy Preload transfer (~40-60MB kalau
+      // volume tumbuh besar). Mitigation: polling 60s + composite index
+      // 000046. Kalau nanti volume > 5000/bulan, harus refactor pakai
+      // date-range fetch (Path B) — approach ini tidak scale.
+      const res = await orderApi.getAll({ limit: 100_000 });
       set({ orders: (res.body || []).map(mapOrder) });
     } catch { /* ignore */ }
   },
