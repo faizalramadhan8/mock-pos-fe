@@ -1,5 +1,6 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useAuthStore, useLangStore, useOrderStore, useProductStore, useBatchStore } from "@/stores";
+import type { Order } from "@/types";
 import { ProductDetailModal } from "@/components/ProductDetailModal";
 import { useThemeClasses } from "@/hooks/useThemeClasses";
 import { usePageFetch } from "@/hooks/usePageFetch";
@@ -45,6 +46,9 @@ function getPreviousWindow(mode: Range, customFrom: string, customTo: string): {
 
 export function DashboardPage() {
   usePageFetch([
+    // Path B (Bu Santi 19 Jul 2026): pending list tetap dari store recent 500
+    // (pending order jarang > 7 hari), tapi range-based aggregates fetch
+    // by-range di useEffect di bawah.
     { key: "orders",   fetch: () => useOrderStore.getState().fetchOrders() },
     { key: "products", fetch: () => useProductStore.getState().fetchProducts() },
     { key: "batches",  fetch: () => useBatchStore.getState().fetchBatches() },
@@ -54,6 +58,8 @@ export function DashboardPage() {
   const user = useAuthStore(s => s.user)!;
   const users = useAuthStore(s => s.users);
   const orders = useOrderStore(s => s.orders);
+  // Path B — auto refetch range setelah checkout/edit/cancel.
+  const ordersVersion = useOrderStore(s => s.version);
   const products = useProductStore(s => s.products);
   const getExpiringBatches = useBatchStore(s => s.getExpiringBatches);
   const batches = useBatchStore(s => s.batches);
@@ -70,30 +76,48 @@ export function DashboardPage() {
   const isCashier = user.role === "cashier";
   const isStaff = user.role === "staff";
 
-  const completedOrders = useMemo(() => orders.filter(o => o.status === "completed"), [orders]);
+  // Pending berasal dari store recent 500 (aktif pending pasti recent).
   const pendingOrders = useMemo(() => orders.filter(o => o.status === "pending"), [orders]);
+  // Cashier stats card menunjukkan lifetime activity dari store recent 500 —
+  // tidak butuh scope wider (kasir cuma lihat "hari ini kerja").
+  const completedOrders = useMemo(() => orders.filter(o => o.status === "completed"), [orders]);
   const outOfStock = useMemo(() => products.filter(p => p.isActive && p.stock === 0), [products]);
   const lowStock = useMemo(() => products.filter(p => p.isActive && p.stock > 0 && p.stock <= p.minStock), [products]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const expiringBatches = useMemo(() => getExpiringBatches(30), [batches, getExpiringBatches]);
 
-  // Orders that fall within the currently-selected range
   const { from, to } = getRangeWindow(range, customFrom, customTo);
   const prev = getPreviousWindow(range, customFrom, customTo);
-  const rangedOrders = useMemo(() =>
-    completedOrders.filter(o => {
-      const t = new Date(o.createdAt);
-      return t >= from && t < to;
-    }),
-    [completedOrders, from, to]
-  );
-  const prevRangedOrders = useMemo(() =>
-    completedOrders.filter(o => {
-      const t = new Date(o.createdAt);
-      return t >= prev.from && t < prev.to;
-    }),
-    [completedOrders, prev.from, prev.to]
-  );
+
+  // Path B — fetch orders by range (current + previous) via BE endpoint.
+  // Cache 30s per (from,to) key di store, jadi switching range back-forth
+  // tidak spam BE.
+  const [rangedOrders, setRangedOrders] = useState<Order[]>([]);
+  const [prevRangedOrders, setPrevRangedOrders] = useState<Order[]>([]);
+  useEffect(() => {
+    const fromYMD = from.toISOString().slice(0, 10);
+    // `to` di getRangeWindow adalah exclusive end (next day 00:00). BE from/to
+    // inclusive DATE(created_at) BETWEEN — kurangi 1 detik untuk cover-inclusive.
+    const toDate = new Date(to.getTime() - 1);
+    const toYMD_ = toDate.toISOString().slice(0, 10);
+    let cancelled = false;
+    useOrderStore.getState().fetchByRange(fromYMD, toYMD_)
+      .then(list => { if (!cancelled) setRangedOrders(list.filter(o => o.status === "completed")); })
+      .catch(err => { if (!cancelled) { console.error("Dashboard fetchByRange failed", err); setRangedOrders([]); } });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [from.getTime(), to.getTime(), ordersVersion]);
+  useEffect(() => {
+    const fromYMD = prev.from.toISOString().slice(0, 10);
+    const toDate = new Date(prev.to.getTime() - 1);
+    const toYMD_ = toDate.toISOString().slice(0, 10);
+    let cancelled = false;
+    useOrderStore.getState().fetchByRange(fromYMD, toYMD_)
+      .then(list => { if (!cancelled) setPrevRangedOrders(list.filter(o => o.status === "completed")); })
+      .catch(err => { if (!cancelled) { console.error("Dashboard prev fetchByRange failed", err); setPrevRangedOrders([]); } });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prev.from.getTime(), prev.to.getTime(), ordersVersion]);
 
   const rangeRevenue = useMemo(() => rangedOrders.reduce((s, o) => s + o.total, 0), [rangedOrders]);
   const prevRevenue = useMemo(() => prevRangedOrders.reduce((s, o) => s + o.total, 0), [prevRangedOrders]);

@@ -1,5 +1,6 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useLangStore, useOrderStore, useProductStore, useAuthStore, useMemberStore } from "@/stores";
+import type { Order } from "@/types";
 import { ProductDetailModal } from "@/components/ProductDetailModal";
 import { OrderDetailModal } from "@/components/OrderDetailModal";
 import { MemberStatsModal } from "@/components/MemberStatsModal";
@@ -44,15 +45,27 @@ function FilterPill({
   );
 }
 
+// YYYY-MM-DD in local time (WIB) — BE endpoint expects calendar-date strings.
+function toYMD(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 export function OrdersPage() {
   usePageFetch([
+    // Store `orders` recent 500 dipakai untuk default view (dateRange="all"
+    // tanpa search). Path B: kalau user pilih range specific atau search,
+    // fetch dari BE dengan filter — cegah cuma lihat 500 recent.
     { key: "orders",   fetch: () => useOrderStore.getState().fetchOrders() },
     { key: "members",  fetch: () => useMemberStore.getState().fetchMembers() },
     { key: "products", fetch: () => useProductStore.getState().fetchProducts() },
   ]);
   const th = useThemeClasses();
   const { t, lang } = useLangStore();
-  const orders = useOrderStore(s => s.orders);
+  const storeOrders = useOrderStore(s => s.orders);
+  const ordersVersion = useOrderStore(s => s.version);
   const products = useProductStore(s => s.products);
   const user = useAuthStore(s => s.user)!;
   const canViewMembers = user.role === "superadmin" || user.role === "admin";
@@ -68,6 +81,47 @@ export function OrdersPage() {
   const ORDERS_PAGE_SIZE = 20;
   const [visibleCount, setVisibleCount] = useState(ORDERS_PAGE_SIZE);
   const [prevFilterKey, setPrevFilterKey] = useState("");
+
+  // Path B (Bu Santi 19 Jul 2026) — orders yang dipakai untuk list:
+  //   - Default (dateRange="all", no search): pakai storeOrders (recent 500)
+  //     untuk instant response
+  //   - Ada date range specific OR search: fetch dari BE dengan filter
+  const [rangeOrders, setRangeOrders] = useState<Order[]>([]);
+  const [rangeLoading, setRangeLoading] = useState(false);
+  const isFilteredFetch = dateRange !== "all" || debouncedSearch.trim().length > 0;
+  useEffect(() => {
+    if (!isFilteredFetch) {
+      setRangeOrders([]);
+      return;
+    }
+    const range = getDateRange(dateRange, customRange);
+    const from = range ? toYMD(range.start) : "";
+    const to = range ? toYMD(range.end) : "";
+    let cancelled = false;
+    setRangeLoading(true);
+    useOrderStore.getState().fetchByRange(from, to)
+      .then(list => {
+        if (cancelled) return;
+        // Tambahan client-side search kalau BE search kelewat (fetchByRange
+        // gak lewat cursor param — ini defense in-depth). BE sebenarnya
+        // sudah support search via /orders/?search=, tapi fetchByRange
+        // helper skip parameter itu untuk simplicity.
+        const q = debouncedSearch.trim().toLowerCase();
+        const filtered = q ? list.filter(o =>
+          o.id.toLowerCase().includes(q) ||
+          o.customer.toLowerCase().includes(q) ||
+          (o.customerPhone || "").toLowerCase().includes(q) ||
+          (o.member?.name || "").toLowerCase().includes(q) ||
+          (o.member?.phone || "").toLowerCase().includes(q)
+        ) : list;
+        setRangeOrders(filtered);
+      })
+      .catch(err => { if (!cancelled) { console.error("OrdersPage fetchByRange failed", err); setRangeOrders([]); } })
+      .finally(() => { if (!cancelled) setRangeLoading(false); });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dateRange, customRange.from, customRange.to, debouncedSearch, isFilteredFetch, ordersVersion]);
+  const orders = isFilteredFetch ? rangeOrders : storeOrders;
 
   // Members tab state
   const members = useMemberStore(s => s.members);
@@ -86,15 +140,17 @@ export function OrdersPage() {
   const [editMember, setEditMember] = useState<Member | null>(null);
   const [confirmDeleteMemberId, setConfirmDeleteMemberId] = useState<string | null>(null);
 
-  // Filter by date range
+  // Filter by date range — Path B: kalau isFilteredFetch=true, orders udah
+  // datang dari BE dengan filter, gak perlu client filter lagi.
   const dateFiltered = useMemo(() => {
+    if (isFilteredFetch) return orders;
     const range = getDateRange(dateRange, customRange);
     if (!range) return orders;
     return orders.filter(o => {
       const d = new Date(o.createdAt);
       return d >= range.start && d <= range.end;
     });
-  }, [orders, dateRange, customRange]);
+  }, [orders, dateRange, customRange, isFilteredFetch]);
 
   // Custom range validation — true kalau user pilih "custom" tapi belum
   // lengkap atau from > to.
@@ -288,7 +344,12 @@ export function OrdersPage() {
 
       {/* Order list */}
       <div className={`rounded-[22px] border overflow-hidden ${th.card} ${th.bdr}`}>
-        {filtered.length === 0 ? (
+        {rangeLoading && filtered.length === 0 ? (
+          <div className={`py-10 text-center ${th.txm}`}>
+            <FileText size={32} className="mx-auto opacity-20 mb-2 animate-pulse" />
+            <p className="text-sm font-semibold">{lang === "id" ? "Memuat data..." : "Loading..."}</p>
+          </div>
+        ) : filtered.length === 0 ? (
           <div className={`py-10 text-center ${th.txm}`}>
             {debouncedSearch.trim() ? (
               <><Search size={32} className="mx-auto opacity-20 mb-2" /><p className="text-sm font-semibold">{t.noOrdersFound}</p></>

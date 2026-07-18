@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useOrderStore, useExpenseStore, usePurchaseInvoiceStore, useRefundStore, useLangStore, useAuthStore } from "@/stores";
+import type { Order } from "@/types";
 import { useThemeClasses } from "@/hooks/useThemeClasses";
 import { formatCurrency as $ } from "@/utils";
 import { cashbookApi } from "@/api/cashbook";
@@ -63,17 +64,33 @@ interface CapitalEntry {
 export function CashflowTab() {
   const th = useThemeClasses();
   const { lang } = useLangStore();
-  const orders = useOrderStore(s => s.orders);
   const expenses = useExpenseStore(s => s.expenses);
   const invoices = usePurchaseInvoiceStore(s => s.invoices);
   const refunds = useRefundStore(s => s.refunds);
   const user = useAuthStore(s => s.user)!;
   const canWrite = user.role === "admin" || user.role === "superadmin";
+  // Path B — subscribe order version untuk auto refetch setelah mutation.
+  const ordersVersion = useOrderStore(s => s.version);
 
   // ── Month picker state ───────────────────────────────────────────────
   const today = new Date();
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth() + 1); // 1-12
+
+  // Path B (Bu Santi 19 Jul 2026): fetch orders for the selected month via
+  // BE range endpoint. Sebelumnya pakai useOrderStore.orders (recent 500)
+  // yang bakal MISS data > 3 minggu — bug untuk bulan-bulan lama.
+  const [orders, setOrders] = useState<Order[]>([]);
+  useEffect(() => {
+    const toDate = new Date(year, month, 0);
+    const fromYMD = `${year}-${String(month).padStart(2, "0")}-01`;
+    const toYMD = `${year}-${String(month).padStart(2, "0")}-${String(toDate.getDate()).padStart(2, "0")}`;
+    let cancelled = false;
+    useOrderStore.getState().fetchByRange(fromYMD, toYMD)
+      .then(list => { if (!cancelled) setOrders(list); })
+      .catch(err => { if (!cancelled) { console.error("Cashflow fetchByRange failed", err); setOrders([]); } });
+    return () => { cancelled = true; };
+  }, [year, month, ordersVersion]);
 
   // ── Opening balance state ────────────────────────────────────────────
   const [openingBalance, setOpeningBalance] = useState<number>(0);

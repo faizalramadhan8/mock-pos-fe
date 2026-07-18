@@ -39,7 +39,14 @@ export interface ApiRes<T = any> {
   message: string;
   body?: T;
   error?: any;
-  meta?: { total: number; page: number; limit: number };
+  meta?: {
+    total?: number;
+    page?: number;
+    limit?: number;
+    count?: number;
+    /** Path B cursor pagination — pass ke request berikutnya untuk load more. */
+    next_cursor?: string;
+  };
 }
 
 async function request<T = any>(method: string, path: string, body?: any, isFormData?: boolean): Promise<ApiRes<T>> {
