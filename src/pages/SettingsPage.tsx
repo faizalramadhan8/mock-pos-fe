@@ -108,6 +108,20 @@ export function SettingsPage() {
   const [newPasswordInput, setNewPasswordInput] = useState("");
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
+  // POS Layout preference (Bu Santi 19 Jul 2026) — persist per-device.
+  const [posLayout, setPosLayout] = useState<"grid" | "search">(() => {
+    try { return (localStorage.getItem("bakeshop-pos-layout") as "grid" | "search") || "grid"; } catch { return "grid"; }
+  });
+  const changePosLayout = (v: "grid" | "search") => {
+    setPosLayout(v);
+    try {
+      localStorage.setItem("bakeshop-pos-layout", v);
+      // Dispatch storage event supaya POSPage yang lagi open auto-refresh
+      // (same-tab tidak fire otomatis, harus manual).
+      window.dispatchEvent(new StorageEvent("storage", { key: "bakeshop-pos-layout", newValue: v }));
+    } catch { /* ignore */ }
+  };
+
   // Device management — emergency manual approve (WAHA fallback).
   // Fetched on-demand saat user row di-expand. Cache di state jadi tidak
   // refetch tiap collapse/expand.
@@ -259,6 +273,39 @@ export function SettingsPage() {
                       ? "text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48]"
                       : `border ${th.bdr} ${th.txm}`
                   }`}>{o.f} {o.l}</button>
+              ))}
+            </div>
+          </div>
+
+          {/* Layout Kasir — Bu Santi 19 Jul 2026.
+              Persist per-device di localStorage (bakeshop-pos-layout).
+              Kasir toko biasanya pilih "Cari Cepat" — barcode scanner primary,
+              cart luas untuk baca 10+ item. Bu Santi (Grid Produk) untuk browse. */}
+          <div className={`rounded-[22px] border p-5 ${th.card} ${th.bdr}`}>
+            <p className={`text-sm font-extrabold mb-1 ${th.tx}`}>
+              {lang === "id" ? "Layout Kasir" : "POS Layout"}
+            </p>
+            <p className={`text-xs mb-3 ${th.txm}`}>
+              {lang === "id"
+                ? "Ganti tampilan halaman Kasir. Perubahan aktif setelah refresh halaman Kasir."
+                : "Change POS page layout. Takes effect after POS page refresh."}
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              {([
+                { k: "grid" as const, l: lang === "id" ? "Grid Produk" : "Product Grid",
+                  d: lang === "id" ? "Browse kartu produk" : "Browse product cards" },
+                { k: "search" as const, l: lang === "id" ? "Cari Cepat" : "Quick Search",
+                  d: lang === "id" ? "Scan/ketik, cart lebih luas" : "Scan/type, wider cart" },
+              ]).map(o => (
+                <button key={o.k} onClick={() => changePosLayout(o.k)}
+                  className={`py-3.5 px-3 rounded-2xl text-sm font-bold transition-all text-center ${
+                    posLayout === o.k
+                      ? "text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48]"
+                      : `border ${th.bdr} ${th.txm}`
+                  }`}>
+                  <p>{o.l}</p>
+                  <p className={`text-xs font-normal mt-0.5 ${posLayout === o.k ? "opacity-90" : th.txf}`}>{o.d}</p>
+                </button>
               ))}
             </div>
           </div>

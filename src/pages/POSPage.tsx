@@ -102,6 +102,25 @@ export function POSPage() {
   const debouncedQuery = useDebounce(query, 150);
   const [catFilter, setCatFilter] = useState("all");
   const [cartOpen, setCartOpen] = useState(false);
+  // Layout Kasir (Bu Santi 19 Jul 2026) — persistent per-device setting.
+  //   "grid"   : produk grid + cart panel (existing, default untuk Bu Santi)
+  //   "search" : compact search list + cart panel wide (untuk kasir toko —
+  //              barcode scanner primary, cart lebih luas untuk baca 10+ item)
+  // Ganti via Settings → Preferensi.
+  const [posLayout, setPosLayout] = useState<"grid" | "search">(() => {
+    try { return (localStorage.getItem("bakeshop-pos-layout") as "grid" | "search") || "grid"; } catch { return "grid"; }
+  });
+  // Listen ke storage event supaya kalau setting diubah di tab lain (Settings
+  // page), POSPage auto-refresh.
+  useEffect(() => {
+    const handler = (e: StorageEvent) => {
+      if (e.key === "bakeshop-pos-layout") {
+        setPosLayout((e.newValue as "grid" | "search") || "grid");
+      }
+    };
+    window.addEventListener("storage", handler);
+    return () => window.removeEventListener("storage", handler);
+  }, []);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   // Lock UI saat checkout sedang diproses ke BE. Mencegah kasir double-click
   // / start transaksi berikutnya sebelum yang sekarang confirm tersimpan.
@@ -1082,16 +1101,26 @@ export function POSPage() {
   }
 
   return (
-    <div className="lg:flex lg:gap-5">
-      {/* Left: products */}
-      <div className="flex-1 min-w-0">
+    <div className={posLayout === "search" ? "md:flex md:gap-5" : "lg:flex lg:gap-5"}>
+      {/* Left column: toolbar (search + actions) + product grid (Grid mode)
+          atau compact search results list (Search mode). Bu Santi 19 Jul 2026.
+          Search mode pakai md: breakpoint (768px) — kasir tablet portrait Bu
+          Santi langsung liat cart side panel. Grid mode tetap lg: (1024px). */}
+      <div className={`min-w-0 ${
+        posLayout === "search"
+          ? "md:w-[320px] md:shrink-0"
+          : "flex-1"
+      }`}>
         {/* Search + action buttons.
             Mobile: search full-width di row 1, action buttons wrap ke row 2.
             Tablet+ (sm:): semua dalam 1 row. Cegah field pencarian sempit
             di HP 375px (sebelumnya typing area cuma ~47px karena 4 button
-            ambil tempat). */}
+            ambil tempat).
+            Search mode (Bu Santi 19 Jul 2026): search input SELALU full-width
+            row 1, buttons wrap ke row 2 (bahkan di tablet+) supaya kolom
+            320px tetap rapi. */}
         <div className="flex flex-wrap gap-2 mb-4">
-        <div className="relative w-full sm:flex-1 sm:w-auto">
+        <div className={`relative w-full ${posLayout === "search" ? "" : "sm:flex-1 sm:w-auto"}`}>
           <Search size={18} className={`absolute left-3.5 top-1/2 -translate-y-1/2 ${th.txf} pointer-events-none`} />
           <input ref={searchRef} value={query} onChange={e => setQuery(e.target.value)} placeholder={t.search as string}
             inputMode="search"
@@ -1163,8 +1192,11 @@ export function POSPage() {
         )}
         </div>
 
-        {/* Shift summary — only this cashier's orders this shift (or today) */}
-        {(() => {
+        {/* Shift summary — only this cashier's orders this shift (or today).
+            Hidden di Search mode (Bu Santi 19 Jul 2026) — kolom 320px sempit,
+            summary bikin visual clutter. Bu Santi bisa cek shift di Beranda
+            atau Tutup Kasir dropdown. */}
+        {posLayout !== "search" && (() => {
           const sessionStart = activeSession
             ? new Date(activeSession.openedAt)
             : (() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), d.getDate()); })();
@@ -1257,7 +1289,9 @@ export function POSPage() {
           );
         })()}
 
-        {/* Category pills with fade gradient */}
+        {/* Category pills with fade gradient. Hidden di Search mode karena
+            filter category cuma apply ke grid (yang di-hide). Bu Santi 19 Jul. */}
+        {posLayout !== "search" && (
         <div className="relative mb-5">
           <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
             <button onClick={() => setCatFilter("all")}
@@ -1280,9 +1314,54 @@ export function POSPage() {
           </div>
           <div className={`absolute right-0 top-0 bottom-1 w-8 pointer-events-none bg-gradient-to-l ${th.dark ? "from-[#140B0F]" : "from-[#FBE8EE]"}`} />
         </div>
+        )}
 
-        {/* Products grid */}
-        {filtered.length === 0 ? (
+        {/* Products render — 2 modes (Bu Santi 19 Jul 2026):
+            - Grid (existing): 240px card grid, browse-friendly
+            - Search: compact vertical list, cari-first UX. Empty state saat
+              belum ketik = hint "scan barcode atau ketik nama". Kalau ketik
+              → tampil top 8 match sebagai list. Klik row → add ke cart. */}
+        {posLayout === "search" ? (
+          <>
+            {!query.trim() ? (
+              <div className={`text-center py-16 ${th.txm}`}>
+                <ScanLine size={40} className="mx-auto opacity-20 mb-3" />
+                <p className="font-semibold text-sm">
+                  {lang === "id" ? "Scan barcode atau ketik nama produk" : "Scan barcode or type product name"}
+                </p>
+                <p className={`text-xs mt-1 ${th.txf}`}>
+                  {lang === "id" ? "Produk akan muncul di sini" : "Products will appear here"}
+                </p>
+              </div>
+            ) : filtered.length === 0 ? (
+              <div className={`text-center py-16 ${th.txm}`}>
+                <Search size={40} className="mx-auto opacity-20 mb-3" />
+                <p className="font-semibold text-sm">{t.noResults}</p>
+              </div>
+            ) : (
+              <div className={`rounded-2xl border ${th.bdr} ${th.card} overflow-hidden pb-4`}>
+                {filtered.slice(0, 8).map((p, idx) => (
+                  <button key={p.id}
+                    onClick={() => { handleAddToCart(p, "individual"); setQuery(""); }}
+                    className={`w-full flex items-center justify-between gap-3 px-4 py-3 text-left active:opacity-70 ${idx > 0 ? `border-t ${th.bdrSoft}` : ""}`}>
+                    <div className="min-w-0 flex-1">
+                      <p className={`text-sm font-bold truncate ${th.tx}`}>{lang === "id" ? p.nameId : p.name}</p>
+                      <p className={`text-xs ${th.txm}`}>
+                        SKU: {p.sku} · Stok: <span className={p.stock <= (p.minStock || 0) ? "text-[#BE123C] font-bold" : ""}>{p.stock}</span>
+                      </p>
+                    </div>
+                    <p className={`text-sm font-black shrink-0 ${th.acc}`}>{$(p.sellingPrice)}</p>
+                  </button>
+                ))}
+                {filtered.length > 8 && (
+                  <div className={`px-4 py-2 text-center text-xs ${th.txf} border-t ${th.bdrSoft} ${th.elev}`}>
+                    +{filtered.length - 8} produk lain — persempit pencarian
+                  </div>
+                )}
+              </div>
+            )}
+          </>
+        ) : filtered.length === 0 ? (
           <div className={`text-center py-16 ${th.txm}`}>
             <Search size={40} className="mx-auto opacity-20 mb-3" />
             <p className="font-semibold text-sm">{t.noResults}</p>
@@ -1319,8 +1398,16 @@ export function POSPage() {
         )}
       </div>
 
-      {/* Right: cart side panel (desktop only) */}
-      <div className={`hidden lg:flex lg:flex-col lg:w-[480px] xl:w-[560px] 2xl:w-[620px] lg:shrink-0 lg:sticky lg:top-[68px] lg:max-h-[calc(100vh-148px)] lg:rounded-[22px] lg:border lg:overflow-hidden ${th.card} ${th.bdr}`}>
+      {/* Right: cart side panel.
+          Search mode: pakai md: breakpoint (768px) supaya kasir tablet
+          portrait Bu Santi langsung liat cart tanpa buka modal. Cart
+          panel flex-1 = ambil sisa screen setelah left column 320px.
+          Grid mode: tetap lg: (1024px), width fixed 480-620px (existing). */}
+      <div className={`${
+        posLayout === "search"
+          ? "hidden md:flex md:flex-col md:flex-1 md:min-w-0 md:sticky md:top-[68px] md:max-h-[calc(100vh-148px)] md:rounded-[22px] md:border md:overflow-hidden"
+          : "hidden lg:flex lg:flex-col lg:w-[480px] xl:w-[560px] 2xl:w-[620px] lg:shrink-0 lg:sticky lg:top-[68px] lg:max-h-[calc(100vh-148px)] lg:rounded-[22px] lg:border lg:overflow-hidden"
+      } ${th.card} ${th.bdr}`}>
         <div className={`px-5 py-3.5 border-b ${th.bdr} flex items-center justify-between`}>
           <p className={`text-sm font-extrabold tracking-tight ${th.tx}`}>{t.cart} · {cartCount}</p>
           <p className={`text-sm font-black ${th.acc}`}>{$(cartTotal)}</p>
@@ -1330,9 +1417,10 @@ export function POSPage() {
         </div>
       </div>
 
-      {/* Mobile floating cart bar */}
+      {/* Mobile floating cart bar — hidden dari breakpoint mana cart side
+          panel jadi visible (md: untuk Search, lg: untuk Grid). */}
       {cartCount > 0 && (
-        <div className="lg:hidden fixed bottom-20 left-4 right-4 z-30">
+        <div className={`${posLayout === "search" ? "md:hidden" : "lg:hidden"} fixed bottom-20 left-4 right-4 z-30`}>
           <button onClick={() => setCartOpen(true)}
             className="w-full flex items-center justify-between text-white px-5 py-3.5 rounded-[20px] bg-gradient-to-r from-[#FB7185] to-[#E11D48] shadow-[0_8px_30px_rgba(160,103,60,0.3)] active:scale-[0.98] transition-transform">
             <span className="flex items-center gap-2.5">

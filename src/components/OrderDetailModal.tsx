@@ -40,7 +40,10 @@ export function OrderDetailModal({ orderId, onClose }: OrderDetailModalProps) {
   const editPayments = useOrderStore(s => s.editPayments);
   const canVoid = user && ["superadmin", "admin", "cashier"].includes(user.role);
   const canRefund = user && ["superadmin", "admin", "cashier"].includes(user.role);
-  const canEditPayment = user && ["superadmin", "admin"].includes(user.role);
+  // Bu Santi 19 Jul 2026: kasir toko sekarang bisa fix method sendiri
+  // (sebelumnya admin only, ribet kalau Bu Santi tidak standby). Audit
+  // trail tetap track siapa ubah + alasan.
+  const canEditPayment = user && ["superadmin", "admin", "cashier", "staff"].includes(user.role);
 
   const order = orderId ? orders.find(o => o.id === orderId) : null;
 
