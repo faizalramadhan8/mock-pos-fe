@@ -27,6 +27,16 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ["**/*.{js,css,html,svg,png,jpg,jpeg,woff2}"],
+        // Exclude /shop/* dari SW navigation fallback (Bu Santi 20 Jul 2026).
+        // SW POS aggressive claim scope "/" — kalau customer buka tbksanti.id
+        // dulu (SW installed), lalu buka /shop, SW intercept navigation dan
+        // return cached POS index.html. Denylist ini cegah SW handle route
+        // ecom.
+        navigateFallbackDenylist: [
+          /^\/shop/,
+          /^\/api/,
+          /^\/storage/,
+        ],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/fonts\.(googleapis|gstatic)\.com/,
