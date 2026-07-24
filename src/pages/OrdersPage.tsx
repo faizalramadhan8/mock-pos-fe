@@ -313,6 +313,14 @@ export function OrdersPage() {
                         <Pencil size={11} />
                       </span>
                     )}
+                    {/* Badge Online untuk order dari ecom storefront. Bu Santi
+                        24 Jul 2026 — supaya kasir tahu ada order online masuk. */}
+                    {o.orderSource === "ecom" && (
+                      <span title="Order dari toko online"
+                        className={`inline-block text-xs font-bold px-1.5 py-0.5 rounded ${th.dark ? "bg-[#3A1F2A]/60 text-[#FB7185]" : "bg-[#FFE4E9] text-[#E11D48]"}`}>
+                        Online
+                      </span>
+                    )}
                   </p>
                   <p className={`text-sm mt-0.5 ${th.txm} truncate`}>{o.customer} · {formatTime(o.createdAt)}</p>
                 </div>

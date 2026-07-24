@@ -48,6 +48,8 @@ export interface OrderRes {
   payments_edited_at?: string;
   payments_edited_by?: string;
   payments_edited_reason?: string;
+  // Order source (migration 000047): 'pos' (default) or 'ecom'.
+  order_source?: string;
 }
 
 export interface AggregateTopProduct {

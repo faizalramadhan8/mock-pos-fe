@@ -86,6 +86,7 @@ const mapOrder = (o: any): Order => ({
   paymentsEditedAt: o.payments_edited_at || undefined,
   paymentsEditedBy: o.payments_edited_by || undefined,
   paymentsEditedReason: o.payments_edited_reason || undefined,
+  orderSource: o.order_source || "pos",
 });
 
 const mapMovement = (m: any): StockMovement => ({

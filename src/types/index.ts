@@ -179,6 +179,8 @@ export interface Order {
   paymentsEditedAt?: string;
   paymentsEditedBy?: string;
   paymentsEditedReason?: string;
+  /** Order source (Bu Santi 24 Jul 2026): 'pos' | 'ecom'. Default 'pos'. */
+  orderSource?: string;
 }
 
 export interface OrderItem {
