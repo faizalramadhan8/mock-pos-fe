@@ -74,6 +74,15 @@ export const authApi = {
     date_of_birth?: string;
   }) => api.post<{ id: string }>('/auth/register', data),
 
+  // Public customer register — force role='user' di BE. Auto-login setelah
+  // register (BE return access_token). Bu Santi 21 Jul 2026.
+  registerCustomer: (data: {
+    fullname: string;
+    email: string;
+    phone: string;
+    password: string;
+  }) => api.post<LoginRes>('/auth/register-customer', data),
+
   getSession: () => api.get<{ id: string; fullname: string; role: string; email: string; is_active: boolean }>('/auth/session'),
 
   logout: () => api.post('/auth/logout').finally(() => setToken(null)),

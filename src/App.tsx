@@ -67,7 +67,21 @@ export default function App() {
     (async () => {
       if (getToken()) {
         const valid = await useAuthStore.getState().checkSession();
-        if (valid) await hydrateStores();
+        if (valid) {
+          // Role-based redirect (Bu Santi 21 Jul 2026) — unified auth: user
+          // yang buka POS URL tapi role='user' auto-redirect ke storefront.
+          // ecom_admin/superadmin ke admin panel ecom.
+          const role = useAuthStore.getState().user?.role || "";
+          if (role === "user") {
+            window.location.href = "/shop/";
+            return;
+          }
+          if (role === "ecom_admin" || role === "ecom_superadmin") {
+            window.location.href = "/shop/admin";
+            return;
+          }
+          await hydrateStores();
+        }
       }
       setInitializing(false);
     })();
@@ -149,6 +163,17 @@ export default function App() {
           </div>
           <div className="flex items-center gap-1.5">
             <NotificationBell />
+            {/* Ecom Admin button — superadmin only (Bu Santi 21 Jul 2026).
+                Quick-jump ke panel ecom tanpa harus login ulang (JWT shared). */}
+            {user.role === "superadmin" && (
+              <button
+                onClick={() => { window.location.href = "/shop/admin"; }}
+                aria-label="Ecom Admin"
+                title="Buka Ecom Admin Panel"
+                className={`min-w-[44px] min-h-[44px] rounded-2xl flex items-center justify-center transition-all ${th.txm} hover:${th.acc}`}>
+                <ShoppingBag size={22} />
+              </button>
+            )}
             {canSeeSettings && (
               <button
                 onClick={() => setPage("settings")}

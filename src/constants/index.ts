@@ -10,6 +10,10 @@ export const ROLE_PERMISSIONS: Record<Role, PageId[]> = {
   staff: ["pos", "inventory", "orders", "settings"],
   cashier: ["pos", "settings"],
   user: ["pos", "settings"],
+  // Ecom-only roles — di POS gak ada akses (kalau accidental login POS,
+  // App.tsx auto-redirect ke /shop/admin). Bu Santi 21 Jul 2026.
+  ecom_admin: [],
+  ecom_superadmin: [],
 };
 
 export const INVENTORY_WRITE_ROLES: Role[] = ["superadmin", "admin", "staff"];

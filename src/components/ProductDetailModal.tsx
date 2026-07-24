@@ -451,59 +451,101 @@ export function ProductDetailModal({ productId, onClose }: ProductDetailModalPro
           )}
         </div>
 
-        {/* Filter periode DIHAPUS per request Bu Santi 29 Jun 2026 — list
-            jadi feed agregat per (tanggal + alasan). Bu Santi: "ga mau lihat
-            -1 -1 -1, mau nya count". */}
+        {/* Group per hari (Bu Santi 24 Jul 2026): ibu-ibu confused karena dulu
+            layout flat + reverse chronological antar hari + ASC dalam hari
+            bikin saldo naik-turun ambigu ("−3 sisa 14, +30 sisa 44 di 20 Juni
+            atas-bawahan sama-sama tanggal 20 Juni tapi angka jauh").
+            Fix: HEADER per hari dengan saldo akhir hari, events dalam hari
+            di-indent dengan waktu jam prominent. Baca top→bottom per hari
+            langsung nyambung saldo-nya. */}
         {recentMovementGroups.length === 0 ? (
           <p className={`text-xs ${th.txf}`}>{t.noRecentMovements as string}</p>
         ) : (
-          <div className="space-y-2">
-            {recentMovementGroups.map(g => {
-              const sup = g.supplierId ? suppliers.find(s => s.id === g.supplierId) : null;
-              const reasonInfo = REASON_BADGE[g.reason] ?? REASON_BADGE.default;
-              const isIn = g.type === "in";
-              return (
-                <div key={g.key} className={`flex items-start gap-2 py-2 border-b last:border-0 ${th.bdrSoft}`}>
-                  {isIn
-                    ? <ArrowDownCircle size={14} className="shrink-0 mt-0.5 text-[#E11D48]" />
-                    : <ArrowUpCircle size={14} className="shrink-0 mt-0.5 text-[#BE123C]" />
-                  }
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <p className={`text-sm font-bold ${th.tx}`}>
-                        {isIn ? "+" : "−"}{g.qty}
+          <div className="space-y-3">
+            {(() => {
+              // Group by dateYMD, preserve sort order dari recentMovementGroups
+              // (hari DESC, dalam hari ASC).
+              const byDay = new Map<string, MovementGroup[]>();
+              for (const g of recentMovementGroups) {
+                const arr = byDay.get(g.dateYMD) || [];
+                arr.push(g);
+                byDay.set(g.dateYMD, arr);
+              }
+              return Array.from(byDay.entries()).map(([dateYMD, groups]) => {
+                // Saldo akhir hari = balanceAfter dari group terakhir (ASC → last = latest event hari itu)
+                const endBalance = groups[groups.length - 1].balanceAfter;
+                const dayLow = endBalance <= (product?.minStock ?? 0);
+                return (
+                  <div key={dateYMD} className={`rounded-xl border ${th.bdrSoft} overflow-hidden`}>
+                    {/* Day header — tanggal + saldo akhir hari */}
+                    <div className={`px-3 py-2 flex items-center justify-between ${th.elev}`}>
+                      <p className={`text-xs font-black uppercase tracking-wider ${th.txm}`}>
+                        {formatDateDMY(dateYMD)}
                       </p>
-                      <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${th.dark ? reasonInfo.darkClass : reasonInfo.lightClass}`}>
-                        {reasonInfo.label}
-                      </span>
-                      {g.count > 1 && (
-                        <span className={`text-xs font-semibold ${th.txm}`}>
-                          ({g.count} transaksi)
-                        </span>
-                      )}
-                      {g.totalValue > 0 && (
-                        <span className={`text-xs ${th.txm}`}>· {$(g.totalValue)}</span>
-                      )}
+                      <p className={`text-xs font-semibold inline-flex items-center gap-1 ${
+                        endBalance <= 0 ? "text-[#BE123C] dark:text-[#FB7185]"
+                        : dayLow ? "text-[#BE123C] dark:text-[#FB7185]"
+                        : th.tx
+                      }`}>
+                        <span className={th.txf}>Saldo akhir hari:</span>
+                        <span className="font-display font-black text-sm">{endBalance}</span>
+                        {endBalance <= 0 && <span>(habis)</span>}
+                        {endBalance > 0 && dayLow && <span>(menipis)</span>}
+                      </p>
                     </div>
-                    <p className={`text-xs ${th.txf} mt-0.5`}>
-                      {formatDateDMY(g.dateYMD)} · {formatTime(g.lastCreatedAt, "id")}
-                      {sup ? ` · ${sup.name}` : ""}
-                      {g.count === 1 && g.lastNote ? ` · ${g.lastNote}` : ""}
-                    </p>
-                    <p className={`text-xs mt-0.5 font-semibold inline-flex items-center gap-1 ${
-                      g.balanceAfter <= 0 ? "text-[#BE123C] dark:text-[#FB7185]"
-                      : g.balanceAfter <= (product?.minStock ?? 0) ? "text-[#BE123C] dark:text-[#FB7185]"
-                      : th.tx
-                    }`}>
-                      <span className={th.txf}>→ Sisa stok:</span>
-                      <span className="font-display font-black">{g.balanceAfter}</span>
-                      {g.balanceAfter <= 0 && <span className="font-bold">(habis)</span>}
-                      {g.balanceAfter > 0 && g.balanceAfter <= (product?.minStock ?? 0) && <span className="font-bold">(menipis)</span>}
-                    </p>
+                    {/* Events dalam hari — chronological ASC */}
+                    <div className="divide-y divide-[color:var(--tw-divide-color,rgb(0_0_0/0.05))]">
+                      {groups.map(g => {
+                        const sup = g.supplierId ? suppliers.find(s => s.id === g.supplierId) : null;
+                        const reasonInfo = REASON_BADGE[g.reason] ?? REASON_BADGE.default;
+                        const isIn = g.type === "in";
+                        return (
+                          <div key={g.key} className={`flex items-start gap-2 px-3 py-2 ${th.bdrSoft}`}>
+                            <div className="shrink-0 mt-0.5 flex flex-col items-center gap-0.5">
+                              {isIn
+                                ? <ArrowDownCircle size={14} className="text-[#E11D48]" />
+                                : <ArrowUpCircle size={14} className="text-[#BE123C]" />
+                              }
+                              <span className={`text-xs font-mono ${th.txf}`}>
+                                {formatTime(g.lastCreatedAt, "id")}
+                              </span>
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <p className={`text-sm font-bold ${th.tx}`}>
+                                  {isIn ? "+" : "−"}{g.qty}
+                                </p>
+                                <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${th.dark ? reasonInfo.darkClass : reasonInfo.lightClass}`}>
+                                  {reasonInfo.label}
+                                </span>
+                                {g.count > 1 && (
+                                  <span className={`text-xs font-semibold ${th.txm}`}>
+                                    ({g.count} transaksi)
+                                  </span>
+                                )}
+                                {g.totalValue > 0 && (
+                                  <span className={`text-xs ${th.txm}`}>· {$(g.totalValue)}</span>
+                                )}
+                                <span className={`text-xs ml-auto ${th.txf}`}>
+                                  → jadi <b className={th.tx}>{g.balanceAfter}</b>
+                                </span>
+                              </div>
+                              {(sup || (g.count === 1 && g.lastNote)) && (
+                                <p className={`text-xs ${th.txf} mt-0.5`}>
+                                  {sup ? sup.name : ""}
+                                  {sup && g.count === 1 && g.lastNote ? " · " : ""}
+                                  {g.count === 1 && g.lastNote ? g.lastNote : ""}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              });
+            })()}
             {groupedMovements.length > 5 && (
               <button
                 type="button"

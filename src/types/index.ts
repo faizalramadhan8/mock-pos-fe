@@ -1,6 +1,6 @@
 export type Lang = "en" | "id";
 export type Theme = "light" | "dark";
-export type Role = "superadmin" | "admin" | "cashier" | "staff" | "user";
+export type Role = "superadmin" | "admin" | "cashier" | "staff" | "user" | "ecom_admin" | "ecom_superadmin";
 export type PaymentMethod = "cash" | "card" | "transfer" | "qris";
 export type OrderStatus = "completed" | "pending" | "cancelled" | "refunded";
 export type DiscountType = "percent" | "fixed";
