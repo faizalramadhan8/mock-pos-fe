@@ -199,6 +199,13 @@ export function LoginPage() {
                   Daftar sekarang
                 </button>
               </div>
+              <div className={`text-center text-xs mt-1 ${th.txm}`}>
+                Lupa password?{" "}
+                <a href="/shop/lupa-password"
+                  className={`font-bold ${th.acc} hover:underline`}>
+                  Reset via email
+                </a>
+              </div>
             </>
           ) : (
             <>
