@@ -1204,7 +1204,18 @@ export function POSPage() {
             o.status === "completed" && o.createdBy === user.id && new Date(o.createdAt) >= sessionStart
           );
           const byMethod = { cash: 0, qris: 0, transfer: 0, card: 0 } as Record<string, number>;
-          mine.forEach(o => { byMethod[o.payment] = (byMethod[o.payment] || 0) + o.total; });
+          // Split payment aware — iterate per-payment supaya kasir lihat
+          // breakdown akurat saat closing shift. Insiden Bu Ineu Anggraeni
+          // 16 Aug 2026: sebelumnya order split di-bucket cuma ke primary method.
+          mine.forEach(o => {
+            if (o.payments && o.payments.length > 0) {
+              o.payments.forEach(p => {
+                byMethod[p.method] = (byMethod[p.method] || 0) + p.amount;
+              });
+            } else {
+              byMethod[o.payment] = (byMethod[o.payment] || 0) + o.total;
+            }
+          });
           const total = mine.reduce((s, o) => s + o.total, 0);
           // Aggregate items sold this shift
           const itemsMap = new Map<string, { name: string; qty: number; total: number }>();

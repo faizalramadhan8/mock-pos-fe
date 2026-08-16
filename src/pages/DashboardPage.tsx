@@ -164,9 +164,23 @@ export function DashboardPage() {
       const prev = byUser.get(o.createdBy) || { id: o.createdBy, name: uname, count: 0, total: 0, cash: 0, qris: 0, transfer: 0 };
       prev.count += 1;
       prev.total += o.total;
-      if (o.payment === "cash") prev.cash += o.total;
-      else if (o.payment === "qris") prev.qris += o.total;
-      else prev.transfer += o.total;
+      // Split payment — iterate per-payment supaya bucket per method akurat.
+      // Insiden Bu Ineu Anggraeni 16 Aug 2026: order 487.500 dgn split
+      // 500 cash + 487.000 transfer previously ke-bucket seluruhnya ke transfer
+      // karena logic pakai o.payment (primary) + o.total. Cash flow di
+      // Beranda salah — closing kas Bu Santi tidak match rekening.
+      if (o.payments && o.payments.length > 0) {
+        o.payments.forEach(p => {
+          if (p.method === "cash") prev.cash += p.amount;
+          else if (p.method === "qris") prev.qris += p.amount;
+          else prev.transfer += p.amount; // transfer + card
+        });
+      } else {
+        // Fallback untuk order lama tanpa payments array populated.
+        if (o.payment === "cash") prev.cash += o.total;
+        else if (o.payment === "qris") prev.qris += o.total;
+        else prev.transfer += o.total;
+      }
       byUser.set(o.createdBy, prev);
     });
     return Array.from(byUser.values()).sort((a, b) => b.total - a.total);

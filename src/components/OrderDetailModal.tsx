@@ -159,12 +159,37 @@ export function OrderDetailModal({ orderId, onClose }: OrderDetailModalProps) {
                 <p className={`text-xs ${th.txm}`}>{order.member.phone}</p>
               )}
             </div>
+            {/* Badge kanan atas: primary method single, "Split" chip kalau ada > 1
+                payment (detail rincian tampil di bawah). Cegah misleading badge
+                yang tampil cuma "Transfer" padahal ada cash portion — insiden
+                Bu Ineu Anggraeni 16 Aug 2026. */}
             <span className={`text-xs font-bold px-2.5 py-1 rounded-md ${paymentColor}`}>
-              {t[order.payment]}
+              {order.payments && order.payments.length > 1 ? "Split" : t[order.payment]}
             </span>
           </div>
           {order.createdBy && (
             <p className={`text-xs mt-2 ${th.txf}`}>{t.cashier as string}: {users.find(u => u.id === order.createdBy)?.name || order.createdBy}</p>
+          )}
+          {/* Split payment breakdown — hanya tampil kalau > 1 method. Cegah UI
+              noise untuk order single-method (yang badge di atas sudah cukup). */}
+          {order.payments && order.payments.length > 1 && (
+            <div className={`mt-3 pt-3 border-t ${th.bdrSoft}`}>
+              <p className={`text-xs uppercase tracking-wider mb-1.5 ${th.txf}`}>Rincian Pembayaran</p>
+              <div className="flex flex-col gap-1">
+                {order.payments.map((p, i) => (
+                  <div key={p.id || i} className="flex items-center justify-between text-sm">
+                    <span className={th.tx}>{t[p.method]}</span>
+                    <span className={`font-bold tabular-nums ${th.tx}`}>Rp {p.amount.toLocaleString("id-ID")}</span>
+                  </div>
+                ))}
+                <div className={`flex items-center justify-between text-sm pt-1.5 mt-0.5 border-t ${th.bdrSoft}`}>
+                  <span className={`font-bold ${th.txm}`}>Total</span>
+                  <span className={`font-bold tabular-nums ${th.tx}`}>
+                    Rp {order.payments.reduce((sum, p) => sum + p.amount, 0).toLocaleString("id-ID")}
+                  </span>
+                </div>
+              </div>
+            </div>
           )}
           {order.paymentProof && (
             <div className="mt-3">

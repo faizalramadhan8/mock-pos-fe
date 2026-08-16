@@ -336,7 +336,12 @@ export function OrdersPage() {
                   o.status === "cancelled"
                     ? (th.dark ? "bg-[#C4504A]/15 text-[#C4504A]" : "bg-[#FCE4EC] text-[#C4504A]")
                     : (th.dark ? "bg-[#E11D48]/15 text-[#FB7185]" : "bg-[#FFE4E9] text-[#E11D48]")
-                }`}>{o.status === "cancelled" ? t.cancelled : o.status === "refunded" ? t.refunded : t[o.payment]}</span>
+                }`}>{
+                  o.status === "cancelled" ? t.cancelled
+                  : o.status === "refunded" ? t.refunded
+                  : (o.payments && o.payments.length > 1) ? "Split"
+                  : t[o.payment]
+                }</span>
               </div>
             </div>
             {/* Compact item count — full item breakdown available in row-click
