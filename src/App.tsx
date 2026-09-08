@@ -9,7 +9,7 @@ import type { PageId } from "@/types";
 import { Toaster } from "react-hot-toast";
 import { NotificationBell } from "@/components/NotificationBell";
 import {
-  Home, ShoppingBag, Package, FileText, Settings, BarChart3, Wallet,
+  Home, ShoppingBag, Package, FileText, Settings, BarChart3, Wallet, Lock,
 } from "lucide-react";
 
 // Code-split pages
@@ -20,6 +20,7 @@ const InventoryPage = lazy(() => import("@/pages/InventoryPage").then(m => ({ de
 const OrdersPage = lazy(() => import("@/pages/OrdersPage").then(m => ({ default: m.OrdersPage })));
 const ReportsPage = lazy(() => import("@/pages/ReportsPage").then(m => ({ default: m.ReportsPage })));
 const ExpensesPage = lazy(() => import("@/pages/ExpensesPage").then(m => ({ default: m.ExpensesPage })));
+const FinancePage = lazy(() => import("@/pages/FinancePage").then(m => ({ default: m.FinancePage })));
 const SettingsPage = lazy(() => import("@/pages/SettingsPage").then(m => ({ default: m.SettingsPage })));
 const DeviceApprovalPage = lazy(() => import("@/pages/DeviceApprovalPage").then(m => ({ default: m.DeviceApprovalPage })));
 
@@ -30,6 +31,9 @@ const NAV_ICONS: Record<PageId, React.ReactNode> = {
   orders: <FileText size={26} />,
   reports: <BarChart3 size={26} />,
   expenses: <Wallet size={26} />,
+  // "finance" tidak muncul di bottom nav — akses via header icon (superadmin
+  // only). Entry tetap ada supaya Record<PageId, ...> exhaustive.
+  finance: <Lock size={26} />,
   settings: <Settings size={26} />,
 };
 
@@ -44,7 +48,7 @@ function PageLoader() {
 
 export default function App() {
   const th = useThemeClasses();
-  const { t } = useLangStore();
+  const { t, lang } = useLangStore();
   const { user, defaultPage } = useAuthStore();
   const [page, setPage] = useState<PageId>("pos");
   const [initializing, setInitializing] = useState(true);
@@ -95,6 +99,10 @@ export default function App() {
   // secondary actions (config, profile) di header.
   const navItems = (["dashboard", "pos", "inventory", "orders", "reports", "expenses"] as PageId[]).filter(p => perms.includes(p));
   const canSeeSettings = perms.includes("settings");
+  // Keuangan (Arus Kas + Laba Rugi) — header icon, superadmin only.
+  // 8 Sep 2026 per Bu Santi: "selain saya tidak ada yang bisa lihat, termasuk
+  // Pak Komar". Icon-nya sekalian hidden supaya admin tidak penasaran.
+  const canSeeFinance = perms.includes("finance");
   const currentPage = user ? (perms.includes(page) ? page : defaultPage()) : null;
 
   // Dynamic page title
@@ -123,6 +131,7 @@ export default function App() {
       case "orders": return <OrdersPage />;
       case "reports": return <ReportsPage />;
       case "expenses": return <ExpensesPage />;
+      case "finance": return <FinancePage />;
       case "settings": return <SettingsPage />;
       default: return <DashboardPage />;
     }
@@ -163,6 +172,27 @@ export default function App() {
           </div>
           <div className="flex items-center gap-1.5">
             <NotificationBell />
+            {/* Keuangan (Arus Kas + Laba Rugi) — superadmin only, 8 Sep 2026.
+                Icon Wallet + gembok kecil sebagai signal "rahasia". Hidden
+                total untuk admin/staff/kasir — bukan cuma disabled, supaya
+                tidak memancing pertanyaan "itu menu apa Bu?". */}
+            {canSeeFinance && (
+              <button
+                onClick={() => setPage("finance")}
+                aria-label={lang === "id" ? "Keuangan (rahasia)" : "Finance (confidential)"}
+                aria-current={currentPage === "finance" ? "page" : undefined}
+                title={lang === "id" ? "Keuangan — Arus Kas & Laba Rugi (hanya Owner)" : "Finance — Cash Flow & P/L (Owner only)"}
+                className={`relative min-w-[44px] min-h-[44px] rounded-2xl flex items-center justify-center transition-all ${
+                  currentPage === "finance" ? `${th.accBg} ${th.acc}` : th.txm
+                }`}>
+                <Wallet size={22} />
+                <Lock
+                  size={10}
+                  className={`absolute bottom-1.5 right-1.5 ${currentPage === "finance" ? th.acc : th.txf}`}
+                  aria-hidden
+                />
+              </button>
+            )}
             {/* Ecom Admin button — superadmin only (Bu Santi 21 Jul 2026).
                 Quick-jump ke panel ecom tanpa harus login ulang (JWT shared). */}
             {user.role === "superadmin" && (

@@ -7,14 +7,15 @@ import { formatCurrency as $ } from "@/utils";
 import { exportOrders, exportOrderReport } from "@/utils/export";
 import { getDateRange, type DateRange, type CustomRange } from "@/utils/dateRange";
 import { orderApi, type OrderAggregateResponse } from "@/api/orders";
-import { expenseApi, type ProfitLossRes } from "@/api/expenses";
-import { capitalApi } from "@/api/capital";
 import { BakeryLogo } from "@/components/icons";
-import { Package, Users, Wallet, BookOpen, ChevronDown, ChevronUp, TrendingUp, TrendingDown, Minus, Download, Info, Tag } from "lucide-react";
-import { CashflowTab } from "@/components/CashflowTab";
+import { Package, Users, ChevronDown, ChevronUp, TrendingUp, TrendingDown, Minus, Download, Tag, Info } from "lucide-react";
 import toast from "react-hot-toast";
 
-type ReportTab = "cashflow" | "products" | "members" | "bundling" | "profit-loss";
+// Sprint 8 Sep 2026 — "cashflow" + "profit-loss" DIPINDAH ke FinancePage
+// (halaman terpisah, superadmin-only) per request Bu Santi: laporan keuangan
+// bersifat rahasia, admin (Pak Komar) tidak boleh lihat. Laporan operasional
+// (Top Produk / Member / Bundling) tetap di sini untuk admin + superadmin.
+type ReportTab = "products" | "members" | "bundling";
 
 // YYYY-MM-DD in local time (WIB) — BE aggregate expects calendar-date strings.
 function toYMD(d: Date): string {
@@ -41,7 +42,7 @@ export function ReportsPage() {
   const orders = useOrderStore(s => s.orders);
   const products = useProductStore(s => s.products);
 
-  const [tab, setTab] = useState<ReportTab>("cashflow");
+  const [tab, setTab] = useState<ReportTab>("products");
   const [dateRange, setDateRange] = useState<DateRange>("month");
   const [customRange, setCustomRange] = useState<CustomRange>({ from: "", to: "" });
   const [expandedMember, setExpandedMember] = useState<string | null>(null);
@@ -104,21 +105,9 @@ export function ReportsPage() {
     return () => { cancelled = true; };
   }, [dateRange, customRange, customError]);
 
-  // Profit/Loss — fetch setiap range berubah (tidak gated by tab) supaya
-  // selalu siap saat user export ke Excel dari tab manapun. Payload kecil
-  // (summary saja), aman dipanggil eager.
-  const [profitLoss, setProfitLoss] = useState<ProfitLossRes | null>(null);
-  useEffect(() => {
-    if (customError) return;
-    const range = getDateRange(dateRange, customRange);
-    const from = range ? toYMD(range.start) : "";
-    const to = range ? toYMD(range.end) : "";
-    let cancelled = false;
-    expenseApi.profitLoss({ from, to })
-      .then(res => { if (!cancelled) setProfitLoss(res.body ?? null); })
-      .catch(err => { if (!cancelled) { console.error("profit-loss failed", err); setProfitLoss(null); } });
-    return () => { cancelled = true; };
-  }, [dateRange, customRange, customError]);
+  // Profit/Loss fetch DIHAPUS 8 Sep 2026 — pindah ke FinancePage. Excel
+  // export dari halaman ini tidak lagi include sheet Laba Rugi supaya admin
+  // (Pak Komar) tidak bisa dapat data keuangan lewat export.
 
   // Aggregate top produk. Prefer BE-side aggregate (scalable). Fallback ke
   // client-side dari `filteredOrders` kalau BE belum sampai / gagal.
@@ -360,19 +349,22 @@ export function ReportsPage() {
             disabled={!!customError || !hasData}
             onClick={async () => {
               if (customError) { toast.error(customError); return; }
-              await exportOrderReport(filteredOrders, exportRangeLabel(), profitLoss);
+              // profitLoss di-pass null — sheet Laba Rugi sengaja tidak
+              // di-include supaya admin tidak bisa dapat data keuangan lewat
+              // export. Owner export Laba Rugi dari halaman Keuangan.
+              await exportOrderReport(filteredOrders, exportRangeLabel(), null);
               toast.success(lang === "id" ? "Laporan diunduh" : "Report downloaded");
             }}
-            title={lang === "id" ? "Excel berisi: Laba Rugi, Transaksi, Top Produk, Member, Bundling" : "Excel contains: Profit/Loss, Transactions, Top Products, Members, Bundling"}
+            title={lang === "id" ? "Excel berisi: Transaksi, Top Produk, Member, Bundling" : "Excel contains: Transactions, Top Products, Members, Bundling"}
             className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold ${th.accBg} ${th.acc} disabled:opacity-40`}>
             <Download size={12} /> Excel
           </button>
         </div>
       </div>
 
-      {/* Date range row — disembunyikan untuk Arus Kas tab karena pakai
-          month picker internal sendiri (cash basis = monthly accounting). */}
-      {tab !== "cashflow" && (
+      {/* Date range row — selalu tampil sekarang (Arus Kas yang punya month
+          picker sendiri sudah pindah ke FinancePage). */}
+      {true && (
         <>
           <div className="flex flex-wrap items-end gap-2">
             <div className="flex-1 min-w-[160px]">
@@ -415,11 +407,9 @@ export function ReportsPage() {
       <div role="tablist" aria-label={lang === "id" ? "Pilih laporan" : "Report category"}
         className="flex gap-2 overflow-x-auto scrollbar-hide">
         {([
-          { id: "cashflow" as ReportTab, label: lang === "id" ? "Arus Kas" : "Cash Flow", icon: <BookOpen size={16} /> },
           { id: "products" as ReportTab, label: lang === "id" ? "Top Produk" : "Top Products", icon: <Package size={16} /> },
           { id: "members" as ReportTab, label: lang === "id" ? "Member" : "Members", icon: <Users size={16} /> },
           { id: "bundling" as ReportTab, label: lang === "id" ? "Bundling" : "Bundling", icon: <Tag size={16} /> },
-          { id: "profit-loss" as ReportTab, label: lang === "id" ? "Laba Rugi" : "Profit/Loss", icon: <Wallet size={16} /> },
         ]).map(item => (
           <button key={item.id} role="tab" aria-selected={tab === item.id}
             onClick={() => setTab(item.id)}
@@ -433,7 +423,7 @@ export function ReportsPage() {
 
       {/* Empty state — pakai BakeryLogo besar supaya warm (toko kue), bukan
           generic icon. Bundling tab punya empty state sendiri. */}
-      {tab !== "cashflow" && tab !== "bundling" && !hasData && !customError && (
+      {tab !== "bundling" && !hasData && !customError && (
         <div className={`rounded-3xl border bg-bakery-stripe p-10 text-center ${th.bdr} ${th.card2}`}>
           <div className="mx-auto mb-4 opacity-70" style={{ width: 80 }}>
             <BakeryLogo size={80} />
@@ -446,10 +436,6 @@ export function ReportsPage() {
           </p>
         </div>
       )}
-
-      {/* Arus Kas — self-contained tab dengan month picker sendiri (override
-          dateRange parent supaya konsisten dengan cash basis monthly accounting). */}
-      {tab === "cashflow" && <CashflowTab />}
 
       {/* Top Produk */}
       {tab === "products" && hasData && !customError && (
@@ -769,217 +755,8 @@ export function ReportsPage() {
         )
       )}
 
-      {/* Laba Rugi — owner format: Pendapatan − Modal Barang = Laba Kotor
-          − Pengeluaran = Untung Bersih. Bahasa harian, hindari istilah
-          akuntansi yang menakutkan (HPP/COGS/Gross Profit/dll). */}
-      {tab === "profit-loss" && !customError && (
-        <ProfitLossView pl={profitLoss} th={th} lang={lang} />
-      )}
-    </div>
-  );
-}
-
-// ProfitLossView — full Laporan Laba Rugi UI. Diisolasi sebagai komponen
-// terpisah supaya ReportsPage tetap manageable.
-//
-// Per request Bu Santi 30 Jun 2026: Prive (penarikan owner kas) yang di-input
-// di Arus Kas harus juga di-include sebagai Pengeluaran di Laba Rugi, supaya
-// Untung/Rugi Bersih konsisten dengan Arus Kas. COGS + Laba Kotor tetap ada
-// (format accrual standar tidak diubah).
-function ProfitLossView({ pl, th, lang }: { pl: ProfitLossRes | null; th: ThemeClasses; lang: "en" | "id" }) {
-  // Fetch capital injections (modal) + drawings (prive) periode pl.from→pl.to.
-  // Injection masuk Arus Kas Periode Ini sebagai PENAMBAH, prive sebagai
-  // pengurang. Supaya Selisih Kas klop dengan Saldo Akhir di Arus Kas tab.
-  const [totalDrawing, setTotalDrawing] = useState(0);
-  const [totalInjection, setTotalInjection] = useState(0);
-  useEffect(() => {
-    if (!pl?.from || !pl?.to) { setTotalDrawing(0); setTotalInjection(0); return; }
-    let cancelled = false;
-    capitalApi.list(pl.from, pl.to)
-      .then(res => {
-        if (cancelled) return;
-        const rows = res.body || [];
-        setTotalDrawing(rows.filter(r => r.type === "drawing").reduce((s, r) => s + r.amount, 0));
-        setTotalInjection(rows.filter(r => r.type === "injection").reduce((s, r) => s + r.amount, 0));
-      })
-      .catch(() => { if (!cancelled) { setTotalDrawing(0); setTotalInjection(0); } });
-    return () => { cancelled = true; };
-  }, [pl?.from, pl?.to]);
-
-  // Saldo Laba/Rugi (cash basis, klop dengan Arus Kas):
-  //   Pendapatan + Modal − Pengeluaran − Prive
-  // Bu Santi 30 Jun 2026: COGS dihapus, Gain dilihat di Dashboard saja.
-  const adjustedNet = (pl?.revenue || 0) + totalInjection - (pl?.expense_total || 0) - totalDrawing;
-
-  const revenueDisplay = useCountUp(pl?.revenue || 0);
-  const expenseDisplay = useCountUp(pl?.expense_total || 0);
-  const driveDisplay = useCountUp(totalDrawing);
-  const injectionDisplay = useCountUp(totalInjection);
-  const netDisplay = useCountUp(adjustedNet);
-
-  if (!pl) {
-    return (
-      <div className={`rounded-3xl border bg-bakery-stripe p-10 text-center ${th.bdr} ${th.card2}`}>
-        <div className="mx-auto mb-4 opacity-70" style={{ width: 64 }}>
-          <BakeryLogo size={64} />
-        </div>
-        <p className={`text-base font-bold ${th.tx}`}>
-          {lang === "id" ? "Memuat laporan..." : "Loading report..."}
-        </p>
-      </div>
-    );
-  }
-
-  const netPositive = adjustedNet >= 0;
-
-  return (
-    <div className="flex flex-col gap-3">
-      {/* Saldo Laba/Rugi hero — cash basis, klop dengan Arus Kas tab.
-          Untuk lihat margin/gain (COGS based), Bu Santi cek di Dashboard
-          "Laporan Keuangan". */}
-      <div className={`rounded-3xl border p-5 bg-bakery-stripe ${th.bdr} ${th.card2} relative overflow-hidden`}>
-        <p className={`text-xs font-black uppercase tracking-wider mb-1.5 ${th.acc}`}>
-          {lang === "id" ? "Saldo Laba/Rugi" : "Balance"}
-        </p>
-        <p className={`font-display text-3xl sm:text-4xl font-black tracking-tight ${
-          netPositive ? th.acc : (th.dark ? "text-[#FB7185]" : "text-[#BE123C]")
-        }`}>
-          Rp {netDisplay.toLocaleString("id-ID")}
-        </p>
-        <p className={`text-xs mt-1 ${th.txm}`}>
-          {pl.total_orders} {lang === "id" ? "transaksi penjualan" : "sales transactions"}
-        </p>
-      </div>
-
-      {/* Breakdown layar utama: Pendapatan / Modal Barang / Laba Kotor /
-          Pengeluaran / Untung Bersih — pakai bahasa harian. */}
-      <div className={`rounded-2xl border overflow-hidden ${th.bdr} ${th.card2}`}>
-        <div className={`px-4 py-3 border-b ${th.bdrSoft}`}>
-          <p className={`text-xs font-black uppercase tracking-wider ${th.txf}`}>
-            {lang === "id" ? "Rincian Laba Rugi" : "Profit/Loss Breakdown"}
-          </p>
-        </div>
-
-        {/* Pendapatan */}
-        <div className="px-4 py-3 flex items-baseline justify-between gap-3">
-          <div className="min-w-0">
-            <p className={`font-bold text-sm ${th.tx}`}>
-              {lang === "id" ? "Pendapatan (Omzet)" : "Revenue"}
-            </p>
-            <p className={`text-xs ${th.txf}`}>
-              {lang === "id" ? "Total penjualan periode ini" : "Total sales in period"}
-            </p>
-          </div>
-          <p className={`font-display font-bold text-base ${th.tx}`}>
-            Rp {revenueDisplay.toLocaleString("id-ID")}
-          </p>
-        </div>
-
-        {/* Tambahan Modal Owner — penambah uang masuk. Auto dari Arus Kas. */}
-        {totalInjection > 0 && (
-          <div className={`px-4 py-3 flex items-baseline justify-between gap-3 border-t ${th.bdrSoft}`}>
-            <div className="min-w-0">
-              <p className={`font-bold text-sm ${th.tx}`}>
-                + {lang === "id" ? "Tambahan Modal Owner" : "Owner Capital Injection"}
-              </p>
-              <p className={`text-xs ${th.txf}`}>
-                {lang === "id" ? "Otomatis dari input di Arus Kas" : "Auto from Cash Flow input"}
-              </p>
-            </div>
-            <p className={`font-display font-bold text-base ${th.tx}`}>
-              Rp {injectionDisplay.toLocaleString("id-ID")}
-            </p>
-          </div>
-        )}
-
-        {/* Pengeluaran total */}
-        <div className={`px-4 py-3 flex items-baseline justify-between gap-3 border-t ${th.bdrSoft}`}>
-          <div className="min-w-0">
-            <p className={`font-bold text-sm ${th.tx}`}>
-              − {lang === "id" ? "Pengeluaran Operasional" : "Operating Expenses"}
-            </p>
-            <p className={`text-xs ${th.txf}`}>
-              {pl.expense_breakdown.length > 0
-                ? `${pl.expense_breakdown.length} ${lang === "id" ? "kategori" : "categories"}`
-                : (lang === "id" ? "Belum ada pengeluaran" : "No expenses yet")}
-            </p>
-          </div>
-          <p className={`font-display font-bold text-base ${th.txm}`}>
-            Rp {expenseDisplay.toLocaleString("id-ID")}
-          </p>
-        </div>
-
-        {/* Rincian per kategori (kalau ada) */}
-        {pl.expense_breakdown.map((b) => (
-          <div key={b.category_id} className={`px-4 pl-8 py-2 flex items-baseline justify-between gap-3 border-t ${th.bdrSoft}`}>
-            <p className={`text-sm ${th.txm}`}>· {b.category_name}</p>
-            <p className={`font-display text-sm ${th.txm}`}>Rp {b.total.toLocaleString("id-ID")}</p>
-          </div>
-        ))}
-
-        {/* Prive — penarikan owner dari kas. Auto-fetched dari Arus Kas
-            (single input, dual display). Bu Santi 30 Jun 2026: cegah ribet
-            input 2x. */}
-        {totalDrawing > 0 && (
-          <div className={`px-4 py-3 flex items-baseline justify-between gap-3 border-t ${th.bdrSoft}`}>
-            <div className="min-w-0">
-              <p className={`font-bold text-sm ${th.tx}`}>
-                − {lang === "id" ? "Prive (Penarikan Owner)" : "Owner Drawing"}
-              </p>
-              <p className={`text-xs ${th.txf}`}>
-                {lang === "id" ? "Otomatis dari input di Arus Kas" : "Auto from Cash Flow input"}
-              </p>
-            </div>
-            <p className={`font-display font-bold text-base ${th.txm}`}>
-              Rp {driveDisplay.toLocaleString("id-ID")}
-            </p>
-          </div>
-        )}
-
-        {/* Saldo Laba/Rugi final */}
-        <div className={`px-4 py-4 flex items-center justify-between gap-3 border-t-2 ${
-          netPositive
-            ? (th.dark ? "border-[#FB7185] bg-[#3A1F2A]/40" : "border-[#E11D48] bg-[#FFF4F6]")
-            : (th.dark ? "border-[#BE123C] bg-[#3A1F2A]/40" : "border-[#BE123C] bg-[#FCE4EC]/40")
-        }`}>
-          <div className="flex items-center gap-2">
-            {netPositive
-              ? <TrendingUp size={18} className={th.acc} aria-hidden />
-              : <TrendingDown size={18} className={th.dark ? "text-[#FB7185]" : "text-[#BE123C]"} aria-hidden />}
-            <p className={`font-black text-base uppercase tracking-wider ${
-              netPositive ? th.acc : (th.dark ? "text-[#FB7185]" : "text-[#BE123C]")
-            }`}>
-              = {lang === "id" ? "Saldo Laba/Rugi" : "Balance"}
-            </p>
-          </div>
-          <p className={`font-display font-black text-lg ${
-            netPositive ? th.acc : (th.dark ? "text-[#FB7185]" : "text-[#BE123C]")
-          }`}>
-            Rp {netDisplay.toLocaleString("id-ID")}
-          </p>
-        </div>
-      </div>
-
-      {/* Section "Arus Kas Periode Ini" dihapus 30 Jun 2026 — sekarang
-          breakdown utama sudah cash basis (tidak ada COGS), jadi redundant.
-          Untuk lihat Gain (HPP based), Bu Santi cek Dashboard "Laporan
-          Keuangan". */}
-
-      {/* Glossary singkat — buka untuk owner yang gak tahu istilah */}
-      <details className={`rounded-2xl border p-4 ${th.bdr} ${th.card2}`}>
-        <summary className={`text-xs font-bold cursor-pointer inline-flex items-center gap-1.5 ${th.txm}`}>
-          <Info size={14} aria-hidden />
-          {lang === "id" ? "Apa artinya istilah-istilah ini?" : "What do these terms mean?"}
-        </summary>
-        <div className={`mt-3 text-sm space-y-2 ${th.txm}`}>
-          <p><b className={th.tx}>{lang === "id" ? "Pendapatan" : "Revenue"}:</b> {lang === "id" ? "Total uang masuk dari penjualan." : "Total money from sales."}</p>
-          <p><b className={th.tx}>{lang === "id" ? "Modal Barang Terjual" : "Cost of Goods Sold"}:</b> {lang === "id" ? "Harga beli barang dari supplier yang sudah terjual ke pelanggan." : "Supplier cost of items sold to customers."}</p>
-          <p><b className={th.tx}>{lang === "id" ? "Laba Kotor" : "Gross Profit"}:</b> {lang === "id" ? "Untung dari jual barang sebelum dikurangi biaya operasional." : "Profit from selling goods before operating expenses."}</p>
-          <p><b className={th.tx}>{lang === "id" ? "Pengeluaran Operasional" : "Operating Expenses"}:</b> {lang === "id" ? "Biaya menjalankan toko: gaji, listrik, plastik, dll." : "Cost of running the store: salary, electricity, packaging, etc."}</p>
-          <p><b className={th.tx}>{lang === "id" ? "Untung Bersih" : "Net Profit"}:</b> {lang === "id" ? "Hasil akhir = Pendapatan − Modal − Pengeluaran. Ini yang masuk kantong Anda." : "Bottom line = Revenue − COGS − Expenses."}</p>
-          <p><b className={th.tx}>{lang === "id" ? "Arus Kas / Selisih Kas" : "Cash Flow / Cash Diff"}:</b> {lang === "id" ? "Uang real yang masuk dari penjualan dikurangi semua pengeluaran (gaji, plastik, listrik, bayar supplier, dll). Beda dengan Untung Bersih: barang yang dibeli tapi belum laku tetap ngurangi kas, tapi tidak ngurangi untung." : "Real cash from sales minus all expenses (salary, packaging, utilities, supplier payments, etc.). Different from Net Profit: bought but unsold goods reduce cash but not profit."}</p>
-        </div>
-      </details>
+      {/* Laba Rugi + Arus Kas dipindah ke FinancePage (superadmin-only)
+          8 Sep 2026 — laporan keuangan bersifat rahasia per request Bu Santi. */}
     </div>
   );
 }

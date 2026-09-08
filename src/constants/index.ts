@@ -3,9 +3,11 @@ import type { User, Category, Product, Order, StockMovement, StockBatch, Supplie
 // Kasir: hanya POS + buka/tutup register + catat member saat checkout.
 // Admin toko (staff): POS + Inventory + Orders (cek barang/stok masuk).
 //   Tidak akses Dashboard (laporan total tidak boleh dilihat kasir/staff).
-// Admin & Owner (superadmin): semua.
+// Admin (Pak Komar): semua kecuali "finance" — 6 Sep 2026 request Bu Santi:
+//   Arus Kas + Laba Rugi bersifat rahasia owner, admin tidak boleh lihat.
+// Owner (superadmin): semua termasuk "finance".
 export const ROLE_PERMISSIONS: Record<Role, PageId[]> = {
-  superadmin: ["dashboard", "pos", "inventory", "orders", "reports", "expenses", "settings"],
+  superadmin: ["dashboard", "pos", "inventory", "orders", "reports", "expenses", "finance", "settings"],
   admin: ["dashboard", "pos", "inventory", "orders", "reports", "expenses", "settings"],
   staff: ["pos", "inventory", "orders", "settings"],
   cashier: ["pos", "settings"],
