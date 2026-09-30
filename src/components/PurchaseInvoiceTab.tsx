@@ -1,17 +1,27 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Modal } from "./Modal";
 import { SearchableSelect } from "./SearchableSelect";
 import { useProductStore, useSupplierStore, usePurchaseInvoiceStore, useAuthStore, useLangStore } from "@/stores";
 import { useThemeClasses } from "@/hooks/useThemeClasses";
 import { formatCurrency as $, formatDate, formatDateDMY, calcDueDate } from "@/utils";
-import { getDateRange, type DateRange, type CustomRange } from "@/utils/dateRange";
+import { type CustomRange } from "@/utils/dateRange";
+import { getDueRange, DUE_RANGE_LABELS, type DueRange } from "@/utils/dueRange";
 import { PAYMENT_TERMS_OPTIONS, PAYMENT_TERMS_LABELS, INVENTORY_WRITE_ROLES } from "@/constants";
 import type { PaymentTerms, PurchaseInvoice } from "@/types";
 import type { CreatePurchaseInvoiceBody } from "@/api";
-import { Plus, Trash2, Receipt, Calendar, Check, AlertTriangle, Pencil } from "lucide-react";
+import { Plus, Trash2, Receipt, Calendar, Check, AlertTriangle, Pencil, Search, X, RefreshCw } from "lucide-react";
 import toast from "react-hot-toast";
 
 const PPN_RATE = 0.11;
+
+/** Ambil tanggal saja dari due_date, dinormalisasi ke tengah malam waktu
+ *  lokal. BE kirim `due_date` sebagai ISO UTC midnight — kalau langsung
+ *  `new Date(x)` lalu dibanding `new Date()`, faktur yang jatuh tempo HARI
+ *  INI sudah dianggap lewat tempo sejak jam 07:00 WIB (UTC+7). */
+function startOfLocalDay(iso: string): Date {
+  const d = new Date(iso);
+  return new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+}
 
 interface DraftItem {
   productId: string;
@@ -51,10 +61,25 @@ export function PurchaseInvoiceTab() {
 
   const [statusFilter, setStatusFilter] = useState<"all" | "paid" | "unpaid">("all");
   const [supplierFilter, setSupplierFilter] = useState("");
-  // Period filter — default "month" (Bulan Ini) supaya list tidak overwhelming.
-  // Pattern sama dengan Laporan + Pengeluaran page.
-  const [dateRange, setDateRange] = useState<DateRange>("month");
+  // Rentang jatuh tempo — pakai DueRange (forward-looking), bukan DateRange
+  // generik. Lihat utils/dueRange.ts untuk alasannya. Default "thisMonth"
+  // sekarang benar-benar sampai AKHIR bulan, bukan sampai hari ini.
+  const [dueRange, setDueRange] = useState<DueRange>("thisMonth");
   const [customRange, setCustomRange] = useState<CustomRange>({ from: "", to: "" });
+  // Pencarian nomor faktur / supplier / catatan. Saat diisi, rentang tanggal
+  // otomatis dilepas ke "Semua" — orang yang lagi cari faktur lama tidak
+  // peduli jatuh tempo bulan ini (29 Sep 2026, keluhan Bu Santi).
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 400);
+    return () => clearTimeout(t);
+  }, [search]);
+  const searching = debouncedSearch.trim().length > 0;
+
+  const invoiceTotal = usePurchaseInvoiceStore(s => s.invoiceTotal);
+  const invoiceError = usePurchaseInvoiceStore(s => s.invoiceError);
+  const invoiceLoading = usePurchaseInvoiceStore(s => s.invoiceLoading);
   const [createOpen, setCreateOpen] = useState(false);
   // editInvoice: kalau set, modal jadi mode "edit" — prefill data + call update
   const [editInvoice, setEditInvoice] = useState<PurchaseInvoice | null>(null);
@@ -63,7 +88,7 @@ export function PurchaseInvoiceTab() {
 
   // Custom-range validation — kalau dipilih tapi tanggal kosong/salah,
   // skip fetch supaya tidak kirim request invalid.
-  const customError = dateRange === "custom" && (
+  const customError = dueRange === "custom" && !searching && (
     !customRange.from || !customRange.to
       ? "Pilih tanggal awal dan akhir."
       : new Date(customRange.from) > new Date(customRange.to)
@@ -71,24 +96,61 @@ export function PurchaseInvoiceTab() {
         : ""
   );
 
-  useEffect(() => {
+  const doFetch = useCallback(() => {
     if (customError) return;
-    const range = getDateRange(dateRange, customRange);
-    const fmtYMD = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    // Mode cari: lepas filter tanggal + status supaya hasilnya lintas
+    // periode. Kalau tidak, faktur tahun lalu tidak akan ketemu.
+    if (searching) {
+      fetchInvoices({
+        status: "all",
+        supplierId: supplierFilter,
+        search: debouncedSearch,
+        dateField: "invoice",
+      });
+      return;
+    }
+    const r = getDueRange(dueRange, customRange);
+    if (!r) return;
     fetchInvoices({
-      status: statusFilter,
+      // "Lewat Tempo" + "7 Hari ke Depan" hanya relevan untuk yang belum
+      // lunas — paksa status supaya hasilnya tidak tercampur faktur beres.
+      status: r.forceUnpaid ? "unpaid" : statusFilter,
       supplierId: supplierFilter,
-      from: range ? fmtYMD(range.start) : undefined,
-      to: range ? fmtYMD(range.end) : undefined,
+      from: r.from,
+      to: r.to,
+      dateField: "due",
     });
-  }, [statusFilter, supplierFilter, dateRange, customRange, customError, fetchInvoices]);
+  }, [statusFilter, supplierFilter, dueRange, customRange, customError, searching, debouncedSearch, fetchInvoices]);
+
+  useEffect(() => { doFetch(); }, [doFetch]);
+
+  // Auto-refresh: tab ini sebelumnya tidak ikut polling InventoryPage sama
+  // sekali, jadi daftar yang dibiarkan terbuka tidak pernah update kalau
+  // ada faktur baru dari perangkat lain — "terkadang tidak update".
+  // Ref supaya interval selalu pakai filter terkini tanpa re-subscribe.
+  const refetchRef = useRef(doFetch);
+  useEffect(() => { refetchRef.current = doFetch; }, [doFetch]);
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === "visible") refetchRef.current();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    const id = window.setInterval(onVisible, 30_000);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.clearInterval(id);
+    };
+  }, []);
 
   // Stats — count + total unpaid (untuk awareness owner)
   const stats = useMemo(() => {
     const unpaid = invoices.filter(i => i.paymentStatus === "unpaid");
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const dueSoonOrOverdue = unpaid.filter(i => i.dueDate && new Date(i.dueDate) <= new Date(today.getTime() + 3 * 24 * 60 * 60 * 1000));
+    const cutoff = today.getTime() + 3 * 24 * 60 * 60 * 1000;
+    const dueSoonOrOverdue = unpaid.filter(
+      i => i.dueDate && startOfLocalDay(i.dueDate).getTime() <= cutoff,
+    );
     return {
       total: invoices.length,
       unpaidCount: unpaid.length,
@@ -130,10 +192,35 @@ export function PurchaseInvoiceTab() {
         )}
       </div>
 
+      {/* Pencarian — cari faktur lama lintas periode. Saat diisi, filter
+          jatuh tempo otomatis dilepas (lihat doFetch). */}
+      <div className="relative">
+        <Search size={16} className={`absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none ${th.txf}`} aria-hidden />
+        <input
+          type="search"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Cari nomor faktur, pemasok, atau catatan…"
+          inputMode="search"
+          autoComplete="off"
+          aria-label="Cari faktur"
+          className={`w-full pl-10 pr-10 py-3 text-base font-bold rounded-2xl border ${th.inp}`}
+        />
+        {search && (
+          <button
+            onClick={() => setSearch("")}
+            aria-label="Hapus pencarian"
+            className={`absolute right-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-xl flex items-center justify-center ${th.txm}`}>
+            <X size={16} />
+          </button>
+        )}
+      </div>
+
       {/* Filters */}
       <div className="flex gap-2 flex-wrap items-center">
         <select value={statusFilter} onChange={e => setStatusFilter(e.target.value as typeof statusFilter)}
-          className={`px-3 py-2 text-sm font-bold rounded-xl border ${th.inp}`}>
+          disabled={searching}
+          className={`px-3 py-2 text-sm font-bold rounded-xl border ${th.inp} disabled:opacity-40`}>
           <option value="all">Semua Status</option>
           <option value="unpaid">Belum Lunas</option>
           <option value="paid">Lunas</option>
@@ -143,18 +230,16 @@ export function PurchaseInvoiceTab() {
           <option value="">Semua Pemasok</option>
           {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
         </select>
-        <select value={dateRange} onChange={e => setDateRange(e.target.value as DateRange)}
+        <select value={dueRange} onChange={e => setDueRange(e.target.value as DueRange)}
+          disabled={searching}
           aria-label="Filter berdasarkan jatuh tempo"
           title="Filter berdasarkan jatuh tempo"
-          className={`px-3 py-2 text-sm font-bold rounded-xl border ${th.inp}`}>
-          <option value="today">Jatuh Tempo: Hari Ini</option>
-          <option value="yesterday">Jatuh Tempo: Kemarin</option>
-          <option value="week">Jatuh Tempo: Minggu Ini</option>
-          <option value="month">Jatuh Tempo: Bulan Ini</option>
-          <option value="all">Semua</option>
-          <option value="custom">Jatuh Tempo: Pilih Tanggal</option>
+          className={`px-3 py-2 text-sm font-bold rounded-xl border ${th.inp} disabled:opacity-40`}>
+          {(["overdue", "next7", "thisMonth", "nextMonth", "all", "custom"] as DueRange[]).map(r => (
+            <option key={r} value={r}>Jatuh Tempo: {DUE_RANGE_LABELS[r]}</option>
+          ))}
         </select>
-        {dateRange === "custom" && (
+        {dueRange === "custom" && !searching && (
           <>
             <input type="date" value={customRange.from} max={customRange.to || undefined}
               onChange={e => setCustomRange(r => ({ ...r, from: e.target.value }))}
@@ -167,6 +252,11 @@ export function PurchaseInvoiceTab() {
               className={`px-3 py-2 text-sm font-bold rounded-xl border ${th.inp}`} />
           </>
         )}
+        {searching && (
+          <span className={`text-xs ${th.txm}`}>
+            Mencari di semua periode — filter tanggal dilepas sementara.
+          </span>
+        )}
       </div>
       {customError && (
         <p role="alert" className={`text-xs font-bold ${th.dark ? "text-[#FB7185]" : "text-[#BE123C]"} -mt-1`}>
@@ -174,19 +264,70 @@ export function PurchaseInvoiceTab() {
         </p>
       )}
 
+      {/* Error fetch — dulu ditelan diam-diam, jadi gagal muat tidak bisa
+          dibedakan dari "tidak ada perubahan". */}
+      {invoiceError && (
+        <div role="alert" className={`rounded-2xl border p-3 flex items-center gap-2 ${
+          th.dark ? "border-[#BE123C]/40 bg-[#BE123C]/10" : "border-[#BE123C]/30 bg-[#FCE4EC]"
+        }`}>
+          <AlertTriangle size={16} className={th.dark ? "text-[#FB7185]" : "text-[#BE123C]"} aria-hidden />
+          <p className={`text-xs font-bold flex-1 ${th.dark ? "text-[#FB7185]" : "text-[#BE123C]"}`}>
+            Gagal memuat faktur: {invoiceError}
+          </p>
+          <button onClick={doFetch}
+            className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold ${th.accBg} ${th.acc}`}>
+            <RefreshCw size={12} /> Coba lagi
+          </button>
+        </div>
+      )}
+
+      {/* Peringatan kalau hasil terpotong limit — cegah Bu Santi kira
+          faktur yang tidak muncul itu tidak ada. */}
+      {invoiceTotal > invoices.length && (
+        <p className={`text-xs ${th.txm}`}>
+          Menampilkan {invoices.length} dari {invoiceTotal} faktur. Persempit filter atau pakai pencarian untuk melihat sisanya.
+        </p>
+      )}
+
       {/* List */}
       {invoices.length === 0 ? (
         <div className={`rounded-2xl border p-8 text-center ${th.bdr} ${th.card2}`}>
           <Receipt size={28} className={`mx-auto mb-2 ${th.txf}`} />
-          <p className={`text-sm font-bold ${th.tx}`}>Belum ada faktur</p>
-          <p className={`text-xs mt-1 ${th.txm}`}>Klik &quot;Buat Faktur&quot; untuk mulai catat faktur dari supplier.</p>
+          {searching ? (
+            <>
+              <p className={`text-sm font-bold ${th.tx}`}>Tidak ada faktur yang cocok</p>
+              <p className={`text-xs mt-1 ${th.txm}`}>
+                Coba kata kunci lain — nomor faktur, nama pemasok, atau isi catatan.
+              </p>
+            </>
+          ) : dueRange !== "all" ? (
+            <>
+              <p className={`text-sm font-bold ${th.tx}`}>
+                Tidak ada faktur jatuh tempo {DUE_RANGE_LABELS[dueRange].toLowerCase()}
+              </p>
+              <p className={`text-xs mt-1 ${th.txm}`}>
+                Ganti filter jatuh tempo di atas, atau pilih &quot;Semua&quot; untuk lihat seluruh faktur.
+              </p>
+            </>
+          ) : (
+            <>
+              <p className={`text-sm font-bold ${th.tx}`}>Belum ada faktur</p>
+              <p className={`text-xs mt-1 ${th.txm}`}>Klik &quot;Buat Faktur&quot; untuk mulai catat faktur dari supplier.</p>
+            </>
+          )}
         </div>
       ) : (
         <div className="flex flex-col gap-2">
           {invoices.map(inv => {
-            const overdue = inv.paymentStatus === "unpaid" && inv.dueDate && new Date(inv.dueDate) < new Date();
-            const dueSoon = inv.paymentStatus === "unpaid" && inv.dueDate &&
-              new Date(inv.dueDate).getTime() <= Date.now() + 3 * 24 * 60 * 60 * 1000 && !overdue;
+            // Bandingkan per HARI, bukan per milidetik. due_date di-parse
+            // sebagai UTC midnight, jadi `new Date(due) < new Date()` bikin
+            // faktur yang jatuh tempo HARI INI langsung merah "Lewat Tempo"
+            // sejak jam 07:00 WIB — padahal masih hari-H.
+            const dueAt = inv.dueDate ? startOfLocalDay(inv.dueDate) : null;
+            const today = new Date(); today.setHours(0, 0, 0, 0);
+            const overdue = inv.paymentStatus === "unpaid" && dueAt && dueAt.getTime() < today.getTime();
+            const dueSoon = inv.paymentStatus === "unpaid" && dueAt && !overdue &&
+              dueAt.getTime() <= today.getTime() + 3 * 24 * 60 * 60 * 1000;
             return (
               <button key={inv.id} onClick={() => setDetailId(inv.id)}
                 className={`text-left rounded-2xl border p-4 ${th.bdr} ${th.card2} hover:shadow-sm transition`}>

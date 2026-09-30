@@ -1,11 +1,14 @@
 import { useMemo } from "react";
-import { useProductStore, useBatchStore, useInventoryStore, useCashSessionStore, useLangStore } from "@/stores";
+import { useProductStore, useBatchStore, useCashSessionStore, useLangStore, usePurchaseInvoiceStore } from "@/stores";
+import { formatCurrency as fmtRp } from "@/utils";
 import type { AppNotification } from "@/types";
 
 export function useNotifications(): AppNotification[] {
   const products = useProductStore(s => s.products);
   const batches = useBatchStore(s => s.batches);
-  const movements = useInventoryStore(s => s.movements);
+  // Sengaja pakai dueSoonInvoices, bukan `invoices` — yang itu mengikuti
+  // filter tab Faktur, jadi isinya berubah tergantung filter yang dipilih.
+  const invoices = usePurchaseInvoiceStore(s => s.dueSoonInvoices);
   const activeSession = useCashSessionStore(s => s.activeSession);
   const { lang } = useLangStore();
 
@@ -70,22 +73,46 @@ export function useNotifications(): AppNotification[] {
       });
     });
 
-    // Invoice due (unpaid movements with due date within 7 days)
-    const in7Days = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-    movements.filter(m => m.paymentStatus === "unpaid" && m.dueDate && new Date(m.dueDate) <= in7Days).forEach(m => {
-      const product = products.find(p => p.id === m.productId);
-      const overdue = new Date(m.dueDate!) <= now;
-      notifs.push({
-        id: `invoice_due_${m.id}`,
-        type: "invoice_due",
-        priority: overdue ? "high" : "medium",
-        title: overdue
-          ? (lang === "id" ? "Invoice Terlambat" : "Invoice Overdue")
-          : (lang === "id" ? "Invoice Jatuh Tempo" : "Invoice Due Soon"),
-        message: `${product ? (lang === "id" ? product.nameId || product.name : product.name) : m.productId} — ${m.paymentTerms || ""}`,
-        createdAt: now.toISOString(),
+    // Faktur jatuh tempo — baca `purchase_invoices`, BUKAN `stock_movements`.
+    //
+    // Sampai 29 Sep 2026 blok ini membaca `movements` (kolom due_date lama).
+    // Tapi alur faktur sekarang TIDAK menulis stock_movement sama sekali
+    // (lihat "Faktur Barang Masuk — pure record only"), jadi praktis tidak
+    // ada satu pun faktur yang pernah memunculkan notifikasi. Bu Santi
+    // 17 Sep 2026: "jatuh tempo bulan ini terkadang tidak update" —
+    // sebagian karena memang tidak pernah ada peringatannya.
+    //
+    // Bandingkan per HARI: due_date datang sebagai UTC midnight, kalau
+    // dibanding jam-jaman maka faktur hari-H sudah dianggap telat sejak
+    // 07:00 WIB.
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const in7Days = startOfToday.getTime() + 7 * 24 * 60 * 60 * 1000;
+    invoices
+      .filter(inv => inv.paymentStatus === "unpaid" && inv.dueDate)
+      .forEach(inv => {
+        const d = new Date(inv.dueDate!);
+        const dueDay = new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()).getTime();
+        if (dueDay > in7Days) return;
+
+        const overdue = dueDay < startOfToday.getTime();
+        const daysLeft = Math.round((dueDay - startOfToday.getTime()) / (24 * 60 * 60 * 1000));
+        const when = overdue
+          ? (lang === "id" ? `telat ${Math.abs(daysLeft)} hari` : `${Math.abs(daysLeft)} days late`)
+          : daysLeft === 0
+            ? (lang === "id" ? "hari ini" : "today")
+            : (lang === "id" ? `${daysLeft} hari lagi` : `in ${daysLeft} days`);
+
+        notifs.push({
+          id: `invoice_due_${inv.id}`,
+          type: "invoice_due",
+          priority: overdue ? "critical" : daysLeft <= 2 ? "high" : "medium",
+          title: overdue
+            ? (lang === "id" ? "Faktur Lewat Tempo" : "Invoice Overdue")
+            : (lang === "id" ? "Faktur Jatuh Tempo" : "Invoice Due Soon"),
+          message: `${inv.supplierName || "Pemasok"}${inv.invoiceNumber ? ` #${inv.invoiceNumber}` : ""} — ${fmtRp(inv.totalAmount)} · ${when}`,
+          createdAt: now.toISOString(),
+        });
       });
-    });
 
     // Register open too long (> 12 hours)
     if (activeSession && activeSession.openedAt) {
@@ -110,5 +137,5 @@ export function useNotifications(): AppNotification[] {
     notifs.sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority]);
 
     return notifs;
-  }, [products, batches, movements, activeSession, lang]);
+  }, [products, batches, invoices, activeSession, lang]);
 }

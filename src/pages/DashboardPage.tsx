@@ -1,10 +1,10 @@
 import { useState, useMemo } from "react";
-import { useAuthStore, useLangStore, useOrderStore, useProductStore, useBatchStore } from "@/stores";
+import { useAuthStore, useLangStore, useOrderStore, useProductStore, useBatchStore, usePurchaseInvoiceStore } from "@/stores";
 import { ProductDetailModal } from "@/components/ProductDetailModal";
 import { useThemeClasses } from "@/hooks/useThemeClasses";
 import { usePageFetch } from "@/hooks/usePageFetch";
 import { formatCurrency as $ } from "@/utils";
-import { AlertCircle, Clock, Package, ChevronRight, TrendingUp, TrendingDown } from "lucide-react";
+import { AlertCircle, Clock, Package, ChevronRight, TrendingUp, TrendingDown, Receipt } from "lucide-react";
 
 type Range = "today" | "yesterday" | "week" | "month" | "custom";
 
@@ -48,6 +48,8 @@ export function DashboardPage() {
     { key: "orders",   fetch: () => useOrderStore.getState().fetchOrders() },
     { key: "products", fetch: () => useProductStore.getState().fetchProducts() },
     { key: "batches",  fetch: () => useBatchStore.getState().fetchBatches() },
+    // Faktur jatuh tempo untuk kartu "Perlu Perhatian" + lonceng notifikasi.
+    { key: "invoices-due", fetch: () => usePurchaseInvoiceStore.getState().fetchDueSoonInvoices() },
   ]);
   const th = useThemeClasses();
   const { t, lang } = useLangStore();
@@ -159,9 +161,17 @@ export function DashboardPage() {
   const perCashier = useMemo(() => {
     const byUser = new Map<string, { id: string; name: string; count: number; total: number; cash: number; qris: number; transfer: number }>();
     rangedOrders.forEach(o => {
-      const u = users.find(u => u.id === o.createdBy);
-      const uname = u?.name || "(User)";
-      const prev = byUser.get(o.createdBy) || { id: o.createdBy, name: uname, count: 0, total: 0, cash: 0, qris: 0, transfer: 0 };
+      // Pesanan online dikelompokkan jadi SATU baris kanal, bukan per orang.
+      // `orders.created_by` untuk order ecom berisi id customer, bukan kasir —
+      // kalau ikut dikelompokkan per user, Beranda menampilkan nama-nama
+      // customer seolah-olah mereka kasir (atau deretan baris "(User)" kalau
+      // customer-nya tidak ada di daftar pengguna POS). Baru kelihatan setelah
+      // pesanan online ikut masuk ke laporan, 29 Sep 2026.
+      const isEcom = (o.orderSource ?? "pos") === "ecom";
+      const key = isEcom ? "__ecom__" : o.createdBy;
+      const u = isEcom ? undefined : users.find(u => u.id === o.createdBy);
+      const uname = isEcom ? "Online (E-commerce)" : (u?.name || "(User)");
+      const prev = byUser.get(key) || { id: key, name: uname, count: 0, total: 0, cash: 0, qris: 0, transfer: 0 };
       prev.count += 1;
       prev.total += o.total;
       // Split payment — iterate per-payment supaya bucket per method akurat.
@@ -181,7 +191,7 @@ export function DashboardPage() {
         else if (o.payment === "qris") prev.qris += o.total;
         else prev.transfer += o.total;
       }
-      byUser.set(o.createdBy, prev);
+      byUser.set(key, prev);
     });
     return Array.from(byUser.values()).sort((a, b) => b.total - a.total);
   }, [rangedOrders, users]);
@@ -193,8 +203,31 @@ export function DashboardPage() {
     );
   }, [perCashier]);
 
+  // Faktur jatuh tempo ≤ 7 hari (termasuk yang sudah telat). Sampai 29 Sep
+  // 2026 faktur sama sekali tidak muncul di kartu ini maupun di lonceng —
+  // satu-satunya peringatan adalah WhatsApp tepat di hari-H, dan itu pun
+  // mati sejak WAHA dinonaktifkan. Jadi Bu Santi harus ingat sendiri.
+  const dueSoonInvoices = usePurchaseInvoiceStore(s => s.dueSoonInvoices);
+  const { overdueInvoices, upcomingInvoices } = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const overdue: typeof dueSoonInvoices = [];
+    const upcoming: typeof dueSoonInvoices = [];
+    dueSoonInvoices.forEach(inv => {
+      if (!inv.dueDate) return;
+      // due_date dikirim sebagai UTC midnight — baca komponen UTC-nya
+      // supaya faktur hari-H tidak dihitung telat sejak 07:00 WIB.
+      const d = new Date(inv.dueDate);
+      const dueDay = new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+      (dueDay < today ? overdue : upcoming).push(inv);
+    });
+    return { overdueInvoices: overdue, upcomingInvoices: upcoming };
+  }, [dueSoonInvoices]);
+
   // Perlu Perhatian — conditional alert card
-  const hasAlerts = pendingOrders.length > 0 || outOfStock.length > 0 || lowStock.length > 0 || (isOwner && expiringBatches.length > 0);
+  const hasAlerts = pendingOrders.length > 0 || outOfStock.length > 0 || lowStock.length > 0
+    || (isOwner && expiringBatches.length > 0)
+    || (isOwner && dueSoonInvoices.length > 0);
 
   return (
     <div className="flex flex-col gap-5">
@@ -245,6 +278,32 @@ export function DashboardPage() {
                   <span className={`ml-1 ${th.txm}`}>
                     · {lowStock.slice(0, 3).map(p => lang === "id" ? p.nameId : p.name).join(", ")}
                     {lowStock.length > 3 && ` +${lowStock.length - 3} lagi`}
+                  </span>
+                </p>
+              </div>
+            )}
+            {isOwner && overdueInvoices.length > 0 && (
+              <div className="flex items-start gap-2">
+                <Receipt size={16} className="text-[#BE123C] mt-0.5 shrink-0" />
+                <p className={`text-sm ${th.tx}`}>
+                  <b className="text-[#BE123C]">{overdueInvoices.length} faktur lewat tempo</b>
+                  <span className={`ml-1 ${th.txm}`}>
+                    · {overdueInvoices.slice(0, 2).map(i => i.supplierName || "Pemasok").join(", ")}
+                    {overdueInvoices.length > 2 && ` +${overdueInvoices.length - 2} lagi`}
+                    {" · total "}{$(overdueInvoices.reduce((s, i) => s + i.totalAmount, 0))}
+                  </span>
+                </p>
+              </div>
+            )}
+            {isOwner && upcomingInvoices.length > 0 && (
+              <div className="flex items-start gap-2">
+                <Receipt size={16} className={`${th.acc} mt-0.5 shrink-0`} />
+                <p className={`text-sm ${th.tx}`}>
+                  <b className={th.acc}>{upcomingInvoices.length} faktur jatuh tempo 7 hari</b>
+                  <span className={`ml-1 ${th.txm}`}>
+                    · {upcomingInvoices.slice(0, 2).map(i => i.supplierName || "Pemasok").join(", ")}
+                    {upcomingInvoices.length > 2 && ` +${upcomingInvoices.length - 2} lagi`}
+                    {" · total "}{$(upcomingInvoices.reduce((s, i) => s + i.totalAmount, 0))}
                   </span>
                 </p>
               </div>

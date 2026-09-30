@@ -59,6 +59,7 @@ export function OrdersPage() {
   const [activeTab, setActiveTab] = useState<OrdersTab>("orders");
   const [statusFilter, setStatusFilter] = useState("all");
   const [paymentFilter, setPaymentFilter] = useState("all");
+  const [sourceFilter, setSourceFilter] = useState<"all" | "pos" | "ecom">("all");
   const [dateRange, setDateRange] = useState<DateRange>("all");
   const [customRange, setCustomRange] = useState<CustomRange>({ from: "", to: "" });
   const [detailProductId, setDetailProductId] = useState<string | null>(null);
@@ -120,13 +121,21 @@ export function OrdersPage() {
   );
 
   // Filter by payment method
-  const filtered = useMemo(() =>
+  const paymentFiltered = useMemo(() =>
     paymentFilter === "all" ? statusFiltered : statusFiltered.filter(o => o.payment === paymentFilter),
     [statusFiltered, paymentFilter]
   );
 
+  // Filter by asal transaksi — toko (offline) vs online (ecom).
+  // Sejak 29 Sep 2026 order ecom ikut tampil di sini; sebelumnya di-exclude
+  // di BE. Bu Santi minta digabung dengan penanda.
+  const filtered = useMemo(() =>
+    sourceFilter === "all" ? paymentFiltered : paymentFiltered.filter(o => (o.orderSource ?? "pos") === sourceFilter),
+    [paymentFiltered, sourceFilter]
+  );
+
   // Reset pagination when filters change
-  const filterKey = `${dateRange}-${statusFilter}-${paymentFilter}-${debouncedSearch}`;
+  const filterKey = `${dateRange}-${statusFilter}-${paymentFilter}-${sourceFilter}-${debouncedSearch}`;
   if (filterKey !== prevFilterKey) {
     setPrevFilterKey(filterKey);
     setVisibleCount(ORDERS_PAGE_SIZE);
@@ -216,6 +225,15 @@ export function OrdersPage() {
           <option value="cash">{lang === "id" ? "Tunai" : "Cash"}</option>
           <option value="transfer">Transfer</option>
           <option value="qris">QRIS</option>
+        </select>
+        {/* Asal transaksi — toko vs online. Order ecom ikut tampil di sini
+            sejak 29 Sep 2026 (sebelumnya di-exclude di BE). */}
+        <select value={sourceFilter} onChange={e => setSourceFilter(e.target.value as typeof sourceFilter)}
+          aria-label={lang === "id" ? "Filter asal transaksi" : "Filter order source"}
+          className={`px-4 py-3 text-sm font-bold rounded-2xl border appearance-none cursor-pointer ${th.inp}`}>
+          <option value="all">{lang === "id" ? "Toko + Online" : "Store + Online"}</option>
+          <option value="pos">{lang === "id" ? "Toko" : "Store"}</option>
+          <option value="ecom">{lang === "id" ? "Online" : "Online"}</option>
         </select>
       </div>
 

@@ -104,18 +104,26 @@ export function FinancePage() {
           <p className={`text-xs font-black uppercase tracking-wider mb-2 ${th.txf}`}>
             {t.period}
           </p>
+          {/* Label di-map eksplisit. Sebelumnya `t[r]` — tapi kunci `week` dan
+              `month` tidak ada di tabel i18n (yang ada `thisWeek`/`thisMonth`),
+              jadi dua tombol terakhir render TANPA teks: cuma pil kosong.
+              Bu Santi 30 Sep 2026: "ini apa?" */}
           <div className="flex flex-wrap gap-2">
             {(["today", "yesterday", "week", "month"] as DateRange[]).map(r => (
               <button
                 key={r}
                 onClick={() => setRange(r)}
+                aria-pressed={range === r}
                 className={`px-3 min-h-[44px] rounded-xl text-sm font-bold transition-colors ${
                   range === r
                     ? "text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48]"
                     : `border ${th.bdr} ${th.card} ${th.txm}`
                 }`}
               >
-                {t[r as keyof typeof t] as string}
+                {r === "today" ? t.today
+                  : r === "yesterday" ? t.yesterday
+                  : r === "week" ? t.thisWeek
+                  : t.thisMonth}
               </button>
             ))}
           </div>

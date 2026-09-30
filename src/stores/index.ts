@@ -83,10 +83,10 @@ const mapOrder = (o: any): Order => ({
   createdAt: o.created_at, createdBy: o.created_by,
   paymentProof: o.payment_proof, orderDiscountType: o.order_discount_type,
   orderDiscountValue: o.order_discount_value, orderDiscount: o.order_discount,
+  orderSource: o.order_source === "ecom" ? "ecom" : "pos",
   paymentsEditedAt: o.payments_edited_at || undefined,
   paymentsEditedBy: o.payments_edited_by || undefined,
   paymentsEditedReason: o.payments_edited_reason || undefined,
-  orderSource: o.order_source || "pos",
 });
 
 const mapMovement = (m: any): StockMovement => ({
@@ -1340,9 +1340,38 @@ const mapPurchaseInvoice = (p: PurchaseInvoiceRes): PurchaseInvoice => ({
   items: (p.items || []).map(mapPurchaseInvoiceItem),
 });
 
+export interface FetchInvoiceParams {
+  status?: "paid" | "unpaid" | "all";
+  supplierId?: string;
+  from?: string;
+  to?: string;
+  /** "due" (jatuh tempo, default) atau "invoice" (tanggal faktur). */
+  dateField?: "due" | "invoice";
+  /** Cari nomor faktur / supplier / catatan. */
+  search?: string;
+  limit?: number;
+}
+
 interface PurchaseInvoiceState {
   invoices: PurchaseInvoice[];
-  fetchInvoices: (params?: { status?: "paid" | "unpaid" | "all"; supplierId?: string; from?: string; to?: string }) => Promise<void>;
+  /** Faktur belum lunas yang jatuh tempo ≤ 7 hari (termasuk yang sudah
+   *  telat). DIPISAH dari `invoices` karena yang itu mengikuti filter UI
+   *  tab Faktur — kalau notifikasi ikut membacanya, isinya berubah-ubah
+   *  tergantung filter yang sedang dipilih, dan halaman lain yang juga
+   *  memanggil fetchInvoices() saling menimpa. */
+  dueSoonInvoices: PurchaseInvoice[];
+  /** Ambil faktur jatuh tempo ≤ 7 hari untuk lonceng notifikasi +
+   *  kartu "Perlu Perhatian". Tidak menyentuh `invoices`. */
+  fetchDueSoonInvoices: () => Promise<void>;
+  /** Total di server untuk filter aktif — bisa > invoices.length kalau
+   *  kena limit. Dipakai UI untuk kasih tau "menampilkan N dari M". */
+  invoiceTotal: number;
+  /** Error terakhir saat fetch. Sebelumnya di-swallow diam-diam, jadi
+   *  fetch gagal tidak bisa dibedakan dari "tidak ada perubahan" — itu
+   *  yang bikin Bu Santi lapor "terkadang tidak update" (29 Sep 2026). */
+  invoiceError: string | null;
+  invoiceLoading: boolean;
+  fetchInvoices: (params?: FetchInvoiceParams) => Promise<void>;
   createInvoice: (body: CreatePurchaseInvoiceBody) => Promise<PurchaseInvoice | null>;
   updateInvoice: (id: string, body: CreatePurchaseInvoiceBody) => Promise<PurchaseInvoice | null>;
   markPaid: (id: string) => Promise<void>;
@@ -1351,17 +1380,54 @@ interface PurchaseInvoiceState {
 
 export const usePurchaseInvoiceStore = create<PurchaseInvoiceState>((set, get) => ({
   invoices: [],
+  dueSoonInvoices: [],
+  invoiceTotal: 0,
+  invoiceError: null,
+  invoiceLoading: false,
+  fetchDueSoonInvoices: async () => {
+    try {
+      // Tanpa batas bawah — tunggakan lama tetap perlu muncul. Batas atas
+      // 7 hari ke depan supaya jadi peringatan dini, bukan kabar hari-H.
+      const in7 = new Date();
+      in7.setDate(in7.getDate() + 7);
+      const ymd = (d: Date) =>
+        `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      const res = await purchaseInvoiceApi.getAll({
+        status: "unpaid",
+        to: ymd(in7),
+        date_field: "due",
+        limit: 100,
+      });
+      set({ dueSoonInvoices: (res.body || []).map(mapPurchaseInvoice) });
+    } catch {
+      // Diamkan — ini data pendukung notifikasi, bukan alur utama.
+      // Kegagalan cukup berarti lonceng tidak menampilkan apa-apa.
+    }
+  },
   fetchInvoices: async (params) => {
+    set({ invoiceLoading: true });
     try {
       const res = await purchaseInvoiceApi.getAll({
         status: params?.status,
         supplier_id: params?.supplierId,
         from: params?.from,
         to: params?.to,
-        limit: 200,
+        date_field: params?.dateField,
+        q: params?.search,
+        limit: params?.limit ?? 200,
       });
-      set({ invoices: (res.body || []).map(mapPurchaseInvoice) });
-    } catch { /* silent */ }
+      set({
+        invoices: (res.body || []).map(mapPurchaseInvoice),
+        invoiceTotal: res.meta?.total ?? (res.body || []).length,
+        invoiceError: null,
+        invoiceLoading: false,
+      });
+    } catch (e) {
+      set({
+        invoiceError: e instanceof Error ? e.message : "Gagal memuat faktur",
+        invoiceLoading: false,
+      });
+    }
   },
   createInvoice: async (body) => {
     try {
@@ -1603,6 +1669,9 @@ export async function hydrateStores() {
       useAuditStore.getState().fetchEntries(),
       useAuthStore.getState().fetchUsers(),
       useExpenseStore.getState().fetchCategories(),
+      // Faktur jatuh tempo — supaya lonceng notifikasi + "Perlu Perhatian"
+      // punya isi sejak login, bukan hanya setelah tab Faktur dibuka.
+      usePurchaseInvoiceStore.getState().fetchDueSoonInvoices(),
     ]);
   }, 100);
 }

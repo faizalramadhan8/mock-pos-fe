@@ -176,11 +176,14 @@ export interface Order {
   orderDiscountValue?: number;
   orderDiscount?: number;
   /** Payment edit audit (Bu Santi 12 Jul 2026). NULL = never edited. */
+  /** Asal transaksi: "pos" (toko/offline) atau "ecom" (online/storefront).
+   *  Order lama sebelum kolom ini ada bernilai undefined — perlakukan
+   *  sebagai POS. Bu Santi 17 Sep 2026: laporan digabung tapi "di kasih
+   *  tanda aja ya. Antara e commerce dan offline". */
+  orderSource?: "pos" | "ecom";
   paymentsEditedAt?: string;
   paymentsEditedBy?: string;
   paymentsEditedReason?: string;
-  /** Order source (Bu Santi 24 Jul 2026): 'pos' | 'ecom'. Default 'pos'. */
-  orderSource?: string;
 }
 
 export interface OrderItem {

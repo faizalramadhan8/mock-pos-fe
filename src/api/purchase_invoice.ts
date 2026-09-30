@@ -66,6 +66,11 @@ export const purchaseInvoiceApi = {
     supplier_id?: string;
     from?: string;
     to?: string;
+    /** Kolom tanggal yang di-range: "due" (jatuh tempo, default) atau
+     *  "invoice" (tanggal faktur — untuk cari arsip lama). 29 Sep 2026. */
+    date_field?: "due" | "invoice";
+    /** Cari di nomor faktur / nama supplier / catatan. */
+    q?: string;
     page?: number;
     limit?: number;
   }) => {
@@ -74,6 +79,8 @@ export const purchaseInvoiceApi = {
     if (params?.supplier_id) q.set("supplier_id", params.supplier_id);
     if (params?.from) q.set("from", params.from);
     if (params?.to) q.set("to", params.to);
+    if (params?.date_field) q.set("date_field", params.date_field);
+    if (params?.q?.trim()) q.set("q", params.q.trim());
     if (params?.page) q.set("page", String(params.page));
     if (params?.limit) q.set("limit", String(params.limit));
     const qs = q.toString();

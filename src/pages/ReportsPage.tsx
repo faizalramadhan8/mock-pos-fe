@@ -43,6 +43,7 @@ export function ReportsPage() {
   const products = useProductStore(s => s.products);
 
   const [tab, setTab] = useState<ReportTab>("products");
+  const [sourceFilter, setSourceFilter] = useState<"all" | "pos" | "ecom">("all");
   const [dateRange, setDateRange] = useState<DateRange>("month");
   const [customRange, setCustomRange] = useState<CustomRange>({ from: "", to: "" });
   const [expandedMember, setExpandedMember] = useState<string | null>(null);
@@ -81,12 +82,38 @@ export function ReportsPage() {
   // (FE-side topProducts/memberStats di-fallback kalau aggregate belum sampai).
   const filteredOrders = useMemo(() => {
     const range = getDateRange(dateRange, customRange);
-    const completed = orders.filter(o => o.status === "completed");
+    let completed = orders.filter(o => o.status === "completed");
+    // Asal transaksi — order ecom ikut masuk laporan sejak 29 Sep 2026.
+    // Aman digabung karena ecom yang sudah dibayar ikut berstatus
+    // "completed"; yang belum bayar tetap "pending" dan tidak terhitung.
+    if (sourceFilter !== "all") {
+      completed = completed.filter(o => (o.orderSource ?? "pos") === sourceFilter);
+    }
     if (!range) return completed;
     return completed.filter(o => {
       const d = new Date(o.createdAt);
       return d >= range.start && d <= range.end;
     });
+  }, [orders, dateRange, customRange, sourceFilter]);
+
+  // Ringkasan per asal — supaya Bu Santi bisa lihat porsi toko vs online
+  // tanpa harus ganti filter bolak-balik. Dihitung dari periode yang sama
+  // tapi mengabaikan sourceFilter (kalau ikut, angkanya jadi tidak berguna).
+  const sourceSplit = useMemo(() => {
+    const range = getDateRange(dateRange, customRange);
+    const inRange = orders.filter(o => {
+      if (o.status !== "completed") return false;
+      if (!range) return true;
+      const d = new Date(o.createdAt);
+      return d >= range.start && d <= range.end;
+    });
+    const acc = { pos: { count: 0, total: 0 }, ecom: { count: 0, total: 0 } };
+    inRange.forEach(o => {
+      const bucket = (o.orderSource ?? "pos") === "ecom" ? acc.ecom : acc.pos;
+      bucket.count += 1;
+      bucket.total += o.total;
+    });
+    return acc;
   }, [orders, dateRange, customRange]);
 
   // BE-side aggregate. Dipanggil setiap dateRange/customRange berubah.
@@ -404,6 +431,40 @@ export function ReportsPage() {
       )}
 
       {/* Tab switch — role=tablist + touch target ≥44px */}
+      {/* Toko vs Online — Bu Santi 17 Sep 2026: "Paling nanti di kasih tanda
+          aja ya. Antara e commerce dan offline." Selalu tampil porsinya,
+          klik kartu untuk memfilter laporan di bawahnya. */}
+      {(sourceSplit.pos.count > 0 || sourceSplit.ecom.count > 0) && (
+        <div className="grid grid-cols-3 gap-2">
+          {([
+            { key: "all" as const, label: lang === "id" ? "Semua" : "All",
+              count: sourceSplit.pos.count + sourceSplit.ecom.count,
+              total: sourceSplit.pos.total + sourceSplit.ecom.total },
+            { key: "pos" as const, label: lang === "id" ? "Toko" : "Store",
+              count: sourceSplit.pos.count, total: sourceSplit.pos.total },
+            { key: "ecom" as const, label: "Online",
+              count: sourceSplit.ecom.count, total: sourceSplit.ecom.total },
+          ]).map(s => {
+            const active = sourceFilter === s.key;
+            return (
+              <button key={s.key} onClick={() => setSourceFilter(s.key)}
+                aria-pressed={active}
+                className={`rounded-2xl border p-3 text-left transition ${
+                  active ? "border-[#E11D48] bg-[#FFF4F6] dark:bg-[#E11D48]/10" : `${th.bdr} ${th.card2}`
+                }`}>
+                <p className={`text-xs font-bold uppercase tracking-wider ${active ? th.acc : th.txf}`}>
+                  {s.label}
+                </p>
+                <p className={`font-display text-base font-black tabular-nums mt-0.5 ${th.tx}`}>
+                  {$(s.total)}
+                </p>
+                <p className={`text-xs ${th.txm}`}>{s.count} transaksi</p>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       <div role="tablist" aria-label={lang === "id" ? "Pilih laporan" : "Report category"}
         className="flex gap-2 overflow-x-auto scrollbar-hide">
         {([

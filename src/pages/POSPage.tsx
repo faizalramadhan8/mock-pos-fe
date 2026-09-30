@@ -17,7 +17,7 @@ import Barcode from "react-barcode";
 import type { PaymentMethod, UnitType, DiscountType, Product, Order, Member } from "@/types";
 import toast from "react-hot-toast";
 import {
-  Search, ScanLine, ShoppingBag, Minus, Plus, Trash2, ImagePlus, X, UserPlus, Tag, Percent, Wallet, FileText, Printer, Barcode as BarcodeIcon, Clock, Send, AlertCircle, Eye, EyeOff, Gift, Sparkles, TrendingDown, Bookmark,
+  Search, ScanLine, ShoppingBag, Minus, Plus, Trash2, ImagePlus, X, UserPlus, Tag, Percent, Wallet, FileText, Printer, Barcode as BarcodeIcon, Clock, Send, AlertCircle, Eye, EyeOff, Gift, Sparkles, TrendingDown, Bookmark, List, Rows3, Copy,
 } from "lucide-react";
 
 export function POSPage() {
@@ -86,6 +86,64 @@ export function POSPage() {
   // customer yang sama dalam 1 sesi modal sukses.
   const [waSentForOrderId, setWaSentForOrderId] = useState<string | null>(null);
   const [discountItemId, setDiscountItemId] = useState<string | null>(null);
+
+  // Mode tampilan cart — "lengkap" (default, semua kontrol) vs "ringkas"
+  // (tabel padat: Produk · @ · Qty · Total).
+  //
+  // Bu Santi 17 Sep 2026 kirim contoh tulisan tangan dengan format tabel:
+  // "Jadi mudah untuk melihat dalam satu baris dan ketika di foto kirim ke
+  // customer juga lebih terlihat semuanya." Dia MEMFOTO layar kasir lalu
+  // kirim ke customer — makanya perlu muat tanpa scroll. Mode lengkap tetap
+  // default karena itu yang dipakai saat input; ringkas dipakai saat mau
+  // menunjukkan/memfoto. Pilihan disimpan supaya tidak perlu diklik ulang.
+  const [compactCart, setCompactCart] = useState(() => {
+    try { return localStorage.getItem("bakeshop-cart-compact") === "1"; } catch { return false; }
+  });
+  const toggleCompactCart = () => {
+    setCompactCart(v => {
+      const next = !v;
+      try { localStorage.setItem("bakeshop-cart-compact", next ? "1" : "0"); } catch { /* private mode */ }
+      return next;
+    });
+  };
+
+  // Salin rincian cart sebagai teks rapi untuk ditempel ke WhatsApp.
+  // Alternatif yang lebih baik daripada memfoto layar: tidak buram, bisa
+  // disalin customer, hemat kuota. Format mengikuti struk supaya familiar.
+  const copyCartDetails = async () => {
+    if (cartItems.length === 0) return;
+    const rp = (n: number) => "Rp " + Math.round(n).toLocaleString("id-ID");
+    const lines: string[] = [];
+    const storeName = useSettingsStore.getState().storeName?.trim();
+    if (storeName) lines.push(storeName, "");
+
+    cartItems.forEach(ci => {
+      const gross = ci.unitPrice * ci.quantity;
+      const net = gross - calcItemDiscount(ci);
+      const unit = ci.unitType === "box" ? ` (${t.box}/${ci.qtyPerBox})` : "";
+      if (ci.redeemWithPoints) {
+        // Baris tebus poin: tampilkan sebagai potongan poin, bukan rupiah,
+        // supaya customer tidak bingung kenapa totalnya tidak cocok.
+        lines.push(`${ci.name}${unit}`);
+        lines.push(`  ${ci.quantity} x tebus poin = −${gross.toLocaleString("id-ID")} poin`);
+      } else {
+        lines.push(`${ci.name}${unit}`);
+        lines.push(`  ${ci.quantity} x ${rp(ci.unitPrice)} = ${rp(net)}`);
+      }
+    });
+
+    lines.push("", `TOTAL: ${rp(cartTotal)}`);
+
+    const text = lines.join("\n");
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success("Rincian disalin — tinggal tempel di WhatsApp");
+    } catch {
+      // Clipboard API butuh HTTPS + izin. Kalau ditolak, jangan diam —
+      // kasih tahu kasir supaya tidak mengira sudah tersalin.
+      toast.error("Gagal menyalin. Coba lagi atau screenshot layar.");
+    }
+  };
   const [discountInput, setDiscountInput] = useState("");
   const [discountMode, setDiscountMode] = useState<DiscountType>("percent");
   const [showOrderDiscount, setShowOrderDiscount] = useState(false);
@@ -758,12 +816,93 @@ export function POSPage() {
         );
       })()}
 
+      {/* Toolbar cart — ganti mode tampilan + salin rincian. Hanya muncul
+          kalau ada isi; cart kosong tidak perlu kontrol apa-apa. */}
+      {cartItems.length > 0 && (
+        <div className="flex items-center justify-between gap-2">
+          <button
+            onClick={toggleCompactCart}
+            aria-pressed={compactCart}
+            title={compactCart ? "Tampilkan detail lengkap" : "Ringkas — semua barang muat dalam satu layar"}
+            className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold ${
+              compactCart ? "bg-[#E11D48] text-white" : `${th.elev} ${th.txm}`
+            }`}>
+            {compactCart ? <List size={14} /> : <Rows3 size={14} />}
+            {compactCart ? "Tampilan Lengkap" : "Tampilan Ringkas"}
+          </button>
+          <button
+            onClick={copyCartDetails}
+            title="Salin rincian untuk dikirim ke customer via WhatsApp"
+            className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold ${th.elev} ${th.txm}`}>
+            <Copy size={14} /> Salin Rincian
+          </button>
+        </div>
+      )}
+
+      {/* Header kolom — hanya di mode ringkas, meniru format tulisan tangan
+          Bu Santi: Produk · Harga @ · Qty · Total. */}
+      {cartItems.length > 0 && compactCart && (
+        <div className={`flex items-center gap-2 px-3 pb-1 text-xs font-bold uppercase tracking-wider ${th.txf}`}>
+          <span className="flex-1 min-w-0">Produk</span>
+          <span className="w-20 text-right">Harga</span>
+          <span className="w-24 text-center">Qty</span>
+          <span className="w-24 text-right">Total</span>
+          <span className="w-9" aria-hidden />
+        </div>
+      )}
+
       {cartItems.length === 0 ? (
         <div className={`text-center py-6 ${th.txm}`}>
           <ShoppingBag size={28} className="mx-auto opacity-20 mb-2" />
           <p className="font-semibold text-sm">{t.emptyCart}</p>
         </div>
-      ) : cartItems.map(ci => {
+      ) : compactCart ? cartItems.map(ci => {
+        const itemGross = ci.unitPrice * ci.quantity;
+        const itemDisc = calcItemDiscount(ci);
+        const isRedeemed = !!ci.redeemWithPoints;
+        return (
+          <div key={ci.id}
+            className={`flex items-center gap-2 px-3 py-2 rounded-xl border ${th.card2} ${th.bdr} ${
+              isRedeemed ? "ring-1 ring-[#E11D48]/40" : ""
+            }`}>
+            <div className="flex-1 min-w-0">
+              <p className={`font-semibold text-sm truncate ${th.tx}`}>{ci.name}</p>
+              {ci.unitType === "box" && (
+                <p className={`text-xs ${th.txf}`}>{t.box}({ci.qtyPerBox})</p>
+              )}
+            </div>
+            <span className={`w-20 text-right font-display text-sm tabular-nums ${th.txm}`}>
+              {ci.unitPrice.toLocaleString("id-ID")}
+            </span>
+            {/* Stepper tetap ada di mode ringkas — Fai: "tombol nambah
+                quantity setiap produk". Ukuran diperkecil tapi masih 36px. */}
+            <div className="w-24 flex items-center justify-center gap-1">
+              <button onClick={() => handleQtyUpdate(ci.id, -1)} aria-label="Kurangi"
+                className="w-9 h-9 rounded-lg flex items-center justify-center bg-white border border-[#FFB5C0] text-[#E11D48] active:scale-90 transition-transform dark:bg-[#3D2230] dark:border-[#E11D48]/40 dark:text-[#FB7185]">
+                <Minus size={14} strokeWidth={3} />
+              </button>
+              <span className={`font-display w-6 text-center text-base font-black tabular-nums ${th.tx}`}>
+                {ci.quantity}
+              </span>
+              <button onClick={() => handleQtyUpdate(ci.id, 1)} aria-label="Tambah"
+                className="w-9 h-9 rounded-lg flex items-center justify-center text-white bg-gradient-to-br from-[#FB7185] to-[#E11D48] active:scale-90 transition-transform">
+                <Plus size={14} strokeWidth={3} />
+              </button>
+            </div>
+            <span className={`w-24 text-right font-display text-sm font-black tabular-nums ${
+              isRedeemed ? "text-[#E11D48]" : th.tx
+            }`}>
+              {isRedeemed
+                ? `−${itemGross.toLocaleString("id-ID")} poin`
+                : (itemGross - itemDisc).toLocaleString("id-ID")}
+            </span>
+            <button onClick={() => removeItem(ci.id)} aria-label="Hapus item"
+              className="w-9 h-9 rounded-lg flex items-center justify-center bg-[#FCE4EC] text-[#BE123C] active:scale-90 transition-transform dark:bg-[#E11D48]/15 dark:text-[#FB7185]">
+              <Trash2 size={14} strokeWidth={2.4} />
+            </button>
+          </div>
+        );
+      }) : cartItems.map(ci => {
         const itemGross = ci.unitPrice * ci.quantity;
         const itemDisc = calcItemDiscount(ci);
         const isRedeemed = !!ci.redeemWithPoints;
