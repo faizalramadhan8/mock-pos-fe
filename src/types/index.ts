@@ -181,6 +181,12 @@ export interface Order {
    *  sebagai POS. Bu Santi 17 Sep 2026: laporan digabung tapi "di kasih
    *  tanda aja ya. Antara e commerce dan offline". */
   orderSource?: "pos" | "ecom";
+  /** Ongkos kirim yang ditagihkan ke customer (pesanan online saja; 0 untuk
+   *  POS). CATATAN: `total` pesanan online SUDAH termasuk ongkir —
+   *  `total = subtotal − voucher + ongkir`. Ongkir bukan pendapatan toko,
+   *  cuma uang titipan untuk kurir, jadi JANGAN pakai `total` mentah untuk
+   *  menghitung omzet. Pakai `salesTotal()` di utils. */
+  shippingCost?: number;
   paymentsEditedAt?: string;
   paymentsEditedBy?: string;
   paymentsEditedReason?: string;

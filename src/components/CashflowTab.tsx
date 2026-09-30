@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useOrderStore, useExpenseStore, usePurchaseInvoiceStore, useRefundStore, useLangStore, useAuthStore } from "@/stores";
 import { useThemeClasses } from "@/hooks/useThemeClasses";
-import { formatCurrency as $ } from "@/utils";
+import { formatCurrency as $, salesTotal } from "@/utils";
 import { cashbookApi } from "@/api/cashbook";
 import { capitalApi } from "@/api/capital";
 import { Modal } from "./Modal";
@@ -214,7 +214,7 @@ export function CashflowTab() {
       if (d < monthStart || d > monthEnd) return;
       const key = ymd(d);
       const cur = salesByDay.get(key) || { total: 0, count: 0, orders: [] };
-      cur.total += o.total;
+      cur.total += salesTotal(o);
       cur.count += 1;
       cur.orders.push(o);
       salesByDay.set(key, cur);
@@ -272,7 +272,7 @@ export function CashflowTab() {
           type: "sales",
           detail: sales.orders.map(o => ({
             name: `${o.id.slice(0, 8)} · ${o.customer || "Walk-in"}`,
-            amount: o.total,
+            amount: salesTotal(o),
           })),
         });
         runningIn += sales.total;

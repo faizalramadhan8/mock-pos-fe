@@ -3,7 +3,7 @@ import { useLangStore, useOrderStore, useProductStore, useExpenseStore, usePurch
 import { useThemeClasses } from "@/hooks/useThemeClasses";
 import { usePageFetch } from "@/hooks/usePageFetch";
 import { useCountUp } from "@/hooks/useCountUp";
-import { formatCurrency as $ } from "@/utils";
+import { formatCurrency as $, salesTotal } from "@/utils";
 import { exportOrders, exportOrderReport } from "@/utils/export";
 import { getDateRange, type DateRange, type CustomRange } from "@/utils/dateRange";
 import { orderApi, type OrderAggregateResponse } from "@/api/orders";
@@ -111,7 +111,7 @@ export function ReportsPage() {
     inRange.forEach(o => {
       const bucket = (o.orderSource ?? "pos") === "ecom" ? acc.ecom : acc.pos;
       bucket.count += 1;
-      bucket.total += o.total;
+      bucket.total += salesTotal(o);
     });
     return acc;
   }, [orders, dateRange, customRange]);
@@ -434,7 +434,13 @@ export function ReportsPage() {
       {/* Toko vs Online — Bu Santi 17 Sep 2026: "Paling nanti di kasih tanda
           aja ya. Antara e commerce dan offline." Selalu tampil porsinya,
           klik kartu untuk memfilter laporan di bawahnya. */}
-      {(sourceSplit.pos.count > 0 || sourceSplit.ecom.count > 0) && (
+      {/* Hanya muncul kalau memang ADA pesanan online di periode ini. Toko
+          online belum jalan (yang ada cuma transaksi uji coba, dihapus
+          30 Sep 2026) — memisah "Toko vs Online" saat online-nya nol cuma
+          menambah kotak berisi Rp 0. Sengaja bukan pakai saklar on/off:
+          begitu pesanan online pertama masuk, kartunya muncul sendiri tanpa
+          perlu ada yang ingat menyalakannya. */}
+      {sourceSplit.ecom.count > 0 && (
         <div className="grid grid-cols-3 gap-2">
           {([
             { key: "all" as const, label: lang === "id" ? "Semua" : "All",

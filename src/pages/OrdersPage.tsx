@@ -7,7 +7,7 @@ import { Modal } from "@/components/Modal";
 import { useThemeClasses } from "@/hooks/useThemeClasses";
 import { useDebounce } from "@/hooks/useDebounce";
 import { usePageFetch } from "@/hooks/usePageFetch";
-import { formatCurrency as $, formatTime, formatDate, genId, normalizePhone } from "@/utils";
+import { formatCurrency as $, formatTime, formatDate, genId, normalizePhone, salesTotal } from "@/utils";
 import { getDateRange, type DateRange, type CustomRange } from "@/utils/dateRange";
 import { FileText, Search, Users, Trash2, Plus, Receipt, Pencil, Sparkles, MapPin, AlertCircle } from "lucide-react";
 import type { Member } from "@/types";
@@ -147,7 +147,7 @@ export function OrdersPage() {
     const completed = dateFiltered.filter(o => o.status === "completed");
     const cancelled = dateFiltered.filter(o => o.status === "cancelled");
     const refunded = dateFiltered.filter(o => o.status === "refunded");
-    const revenue = completed.reduce((s, o) => s + o.total, 0);
+    const revenue = completed.reduce((s, o) => s + salesTotal(o), 0);
     const avg = completed.length > 0 ? Math.round(revenue / completed.length) : 0;
     return { revenue, completedCount: completed.length, avg, cancelledCount: cancelled.length, refundedCount: refunded.length };
   }, [dateFiltered]);
@@ -227,7 +227,11 @@ export function OrdersPage() {
           <option value="qris">QRIS</option>
         </select>
         {/* Asal transaksi — toko vs online. Order ecom ikut tampil di sini
-            sejak 29 Sep 2026 (sebelumnya di-exclude di BE). */}
+            sejak 29 Sep 2026 (sebelumnya di-exclude di BE). Filter-nya
+            disembunyikan selama belum ada satu pun pesanan online: memilih
+            antara "Toko" dan "Online" tidak ada gunanya kalau semuanya toko.
+            Muncul sendiri begitu pesanan online pertama masuk. */}
+        {orders.some(o => (o.orderSource ?? "pos") === "ecom") && (
         <select value={sourceFilter} onChange={e => setSourceFilter(e.target.value as typeof sourceFilter)}
           aria-label={lang === "id" ? "Filter asal transaksi" : "Filter order source"}
           className={`px-4 py-3 text-sm font-bold rounded-2xl border appearance-none cursor-pointer ${th.inp}`}>
@@ -235,6 +239,7 @@ export function OrdersPage() {
           <option value="pos">{lang === "id" ? "Toko" : "Store"}</option>
           <option value="ecom">{lang === "id" ? "Online" : "Online"}</option>
         </select>
+        )}
       </div>
 
       {/* Custom date range — muncul cuma kalau pilih "Pilih Tanggal".

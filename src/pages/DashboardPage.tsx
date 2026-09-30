@@ -3,7 +3,7 @@ import { useAuthStore, useLangStore, useOrderStore, useProductStore, useBatchSto
 import { ProductDetailModal } from "@/components/ProductDetailModal";
 import { useThemeClasses } from "@/hooks/useThemeClasses";
 import { usePageFetch } from "@/hooks/usePageFetch";
-import { formatCurrency as $ } from "@/utils";
+import { formatCurrency as $, salesTotal } from "@/utils";
 import { AlertCircle, Clock, Package, ChevronRight, TrendingUp, TrendingDown, Receipt } from "lucide-react";
 
 type Range = "today" | "yesterday" | "week" | "month" | "custom";
@@ -97,8 +97,8 @@ export function DashboardPage() {
     [completedOrders, prev.from, prev.to]
   );
 
-  const rangeRevenue = useMemo(() => rangedOrders.reduce((s, o) => s + o.total, 0), [rangedOrders]);
-  const prevRevenue = useMemo(() => prevRangedOrders.reduce((s, o) => s + o.total, 0), [prevRangedOrders]);
+  const rangeRevenue = useMemo(() => rangedOrders.reduce((s, o) => s + salesTotal(o), 0), [rangedOrders]);
+  const prevRevenue = useMemo(() => prevRangedOrders.reduce((s, o) => s + salesTotal(o), 0), [prevRangedOrders]);
   const revenueDeltaPct = prevRevenue > 0 ? ((rangeRevenue - prevRevenue) / prevRevenue) * 100 : (rangeRevenue > 0 ? 100 : 0);
 
   // (Pengeluaran/Untung Bersih daily fetch removed — cards dihapus dari Beranda)
@@ -125,7 +125,7 @@ export function DashboardPage() {
     let gross = 0, cogs = 0, itemsCount = 0;
     const perProd = new Map<string, { name: string; qty: number; gross: number; cogs: number }>();
     for (const o of rangedOrders) {
-      gross += o.total;
+      gross += salesTotal(o);
       for (const it of o.items || []) {
         const lineRevenue = it.unitPrice * it.quantity - (it.discountAmount || 0);
         let lineCogs = 0;
@@ -173,7 +173,7 @@ export function DashboardPage() {
       const uname = isEcom ? "Online (E-commerce)" : (u?.name || "(User)");
       const prev = byUser.get(key) || { id: key, name: uname, count: 0, total: 0, cash: 0, qris: 0, transfer: 0 };
       prev.count += 1;
-      prev.total += o.total;
+      prev.total += salesTotal(o);
       // Split payment — iterate per-payment supaya bucket per method akurat.
       // Insiden Bu Ineu Anggraeni 16 Aug 2026: order 487.500 dgn split
       // 500 cash + 487.000 transfer previously ke-bucket seluruhnya ke transfer
@@ -387,7 +387,7 @@ export function DashboardPage() {
           <div className="rounded-[24px] p-6 text-white bg-gradient-to-br from-[#FB7185] to-[#9F1239]">
             <p className="text-sm font-semibold uppercase tracking-wider opacity-75">{t.revenue}</p>
             <p className="font-display text-[38px] font-black tracking-tight mt-2 leading-none" style={{ fontVariationSettings: '"wght" 900' }}>
-              {$(completedOrders.reduce((s, o) => s + o.total, 0))}
+              {$(completedOrders.reduce((s, o) => s + salesTotal(o), 0))}
             </p>
           </div>
           <div className={`rounded-[20px] border p-5 flex flex-col justify-center ${th.card} ${th.bdr}`}>

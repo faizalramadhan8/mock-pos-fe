@@ -6,6 +6,29 @@ import { useSettingsStore } from "@/stores";
 
 export function cn(...inputs: ClassValue[]) { return twMerge(clsx(inputs)); }
 export function formatCurrency(n: number) { return "Rp " + n.toLocaleString("id-ID"); }
+
+/**
+ * salesTotal — omzet sebenarnya dari satu pesanan, yaitu `total` dikurangi
+ * ongkos kirim.
+ *
+ * Kenapa perlu (Bu Santi 30 Sep 2026, "dengan arus kas kenapa tidak sama
+ * jumlahnya"): checkout online menghitung `total = subtotal − voucher +
+ * ongkir`, jadi `orders.total` pesanan online sudah termasuk ongkir. Ongkir
+ * itu uang titipan untuk kurir, bukan hasil jualan Bu Santi. Selama pesanan
+ * online masih disembunyikan dari laporan hal ini tidak kelihatan; begitu
+ * laporan toko dan online digabung (29 Sep 2026), ongkir ikut terhitung
+ * sebagai omzet dan menggelembungkan laba.
+ *
+ * Untuk pesanan POS `shippingCost` selalu 0, jadi hasilnya sama dengan
+ * `total` — angka historis toko tidak bergeser sedikit pun.
+ *
+ * Pakai ini di SETIAP penjumlahan omzet/pendapatan. Kalau suatu saat ongkir
+ * mau dihitung sebagai pendapatan, biaya kurirnya harus dicatat sebagai
+ * pengeluaran juga — kalau tidak, labanya kelebihan terus.
+ */
+export function salesTotal(o: { total: number; shippingCost?: number }) {
+  return o.total - (o.shippingCost ?? 0);
+}
 export function formatDate(d: string, lang: "en" | "id" = "en") {
   const locale = lang === "id" ? "id-ID" : "en";
   return new Date(d).toLocaleDateString(locale, { day: "numeric", month: "short" });

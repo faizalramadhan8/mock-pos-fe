@@ -84,6 +84,7 @@ const mapOrder = (o: any): Order => ({
   paymentProof: o.payment_proof, orderDiscountType: o.order_discount_type,
   orderDiscountValue: o.order_discount_value, orderDiscount: o.order_discount,
   orderSource: o.order_source === "ecom" ? "ecom" : "pos",
+  shippingCost: Number(o.shipping_cost) || 0,
   paymentsEditedAt: o.payments_edited_at || undefined,
   paymentsEditedBy: o.payments_edited_by || undefined,
   paymentsEditedReason: o.payments_edited_reason || undefined,
