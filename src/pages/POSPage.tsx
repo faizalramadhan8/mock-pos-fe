@@ -651,7 +651,7 @@ export function POSPage() {
 
   // Shared cart content renderer
   const renderCartContent = (isPanel: boolean) => (
-    <div className="flex flex-col gap-3">
+    <div className={`flex flex-col ${compact ? "gap-2" : "gap-3"}`}>
       {/* Active member badge — compact one-row layout. Avoids the 3-line
           stack that wasted vertical space on tablet (Santi: "rada ribet
           kalau pesanannya banyak"). Phone + member-price-active info kept
@@ -693,15 +693,19 @@ export function POSPage() {
         </button>
       )}
 
-      {/* Member search (separate from customer details) */}
+      {/* Saat ringkas, tiga input identitas berbagi SATU baris. Sebelumnya dua
+          baris penuh — begitu dibuka, daftar barang terdorong sampai harus
+          scroll. Membuka sesuatu yang opsional tidak boleh merusak tampilan
+          utama, jadi biayanya ditekan dari ~110px jadi ~50px. */}
       {!activeMember && (!compact || showCustomerFields || customer || customerPhone) && (
+        <div className={compact ? "grid grid-cols-[1fr_1fr_1fr_auto] gap-2 items-start" : "flex flex-col gap-3"}>
         <div className="relative" ref={memberDropdownRef}>
           <input
             value={memberQuery}
             onChange={e => { setMemberQuery(e.target.value); setShowMemberDropdown(true); }}
             onFocus={() => setShowMemberDropdown(true)}
-            placeholder={t.searchMemberPhone as string || t.searchMember as string}
-            className={`w-full px-4 py-3 text-sm rounded-2xl border ${th.inp}`}
+            placeholder={compact ? "Cari member..." : (t.searchMemberPhone as string || t.searchMember as string)}
+            className={`w-full px-3 ${compact ? "py-2" : "px-4 py-3"} text-sm rounded-2xl border ${th.inp}`}
           />
           {showMemberDropdown && (
             <div className={`absolute top-full left-0 right-0 z-20 mt-1 rounded-xl border shadow-lg overflow-hidden ${th.card} ${th.bdr}`}>
@@ -729,25 +733,36 @@ export function POSPage() {
             </div>
           )}
         </div>
-      )}
 
-      {/* Non-member customer details — separate Name + Phone fields */}
-      {!activeMember && (!compact || showCustomerFields || customer || customerPhone) && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        {/* Nama + HP customer non-member */}
+        <div className={`grid grid-cols-1 sm:grid-cols-2 gap-2 ${compact ? "col-span-2" : ""}`}>
           <input
             value={customer}
             onChange={e => setCustomer(e.target.value)}
-            placeholder="Nama customer (opsional)"
-            className={`w-full px-4 py-3 text-sm rounded-2xl border ${th.inp}`}
+            placeholder={compact ? "Nama customer" : "Nama customer (opsional)"}
+            className={`w-full ${compact ? "px-3 py-2" : "px-4 py-3"} text-sm rounded-2xl border ${th.inp}`}
           />
           <input
             value={customerPhone}
             onChange={e => setCustomerPhone(e.target.value)}
-            placeholder="Nomor HP (opsional — untuk kirim struk WA)"
+            placeholder={compact ? "Nomor HP" : "Nomor HP (opsional — untuk kirim struk WA)"}
             type="tel"
             inputMode="tel"
-            className={`w-full px-4 py-3 text-sm rounded-2xl border ${th.inp}`}
+            className={`w-full ${compact ? "px-3 py-2" : "px-4 py-3"} text-sm rounded-2xl border ${th.inp}`}
           />
+        </div>
+        {/* Jalan keluar — kalau barisnya kebuka tidak sengaja, bisa ditutup
+            lagi. Hanya saat semuanya masih kosong; kalau sudah diisi,
+            menutup berarti menyembunyikan data yang sudah diketik. */}
+        {compact && !customer && !customerPhone && (
+          <button
+            type="button"
+            onClick={() => { setShowCustomerFields(false); setMemberQuery(""); }}
+            aria-label="Tutup kolom identitas"
+            className={`w-9 h-9 rounded-xl flex items-center justify-center border ${th.bdr} ${th.txm}`}>
+            <X size={14} strokeWidth={2.6} />
+          </button>
+        )}
         </div>
       )}
 
@@ -884,7 +899,9 @@ export function POSPage() {
         // tinggi baris tapi ruang kanan yang menganggur. Dipecah per kolom
         // (kiri penuh dulu, baru kanan) supaya urutannya masih enak dibaca,
         // dan tiap kolom punya judulnya sendiri.
-        const cols = isPanel && cartWide && cartItems.length > 6 ? 2 : 1;
+        // Ambang 4, bukan 6. Percobaan pertama pakai >6 dan keranjang berisi
+        // tepat 6 barang tetap satu kolom — persis kasus yang dikeluhkan.
+        const cols = isPanel && cartWide && cartItems.length > 4 ? 2 : 1;
         const perCol = Math.ceil(cartItems.length / cols);
         const chunks = Array.from({ length: cols }, (_, i) =>
           cartItems.slice(i * perCol, (i + 1) * perCol));
@@ -1132,8 +1149,13 @@ export function POSPage() {
       })}
 
       {cartItems.length > 0 && <>
-        <div className={`p-4 rounded-[18px] ${th.elev}`}>
+        <div className={`${compact ? "p-2.5" : "p-4"} rounded-[18px] ${th.elev}`}>
+          {/* Saat ringkas, baris Subtotal disembunyikan kalau angkanya sama
+              persis dengan Total (tidak ada diskon/hemat/PPN) — mengulang
+              angka yang sama memakan satu baris tanpa memberi informasi. */}
+          {(!compact || cartSubtotal !== cartTotal) && (
           <div className="flex justify-between text-sm"><span className={th.txm}>{t.subtotal}</span><span className={`font-semibold ${th.tx}`}>{$(cartSubtotal)}</span></div>
+          )}
           {memberSavings > 0 && (
             <div className="flex justify-between text-sm mt-1"><span className={th.acc}>Hemat</span><span className={`font-semibold ${th.acc}`}>-{$(memberSavings)}</span></div>
           )}
@@ -1152,7 +1174,9 @@ export function POSPage() {
               <span className="font-semibold text-[#E11D48]">−{pointsToRedeem.toLocaleString("id-ID")} poin</span>
             </div>
           )}
-          <div className={`flex justify-between text-base pt-3 mt-3 border-t ${th.bdr}`}>
+          <div className={`flex justify-between items-center text-base ${
+            compact && cartSubtotal === cartTotal ? "" : `pt-2 mt-2 border-t ${th.bdr}`
+          }`}>
             <span className={`font-extrabold ${th.tx}`}>{t.total}</span>
             <span className={`font-black text-xl ${th.acc}`}>{$(cartTotal)}</span>
           </div>
@@ -1612,11 +1636,11 @@ export function POSPage() {
           ? "hidden md:flex md:flex-col md:flex-1 md:min-w-0 md:sticky md:top-[68px] md:max-h-[calc(100vh-148px)] md:rounded-[22px] md:border md:overflow-hidden"
           : "hidden lg:flex lg:flex-col lg:w-[480px] xl:w-[560px] 2xl:w-[620px] lg:shrink-0 lg:sticky lg:top-[68px] lg:max-h-[calc(100vh-148px)] lg:rounded-[22px] lg:border lg:overflow-hidden"
       } ${th.card} ${th.bdr}`}>
-        <div className={`px-5 py-3.5 border-b ${th.bdr} flex items-center justify-between`}>
+        <div className={`px-5 ${compact ? "py-2" : "py-3.5"} border-b ${th.bdr} flex items-center justify-between`}>
           <p className={`text-sm font-extrabold tracking-tight ${th.tx}`}>{t.cart} · {cartCount}</p>
           <p className={`text-sm font-black ${th.acc}`}>{$(cartTotal)}</p>
         </div>
-        <div className="flex-1 overflow-y-auto p-4 scrollbar-hide">
+        <div className={`flex-1 overflow-y-auto ${compact ? "p-3" : "p-4"} scrollbar-hide`}>
           {renderCartContent(true)}
         </div>
       </div>
