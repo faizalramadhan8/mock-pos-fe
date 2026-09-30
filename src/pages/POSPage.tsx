@@ -10,6 +10,7 @@ import { useThemeClasses } from "@/hooks/useThemeClasses";
 import { useDebounce } from "@/hooks/useDebounce";
 import { useBarcodeScanner } from "@/hooks/useBarcodeScanner";
 import { usePageFetch } from "@/hooks/usePageFetch";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { formatCurrency as $, printReceipt, compressImage, genId, formatTime, printBarcodeLabel, printBarcodeLabels, normalizePhone } from "@/utils";
 import { calcItemDiscount } from "@/utils/calc";
 import { orderApi } from "@/api";
@@ -168,6 +169,22 @@ export function POSPage() {
   const [posLayout, setPosLayout] = useState<"grid" | "search">(() => {
     try { return (localStorage.getItem("bakeshop-pos-layout") as "grid" | "search") || "grid"; } catch { return "grid"; }
   });
+
+  // Mode pencarian cepat SELALU pakai format tabel Bu Santi — tidak ada
+  // toggle di sana. Fai 30 Sep 2026: "yg mode pencarian cepat diubah jadi
+  // seperti gambar dari bu santi saja." Mode grid tetap punya toggle karena
+  // panel keranjangnya sempit (480-620px), tabel 4 kolom jadi sesak.
+  const compact = posLayout === "search" || compactCart;
+
+  // Di layar lebar panel keranjang mode pencarian sangat lapang (flex-1),
+  // jadi satu barang per baris membuang ruang dan memaksa scroll padahal
+  // layar masih kosong di kanan. Di atas 1280px daftarnya dibagi dua kolom.
+  const cartWide = useMediaQuery("(min-width: 1280px)");
+
+  // Kolom identitas customer disembunyikan saat ringkas — tiga input itu
+  // memakan tinggi setara 3 baris barang, padahal semuanya opsional dan
+  // jarang diisi. Muncul otomatis kalau sudah ada isinya.
+  const [showCustomerFields, setShowCustomerFields] = useState(false);
   // Listen ke storage event supaya kalau setting diubah di tab lain (Settings
   // page), POSPage auto-refresh.
   useEffect(() => {
@@ -663,8 +680,21 @@ export function POSPage() {
         </div>
       )}
 
+      {/* Saat ringkas, tiga input identitas (cari member + nama + HP) diganti
+          satu tombol kecil. Semuanya opsional dan jarang dipakai, tapi
+          tingginya setara 3 baris barang — itu selisih antara muat dan harus
+          scroll. Otomatis terbuka kalau sudah ada isinya. */}
+      {compact && !activeMember && !showCustomerFields && !customer && !customerPhone && (
+        <button
+          type="button"
+          onClick={() => setShowCustomerFields(true)}
+          className={`self-start inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border ${th.bdr} ${th.txm}`}>
+          <UserPlus size={13} strokeWidth={2.6} /> Member / Customer
+        </button>
+      )}
+
       {/* Member search (separate from customer details) */}
-      {!activeMember && (
+      {!activeMember && (!compact || showCustomerFields || customer || customerPhone) && (
         <div className="relative" ref={memberDropdownRef}>
           <input
             value={memberQuery}
@@ -702,7 +732,7 @@ export function POSPage() {
       )}
 
       {/* Non-member customer details — separate Name + Phone fields */}
-      {!activeMember && (
+      {!activeMember && (!compact || showCustomerFields || customer || customerPhone) && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           <input
             value={customer}
@@ -820,6 +850,9 @@ export function POSPage() {
           kalau ada isi; cart kosong tidak perlu kontrol apa-apa. */}
       {cartItems.length > 0 && (
         <div className="flex items-center justify-between gap-2">
+          {/* Toggle hanya untuk mode grid. Di mode pencarian cepat tampilan
+              tabel sudah jadi satu-satunya, jadi tombolnya cuma bikin bingung. */}
+          {posLayout === "search" ? <span /> : (
           <button
             onClick={toggleCompactCart}
             aria-pressed={compactCart}
@@ -830,6 +863,7 @@ export function POSPage() {
             {compactCart ? <List size={14} /> : <Rows3 size={14} />}
             {compactCart ? "Tampilan Lengkap" : "Tampilan Ringkas"}
           </button>
+          )}
           <button
             onClick={copyCartDetails}
             title="Salin rincian untuk dikirim ke customer via WhatsApp"
@@ -839,70 +873,90 @@ export function POSPage() {
         </div>
       )}
 
-      {/* Header kolom — hanya di mode ringkas, meniru format tulisan tangan
-          Bu Santi: Produk · Harga @ · Qty · Total. */}
-      {cartItems.length > 0 && compactCart && (
-        <div className={`flex items-center gap-2 px-3 pb-1 text-xs font-bold uppercase tracking-wider ${th.txf}`}>
-          <span className="flex-1 min-w-0">Produk</span>
-          <span className="w-20 text-right">Harga</span>
-          <span className="w-24 text-center">Qty</span>
-          <span className="w-24 text-right">Total</span>
-          <span className="w-9" aria-hidden />
-        </div>
-      )}
-
       {cartItems.length === 0 ? (
         <div className={`text-center py-6 ${th.txm}`}>
           <ShoppingBag size={28} className="mx-auto opacity-20 mb-2" />
           <p className="font-semibold text-sm">{t.emptyCart}</p>
         </div>
-      ) : compactCart ? cartItems.map(ci => {
-        const itemGross = ci.unitPrice * ci.quantity;
-        const itemDisc = calcItemDiscount(ci);
-        const isRedeemed = !!ci.redeemWithPoints;
-        return (
-          <div key={ci.id}
-            className={`flex items-center gap-2 px-3 py-2 rounded-xl border ${th.card2} ${th.bdr} ${
-              isRedeemed ? "ring-1 ring-[#E11D48]/40" : ""
-            }`}>
-            <div className="flex-1 min-w-0">
-              <p className={`font-semibold text-sm truncate ${th.tx}`}>{ci.name}</p>
-              {ci.unitType === "box" && (
-                <p className={`text-xs ${th.txf}`}>{t.box}({ci.qtyPerBox})</p>
-              )}
-            </div>
-            <span className={`w-20 text-right font-display text-sm tabular-nums ${th.txm}`}>
-              {ci.unitPrice.toLocaleString("id-ID")}
-            </span>
-            {/* Stepper tetap ada di mode ringkas — Fai: "tombol nambah
-                quantity setiap produk". Ukuran diperkecil tapi masih 36px. */}
-            <div className="w-24 flex items-center justify-center gap-1">
-              <button onClick={() => handleQtyUpdate(ci.id, -1)} aria-label="Kurangi"
-                className="w-9 h-9 rounded-lg flex items-center justify-center bg-white border border-[#FFB5C0] text-[#E11D48] active:scale-90 transition-transform dark:bg-[#3D2230] dark:border-[#E11D48]/40 dark:text-[#FB7185]">
-                <Minus size={14} strokeWidth={3} />
-              </button>
-              <span className={`font-display w-6 text-center text-base font-black tabular-nums ${th.tx}`}>
-                {ci.quantity}
-              </span>
-              <button onClick={() => handleQtyUpdate(ci.id, 1)} aria-label="Tambah"
-                className="w-9 h-9 rounded-lg flex items-center justify-center text-white bg-gradient-to-br from-[#FB7185] to-[#E11D48] active:scale-90 transition-transform">
-                <Plus size={14} strokeWidth={3} />
-              </button>
-            </div>
-            <span className={`w-24 text-right font-display text-sm font-black tabular-nums ${
-              isRedeemed ? "text-[#E11D48]" : th.tx
-            }`}>
-              {isRedeemed
-                ? `−${itemGross.toLocaleString("id-ID")} poin`
-                : (itemGross - itemDisc).toLocaleString("id-ID")}
-            </span>
-            <button onClick={() => removeItem(ci.id)} aria-label="Hapus item"
-              className="w-9 h-9 rounded-lg flex items-center justify-center bg-[#FCE4EC] text-[#BE123C] active:scale-90 transition-transform dark:bg-[#E11D48]/15 dark:text-[#FB7185]">
-              <Trash2 size={14} strokeWidth={2.4} />
-            </button>
+      ) : compact ? (() => {
+        // Dua kolom kalau panelnya lebar dan barangnya banyak. Bu Santi minta
+        // "semua kelihatan tanpa scroll"; di layar lebar penghalangnya bukan
+        // tinggi baris tapi ruang kanan yang menganggur. Dipecah per kolom
+        // (kiri penuh dulu, baru kanan) supaya urutannya masih enak dibaca,
+        // dan tiap kolom punya judulnya sendiri.
+        const cols = isPanel && cartWide && cartItems.length > 6 ? 2 : 1;
+        const perCol = Math.ceil(cartItems.length / cols);
+        const chunks = Array.from({ length: cols }, (_, i) =>
+          cartItems.slice(i * perCol, (i + 1) * perCol));
+
+        const header = (
+          <div className={`flex items-center gap-2 px-2.5 pb-0.5 text-xs font-bold uppercase tracking-wider ${th.txf}`}>
+            <span className="flex-1 min-w-0">Produk</span>
+            <span className="w-16 text-right">Harga</span>
+            <span className="w-[86px] text-center">Qty</span>
+            <span className="w-20 text-right">Total</span>
+            <span className="w-7" aria-hidden />
           </div>
         );
-      }) : cartItems.map(ci => {
+
+        return (
+          <div className={`grid gap-x-4 gap-y-1.5 ${cols === 2 ? "grid-cols-2" : "grid-cols-1"}`}>
+            {chunks.map((chunk, ci2) => (
+              <div key={ci2} className="flex flex-col gap-1.5 min-w-0">
+                {header}
+                {chunk.map(ci => {
+                  const itemGross = ci.unitPrice * ci.quantity;
+                  const itemDisc = calcItemDiscount(ci);
+                  const isRedeemed = !!ci.redeemWithPoints;
+                  return (
+                    <div key={ci.id}
+                      className={`flex items-center gap-2 px-2.5 py-1 rounded-lg border ${th.card2} ${th.bdr} ${
+                        isRedeemed ? "ring-1 ring-[#E11D48]/40" : ""
+                      }`}>
+                      <div className="flex-1 min-w-0">
+                        <p className={`font-semibold text-sm truncate leading-tight ${th.tx}`}>{ci.name}</p>
+                        {ci.unitType === "box" && (
+                          <p className={`text-xs leading-tight ${th.txf}`}>{t.box}({ci.qtyPerBox})</p>
+                        )}
+                      </div>
+                      <span className={`w-16 text-right font-display text-sm tabular-nums ${th.txm}`}>
+                        {ci.unitPrice.toLocaleString("id-ID")}
+                      </span>
+                      {/* Stepper tetap ada — Fai: "tombol nambah quantity
+                          setiap produk". 32px: lebih kecil dari sebelumnya
+                          supaya tinggi baris turun, masih nyaman ditekan. */}
+                      <div className="w-[86px] flex items-center justify-center gap-1">
+                        <button onClick={() => handleQtyUpdate(ci.id, -1)} aria-label="Kurangi"
+                          className="w-8 h-8 shrink-0 rounded-lg flex items-center justify-center bg-white border border-[#FFB5C0] text-[#E11D48] active:scale-90 transition-transform dark:bg-[#3D2230] dark:border-[#E11D48]/40 dark:text-[#FB7185]">
+                          <Minus size={13} strokeWidth={3} />
+                        </button>
+                        <span className={`font-display w-5 text-center text-sm font-black tabular-nums ${th.tx}`}>
+                          {ci.quantity}
+                        </span>
+                        <button onClick={() => handleQtyUpdate(ci.id, 1)} aria-label="Tambah"
+                          className="w-8 h-8 shrink-0 rounded-lg flex items-center justify-center text-white bg-gradient-to-br from-[#FB7185] to-[#E11D48] active:scale-90 transition-transform">
+                          <Plus size={13} strokeWidth={3} />
+                        </button>
+                      </div>
+                      <span className={`w-20 text-right font-display text-sm font-black tabular-nums ${
+                        isRedeemed ? "text-[#E11D48]" : th.tx
+                      }`}>
+                        {isRedeemed
+                          ? `−${itemGross.toLocaleString("id-ID")}`
+                          : (itemGross - itemDisc).toLocaleString("id-ID")}
+                      </span>
+                      <button onClick={() => removeItem(ci.id)} aria-label="Hapus item"
+                        className="w-7 h-7 shrink-0 rounded-lg flex items-center justify-center bg-[#FCE4EC] text-[#BE123C] active:scale-90 transition-transform dark:bg-[#E11D48]/15 dark:text-[#FB7185]">
+                        <Trash2 size={13} strokeWidth={2.4} />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+        );
+      })() : cartItems.map(ci => {
         const itemGross = ci.unitPrice * ci.quantity;
         const itemDisc = calcItemDiscount(ci);
         const isRedeemed = !!ci.redeemWithPoints;
