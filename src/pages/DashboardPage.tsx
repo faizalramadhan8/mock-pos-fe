@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
-import { useAuthStore, useLangStore, useOrderStore, useProductStore, useBatchStore, usePurchaseInvoiceStore } from "@/stores";
+import { useAuthStore, useLangStore, useOrderStore, useProductStore, useBatchStore, usePurchaseInvoiceStore, useNavIntentStore } from "@/stores";
+import type { PageId } from "@/types";
 import { ProductDetailModal } from "@/components/ProductDetailModal";
 import { useThemeClasses } from "@/hooks/useThemeClasses";
 import { usePageFetch } from "@/hooks/usePageFetch";
@@ -43,7 +44,7 @@ function getPreviousWindow(mode: Range, customFrom: string, customTo: string): {
   return { from: new Date(cur.from.getTime() - lenMs), to: cur.from };
 }
 
-export function DashboardPage() {
+export function DashboardPage({ onNavigate }: { onNavigate?: (page: PageId) => void }) {
   usePageFetch([
     { key: "orders",   fetch: () => useOrderStore.getState().fetchOrders() },
     { key: "products", fetch: () => useProductStore.getState().fetchProducts() },
@@ -234,6 +235,9 @@ export function DashboardPage() {
       {/* Compact greeting */}
       <p className={`text-base ${th.txm}`}>{greetingLine}</p>
 
+      {/* Tiap baris peringatan jadi tombol yang membawa ke daftarnya. Niat
+          "mau lihat yang mana" dititipkan di useNavIntentStore, dibaca sekali
+          oleh halaman tujuan lalu dikosongkan. */}
       {/* ─── PERLU PERHATIAN ─── conditional hero alert card */}
       {(isOwner || isStaff) && hasAlerts && (
         <div className={`relative rounded-[22px] border-2 border-[#FFB5C0] p-5 overflow-hidden ${th.card}`}>
@@ -248,7 +252,8 @@ export function DashboardPage() {
           </div>
           <div className="relative flex flex-col gap-2">
             {pendingOrders.length > 0 && (
-              <div className="flex items-center justify-between gap-2">
+              <button type="button" onClick={() => onNavigate?.("orders")}
+                className="w-full text-left flex items-center justify-between gap-2 rounded-xl px-1 py-0.5 hover:bg-[#FFE4E9]/60 dark:hover:bg-[#E11D48]/10 transition-colors">
                 <div className="flex items-center gap-2 min-w-0">
                   <Clock size={16} className={th.acc} />
                   <p className={`text-sm ${th.tx} truncate`}>
@@ -256,10 +261,12 @@ export function DashboardPage() {
                   </p>
                 </div>
                 <ChevronRight size={16} className={th.txm} />
-              </div>
+              </button>
             )}
             {outOfStock.length > 0 && (
-              <div className="flex items-start gap-2">
+              <button type="button"
+                onClick={() => { useNavIntentStore.getState().set({ inventoryFilter: "out", inventoryTab: "overview" }); onNavigate?.("inventory"); }}
+                className="w-full text-left flex items-start gap-2 rounded-xl px-1 py-0.5 hover:bg-[#FFE4E9]/60 dark:hover:bg-[#E11D48]/10 transition-colors">
                 <Package size={16} className="text-[#BE123C] mt-0.5 shrink-0" />
                 <p className={`text-sm ${th.tx}`}>
                   <b className="text-[#BE123C]">{outOfStock.length} produk stok habis</b>
@@ -268,10 +275,12 @@ export function DashboardPage() {
                     {outOfStock.length > 3 && ` +${outOfStock.length - 3} lagi`}
                   </span>
                 </p>
-              </div>
+              </button>
             )}
             {lowStock.length > 0 && (
-              <div className="flex items-start gap-2">
+              <button type="button"
+                onClick={() => { useNavIntentStore.getState().set({ inventoryFilter: "low", inventoryTab: "overview" }); onNavigate?.("inventory"); }}
+                className="w-full text-left flex items-start gap-2 rounded-xl px-1 py-0.5 hover:bg-[#FFE4E9]/60 dark:hover:bg-[#E11D48]/10 transition-colors">
                 <Package size={16} className={`${th.acc} mt-0.5 shrink-0`} />
                 <p className={`text-sm ${th.tx}`}>
                   <b className={th.acc}>{lowStock.length} produk stok rendah</b>
@@ -280,10 +289,12 @@ export function DashboardPage() {
                     {lowStock.length > 3 && ` +${lowStock.length - 3} lagi`}
                   </span>
                 </p>
-              </div>
+              </button>
             )}
             {isOwner && overdueInvoices.length > 0 && (
-              <div className="flex items-start gap-2">
+              <button type="button"
+                onClick={() => { useNavIntentStore.getState().set({ inventoryTab: "invoices" }); onNavigate?.("inventory"); }}
+                className="w-full text-left flex items-start gap-2 rounded-xl px-1 py-0.5 hover:bg-[#FFE4E9]/60 dark:hover:bg-[#E11D48]/10 transition-colors">
                 <Receipt size={16} className="text-[#BE123C] mt-0.5 shrink-0" />
                 <p className={`text-sm ${th.tx}`}>
                   <b className="text-[#BE123C]">{overdueInvoices.length} faktur lewat tempo</b>
@@ -293,10 +304,12 @@ export function DashboardPage() {
                     {" · total "}{$(overdueInvoices.reduce((s, i) => s + i.totalAmount, 0))}
                   </span>
                 </p>
-              </div>
+              </button>
             )}
             {isOwner && upcomingInvoices.length > 0 && (
-              <div className="flex items-start gap-2">
+              <button type="button"
+                onClick={() => { useNavIntentStore.getState().set({ inventoryTab: "invoices" }); onNavigate?.("inventory"); }}
+                className="w-full text-left flex items-start gap-2 rounded-xl px-1 py-0.5 hover:bg-[#FFE4E9]/60 dark:hover:bg-[#E11D48]/10 transition-colors">
                 <Receipt size={16} className={`${th.acc} mt-0.5 shrink-0`} />
                 <p className={`text-sm ${th.tx}`}>
                   <b className={th.acc}>{upcomingInvoices.length} faktur jatuh tempo 7 hari</b>
@@ -306,16 +319,18 @@ export function DashboardPage() {
                     {" · total "}{$(upcomingInvoices.reduce((s, i) => s + i.totalAmount, 0))}
                   </span>
                 </p>
-              </div>
+              </button>
             )}
             {isOwner && expiringBatches.length > 0 && (
-              <div className="flex items-start gap-2">
+              <button type="button"
+                onClick={() => { useNavIntentStore.getState().set({ inventoryTab: "expiry" }); onNavigate?.("inventory"); }}
+                className="w-full text-left flex items-start gap-2 rounded-xl px-1 py-0.5 hover:bg-[#FFE4E9]/60 dark:hover:bg-[#E11D48]/10 transition-colors">
                 <AlertCircle size={16} className="text-[#BE123C] mt-0.5 shrink-0" />
                 <p className={`text-sm ${th.tx}`}>
                   <b className="text-[#BE123C]">{expiringBatches.length} batch</b>
                   <span className={`ml-1 ${th.txm}`}>kadaluarsa ≤ 30 hari</span>
                 </p>
-              </div>
+              </button>
             )}
           </div>
         </div>

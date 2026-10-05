@@ -1149,7 +1149,19 @@ export function POSPage() {
       })}
 
       {cartItems.length > 0 && <>
-        <div className={`${compact ? "p-2.5" : "p-4"} rounded-[18px] ${th.elev}`}>
+        {/* Blok ringkasan total — satu-satunya bagian yang memakai biru.
+            Bu Santi 1 Okt 2026 minta warna merah muda di sini diganti biru,
+            dan cuma di sini; sisa aplikasi tetap palet "Confectionery Warmth".
+            Disengaja: angka yang harus dibaca kasir sebelum menerima uang
+            jadi menonjol karena warnanya berbeda dari segala hal lain di
+            layar. Biru dipakai PERSIS di blok ini — jangan sebar ke tombol
+            atau kartu lain tanpa keputusan baru, kalau tidak jadi dua palet
+            yang berebut perhatian. */}
+        <div className={`${compact ? "p-2.5" : "p-4"} rounded-[18px] border ${
+          th.dark
+            ? "bg-[#17263F] border-[#1D4ED8]/40"
+            : "bg-[#DBEAFE] border-[#93C5FD]"
+        }`}>
           {/* Saat ringkas, baris Subtotal disembunyikan kalau angkanya sama
               persis dengan Total (tidak ada diskon/hemat/PPN) — mengulang
               angka yang sama memakan satu baris tanpa memberi informasi. */}
@@ -1175,10 +1187,15 @@ export function POSPage() {
             </div>
           )}
           <div className={`flex justify-between items-center text-base ${
-            compact && cartSubtotal === cartTotal ? "" : `pt-2 mt-2 border-t ${th.bdr}`
+            compact && cartSubtotal === cartTotal
+              ? ""
+              : `pt-2 mt-2 border-t ${th.dark ? "border-[#1D4ED8]/40" : "border-[#93C5FD]"}`
           }`}>
-            <span className={`font-extrabold ${th.tx}`}>{t.total}</span>
-            <span className={`font-black text-xl ${th.acc}`}>{$(cartTotal)}</span>
+            <span className={`font-extrabold ${th.dark ? "text-[#DBEAFE]" : "text-[#1E3A8A]"}`}>{t.total}</span>
+            {/* Angka Total ikut biru, bukan cherry: di atas dasar biru, warna
+                aksen merah muda justru berebut perhatian dengan dasarnya.
+                #1D4ED8 pada #DBEAFE kontrasnya ~6.9:1, lewat ambang AA. */}
+            <span className={`font-black text-xl ${th.dark ? "text-[#93C5FD]" : "text-[#1D4ED8]"}`}>{$(cartTotal)}</span>
           </div>
           {activeMember && pointsEarnedPreview > 0 && (
             <div className="flex justify-between text-xs mt-1.5 px-2 py-1.5 rounded-lg bg-[#FFE4E9] dark:bg-[#E11D48]/15">

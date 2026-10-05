@@ -7,6 +7,22 @@
 @import url("https://fonts.googleapis.com/css2?family=Mulish:ital,wght@0,300..900;1,300..900&display=swap");
 @import "tailwindcss";
 
+/* Mode gelap mengikuti KELAS `.dark` di <html>, bukan setelan sistem operasi.
+   Tailwind v4 secara bawaan memetakan `dark:` ke @media (prefers-color-scheme:
+   dark) — dan itu sumber bug yang dilaporkan Bu Santi 1 Okt 2026 ("warna hitam
+   ini bisa diganti dengan warna lain?").
+
+   Penyebabnya ada DUA sumber mode gelap yang tidak nyambung:
+     - token `th.*` (useThemeClasses) mengikuti tombol di dalam aplikasi
+     - kelas `dark:` yang ditulis langsung di komponen mengikuti OS
+
+   Laptop Bu Santi memakai tema gelap Windows, jadi setiap `dark:` di seluruh
+   aplikasi menyala sementara sisa tampilannya tetap terang. Tombol kurang (−)
+   di kasir jadi maroon gelap `dark:bg-[#3D2230]` padahal mestinya putih.
+   Setelah baris ini, `dark:` hanya menyala kalau pengguna menekan tombol mode
+   gelap di aplikasi — satu sumber kebenaran. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* Base size: 20px for legibility on 50+ eyes. Every rem-based Tailwind size
    (text-sm, text-base, text-2xl…) scales off this. */
 html {

@@ -125,7 +125,7 @@ export default function App() {
 
   const renderPage = () => {
     switch (currentPage) {
-      case "dashboard": return <DashboardPage />;
+      case "dashboard": return <DashboardPage onNavigate={setPage} />;
       case "pos": return <POSPage />;
       case "inventory": return <InventoryPage />;
       case "orders": return <OrdersPage />;

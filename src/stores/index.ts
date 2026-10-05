@@ -1031,6 +1031,40 @@ interface ThemeState {
   dark: boolean;
   toggle: () => void;
 }
+// ─── Niat navigasi (tidak disimpan) ─────────────────────────────────────────
+// Bu Santi 1 Okt 2026: "Yang bertanda tidak bisa di klik ya. Tetap harus di
+// lihat di tabelnya." Kartu "Perlu Perhatian" di Beranda cuma memberi tahu ada
+// 243 produk habis, lalu dia harus pindah halaman dan mencari filternya
+// sendiri. Sekarang barisnya bisa diklik dan langsung mendarat di daftar yang
+// tepat.
+//
+// Halaman tujuan dipindahkan lewat prop `onNavigate` (routing ada di App.tsx),
+// sementara "mau lihat yang mana" dititipkan di sini. Dipisah supaya tidak
+// perlu membongkar routing: store ini hanya menyimpan satu niat sekali pakai,
+// dibaca oleh halaman tujuan saat dibuka lalu langsung dikosongkan — kalau
+// tidak, filternya akan menempel terus setiap kali halaman itu dibuka lagi.
+interface NavIntentState {
+  inventoryFilter: "low" | "out" | null;
+  inventoryTab: string | null;
+  set: (intent: { inventoryFilter?: "low" | "out"; inventoryTab?: string }) => void;
+  consume: () => { inventoryFilter: "low" | "out" | null; inventoryTab: string | null };
+}
+export const useNavIntentStore = create<NavIntentState>()((set, get) => ({
+  inventoryFilter: null,
+  inventoryTab: null,
+  set: (intent) => set({
+    inventoryFilter: intent.inventoryFilter ?? null,
+    inventoryTab: intent.inventoryTab ?? null,
+  }),
+  consume: () => {
+    const { inventoryFilter, inventoryTab } = get();
+    if (inventoryFilter !== null || inventoryTab !== null) {
+      set({ inventoryFilter: null, inventoryTab: null });
+    }
+    return { inventoryFilter, inventoryTab };
+  },
+}));
+
 export const useThemeStore = create<ThemeState>()(
   persist(
     (set) => ({
@@ -1041,7 +1075,16 @@ export const useThemeStore = create<ThemeState>()(
         return { dark: next };
       }),
     }),
-    { name: "bakeshop-theme" }
+    {
+      name: "bakeshop-theme",
+      // Kelas `.dark` hanya dipasang di dalam toggle(), jadi setelah halaman
+      // dimuat ulang pilihan yang tersimpan tidak pernah dipasang kembali:
+      // token `th.*` ikut gelap (dari state) tapi kelas `dark:` tidak menyala.
+      // Dipasang ulang di sini begitu state selesai dibaca dari localStorage.
+      onRehydrateStorage: () => (state) => {
+        document.documentElement.classList.toggle("dark", !!state?.dark);
+      },
+    }
   )
 );
 

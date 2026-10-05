@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
-import { useCategoryStore, useProductStore, useInventoryStore, useBatchStore, useAuthStore, useLangStore, useSupplierStore, useSettingsStore } from "@/stores";
+import { useCategoryStore, useProductStore, useInventoryStore, useBatchStore, useAuthStore, useLangStore, useSupplierStore, useSettingsStore, useNavIntentStore } from "@/stores";
 import { INVENTORY_WRITE_ROLES, UNIT_OPTIONS, PAYMENT_TERMS_OPTIONS, PAYMENT_TERMS_LABELS } from "@/constants";
 import { Modal } from "@/components/Modal";
 import { ProductDetailModal } from "@/components/ProductDetailModal";
@@ -114,6 +114,16 @@ export function InventoryPage() {
   const [newCat, setNewCat] = useState({ name: "", nameId: "", color: "#F472B6" });
   const catColors = ["#F472B6", "#BE123C", "#E11D48", "#7D5A44", "#E11D48", "#E11D48", "#E11D48", "#E11D48", "#9B59B6", "#E74C3C"];
   const [overviewFilter, setOverviewFilter] = useState<"all" | "low" | "out" | "inactive" | "member">("all");
+
+  // Dibuka dari kartu "Perlu Perhatian" di Beranda — langsung mendarat di tab
+  // dan filter yang dimaksud, bukan di tampilan bawaan lalu user mencari
+  // sendiri. Niatnya sekali pakai: dibaca lalu dikosongkan, supaya kunjungan
+  // berikutnya ke halaman ini tidak ikut terfilter.
+  useEffect(() => {
+    const { inventoryFilter, inventoryTab } = useNavIntentStore.getState().consume();
+    if (inventoryTab) setActiveTab(inventoryTab as InventoryTab);
+    if (inventoryFilter) setOverviewFilter(inventoryFilter);
+  }, []);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [productSearch, setProductSearch] = useState("");
   const debouncedProductSearch = useDebounce(productSearch, 150);
