@@ -21,6 +21,29 @@ import {
   Search, ScanLine, ShoppingBag, Minus, Plus, Trash2, ImagePlus, X, UserPlus, Tag, Percent, Wallet, FileText, Printer, Barcode as BarcodeIcon, Clock, Send, AlertCircle, Eye, EyeOff, Gift, Sparkles, TrendingDown, Bookmark, List, Rows3, Copy,
 } from "lucide-react";
 
+
+// ── Palet keranjang: biru ─────────────────────────────────────────────────────
+// Bu Santi 6 Okt 2026: "Pink nya di ganti biru aja ya. Pink sama biru ngga
+// cocok. Seperti warna dibawahnya aja." Sebelumnya cuma blok Total yang biru
+// (permintaan 1 Okt), sementara baris produknya masih merah muda — dua warna
+// bertabrakan dalam satu panel. Sekarang SELURUH zona keranjang biru: baris
+// produk, tombol tambah/kurang, dan blok Total.
+//
+// Yang TETAP merah: hal yang warnanya membawa arti — tombol hapus, badge
+// diskon, baris tebus poin. Itu bukan dekorasi; menghilangkan merahnya
+// menghilangkan peringatannya. Sisa aplikasi di luar panel keranjang juga
+// tetap palet "Confectionery Warmth" (lihat CLAUDE.md bagian Theming).
+//
+// Kontras sudah dicek: #1D4ED8 di atas #DBEAFE ≈ 6,9:1 dan putih di atas
+// #1D4ED8 ≈ 7,5:1 — dua-duanya lewat ambang AA.
+const CART_BLUE = {
+  row:   "bg-[#DBEAFE] border-[#BFDBFE] dark:bg-[#17263F] dark:border-[#1D4ED8]/40",
+  minus: "bg-white border-[#93C5FD] text-[#1D4ED8] dark:bg-[#0F1B2E] dark:border-[#1D4ED8]/40 dark:text-[#93C5FD]",
+  plus:  "text-white bg-gradient-to-br from-[#3B82F6] to-[#1D4ED8]",
+  soft:  "bg-[#BFDBFE] text-[#1E3A8A] dark:bg-[#1D4ED8]/20 dark:text-[#93C5FD]",
+  ink:   "text-[#1D4ED8] dark:text-[#93C5FD]",
+};
+
 export function POSPage() {
   // Auto-refresh data setiap kali kasir buka POS atau balik dari aplikasi
   // lain (WA, kalkulator). TTL 10s default — cegah spam network. Plus
@@ -927,7 +950,7 @@ export function POSPage() {
                   const isRedeemed = !!ci.redeemWithPoints;
                   return (
                     <div key={ci.id}
-                      className={`flex items-center gap-2 px-2.5 py-1 rounded-lg border ${th.card2} ${th.bdr} ${
+                      className={`flex items-center gap-2 px-2.5 py-1 rounded-lg border ${CART_BLUE.row} ${
                         isRedeemed ? "ring-1 ring-[#E11D48]/40" : ""
                       }`}>
                       <div className="flex-1 min-w-0">
@@ -944,14 +967,14 @@ export function POSPage() {
                           supaya tinggi baris turun, masih nyaman ditekan. */}
                       <div className="w-[86px] flex items-center justify-center gap-1">
                         <button onClick={() => handleQtyUpdate(ci.id, -1)} aria-label="Kurangi"
-                          className="w-8 h-8 shrink-0 rounded-lg flex items-center justify-center bg-white border border-[#FFB5C0] text-[#E11D48] active:scale-90 transition-transform dark:bg-[#3D2230] dark:border-[#E11D48]/40 dark:text-[#FB7185]">
+                          className={`w-8 h-8 shrink-0 rounded-lg flex items-center justify-center border active:scale-90 transition-transform ${CART_BLUE.minus}`}>
                           <Minus size={13} strokeWidth={3} />
                         </button>
                         <span className={`font-display w-5 text-center text-sm font-black tabular-nums ${th.tx}`}>
                           {ci.quantity}
                         </span>
                         <button onClick={() => handleQtyUpdate(ci.id, 1)} aria-label="Tambah"
-                          className="w-8 h-8 shrink-0 rounded-lg flex items-center justify-center text-white bg-gradient-to-br from-[#FB7185] to-[#E11D48] active:scale-90 transition-transform">
+                          className={`w-8 h-8 shrink-0 rounded-lg flex items-center justify-center active:scale-90 transition-transform ${CART_BLUE.plus}`}>
                           <Plus size={13} strokeWidth={3} />
                         </button>
                       </div>
@@ -963,7 +986,7 @@ export function POSPage() {
                           : (itemGross - itemDisc).toLocaleString("id-ID")}
                       </span>
                       <button onClick={() => removeItem(ci.id)} aria-label="Hapus item"
-                        className="w-7 h-7 shrink-0 rounded-lg flex items-center justify-center bg-[#FCE4EC] text-[#BE123C] active:scale-90 transition-transform dark:bg-[#E11D48]/15 dark:text-[#FB7185]">
+                        className="w-7 h-7 shrink-0 rounded-lg flex items-center justify-center bg-white/70 text-[#BE123C] active:scale-90 transition-transform dark:bg-[#E11D48]/15 dark:text-[#FB7185]">
                         <Trash2 size={13} strokeWidth={2.4} />
                       </button>
                     </div>
@@ -985,7 +1008,7 @@ export function POSPage() {
         const otherRedeemTotal = pointsToRedeem - (isRedeemed ? itemGross : 0);
         const canRedeem = !!activeMember && isRedeemableProduct && memberPoints - otherRedeemTotal >= itemGross;
         return (
-          <div key={ci.id} className={`p-3.5 rounded-[18px] border ${th.card2} ${th.bdr} ${isRedeemed ? "ring-2 ring-[#E11D48]/40" : ""}`}>
+          <div key={ci.id} className={`p-3.5 rounded-[18px] border ${CART_BLUE.row} ${isRedeemed ? "ring-2 ring-[#E11D48]/40" : ""}`}>
             <div className="flex-1 min-w-0">
               {isRedeemed && (
                 <div className="flex items-center gap-1.5 mb-1.5">
@@ -1015,7 +1038,7 @@ export function POSPage() {
                     <>
                       <span className={`text-xs line-through ${th.txf}`}>{$(ci.regularPrice)}</span>
                       <span className={`text-xs font-bold ${th.acc}`}>{$(ci.unitPrice)}</span>
-                      <span className="text-xs font-bold px-1.5 py-0.5 rounded bg-[#FFE4E9] text-[#9F1239]">
+                      <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${CART_BLUE.soft}`}>
                         {tierMatched ? "Grosir" : "Member"}
                       </span>
                     </>
@@ -1046,9 +1069,9 @@ export function POSPage() {
                   <div
                     role="status"
                     aria-live="polite"
-                    className="mt-1.5 px-2 py-1 rounded-lg bg-[#FFE4E9] dark:bg-[#E11D48]/15 inline-flex items-center gap-1.5">
-                    <TrendingDown size={11} strokeWidth={2.6} className="text-[#9F1239] dark:text-[#FB7185] shrink-0" />
-                    <span className="text-xs font-semibold text-[#9F1239] dark:text-[#FB7185]">
+                    className={`mt-1.5 px-2 py-1 rounded-lg inline-flex items-center gap-1.5 ${CART_BLUE.soft}`}>
+                    <TrendingDown size={11} strokeWidth={2.6} className="text-[#1E3A8A] dark:text-[#93C5FD] shrink-0" />
+                    <span className="text-xs font-semibold text-[#1E3A8A] dark:text-[#93C5FD]">
                       Tambah {need} lagi → {$(tierTotal)} total (beli {nextTier.minQty})
                     </span>
                   </div>
@@ -1060,7 +1083,7 @@ export function POSPage() {
                   <button
                     onClick={() => handleQtyUpdate(ci.id, -1)}
                     aria-label="Kurangi"
-                    className="w-11 h-11 rounded-2xl flex items-center justify-center bg-white border-2 border-[#FFB5C0] text-[#E11D48] active:scale-90 active:bg-[#FFE4E9] transition-transform dark:bg-[#3D2230] dark:border-[#E11D48]/40 dark:text-[#FB7185]"
+                    className={`w-11 h-11 rounded-2xl flex items-center justify-center border-2 active:scale-90 transition-transform ${CART_BLUE.minus}`}
                   >
                     <Minus size={22} strokeWidth={3} />
                   </button>
@@ -1070,7 +1093,7 @@ export function POSPage() {
                   <button
                     onClick={() => handleQtyUpdate(ci.id, 1)}
                     aria-label="Tambah"
-                    className="w-11 h-11 rounded-2xl flex items-center justify-center text-white bg-gradient-to-br from-[#FB7185] to-[#E11D48] shadow-[0_4px_12px_-4px_rgba(225,29,72,0.45)] active:scale-90 transition-transform"
+                    className={`w-11 h-11 rounded-2xl flex items-center justify-center shadow-[0_4px_12px_-4px_rgba(29,78,216,0.45)] active:scale-90 transition-transform ${CART_BLUE.plus}`}
                   >
                     <Plus size={22} strokeWidth={3} />
                   </button>
@@ -1079,7 +1102,7 @@ export function POSPage() {
                   {isRedeemed ? (
                     <div className="text-right leading-tight">
                       <div className={`text-xs line-through ${th.txf}`}>{$(itemGross)}</div>
-                      <div className="font-display text-lg font-black text-[#E11D48] flex items-center gap-1" style={{ fontVariationSettings: '"opsz" 72, "wght" 800' }}>
+                      <div className={`font-display text-lg font-black flex items-center gap-1 ${CART_BLUE.ink}`} style={{ fontVariationSettings: '"opsz" 72, "wght" 800' }}>
                         −{itemGross.toLocaleString("id-ID")} poin
                       </div>
                     </div>
