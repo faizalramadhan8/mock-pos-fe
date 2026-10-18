@@ -1289,7 +1289,14 @@ interface SettingsState {
   labelWidth: number;
   labelHeight: number;
   fetchSettings: () => Promise<void>;
-  update: (data: Partial<Pick<SettingsState, "storeName" | "storeAddress" | "storePhone" | "ppnRate" | "bankAccounts" | "labelWidth" | "labelHeight">>) => void;
+  /**
+   * Hanya untuk kolom skalar. `bankAccounts` SENGAJA tidak di sini — rekening
+   * punya endpoint sendiri (`addBankAccount`/`deleteBankAccount`). Dulu
+   * SettingsPage memanggil `update({ bankAccounts })`, state lokal berubah
+   * sehingga rekeningnya tampak tersimpan, padahal PATCH-nya tidak pernah
+   * membawa kolom itu — hilang begitu halaman dimuat ulang.
+   */
+  update: (data: Partial<Pick<SettingsState, "storeName" | "storeAddress" | "storePhone" | "ppnRate" | "labelWidth" | "labelHeight">>) => void;
   addBankAccount: (account: BankAccount) => Promise<void>;
   deleteBankAccount: (id: string) => Promise<void>;
 }
@@ -1328,24 +1335,18 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     }).catch(() => {});
   },
   addBankAccount: async (account) => {
-    try {
-      await settingsApi.addBankAccount({
-        bank_name: account.bankName, account_number: account.accountNumber, account_holder: account.accountHolder,
-      });
-      await get().fetchSettings();
-    } catch (e: any) {
-      set(s => ({ bankAccounts: [...s.bankAccounts, account] }));
-      toast.error(e.message);
-    }
+    // Gagal = JANGAN tampilkan rekeningnya. Versi lama tetap menambahkannya ke
+    // state walau request gagal, jadi layar bilang tersimpan sementara server
+    // tidak punya apa-apa. Lempar ulang supaya pemanggil bisa menahan modal
+    // tetap terbuka dengan pesan salahnya.
+    await settingsApi.addBankAccount({
+      bank_name: account.bankName, account_number: account.accountNumber, account_holder: account.accountHolder,
+    });
+    await get().fetchSettings();
   },
   deleteBankAccount: async (id) => {
-    try {
-      await settingsApi.deleteBankAccount(id);
-      set(s => ({ bankAccounts: s.bankAccounts.filter(ba => ba.id !== id) }));
-    } catch (e: any) {
-      set(s => ({ bankAccounts: s.bankAccounts.filter(ba => ba.id !== id) }));
-      toast.error(e.message);
-    }
+    await settingsApi.deleteBankAccount(id);
+    await get().fetchSettings();
   },
 }));
 

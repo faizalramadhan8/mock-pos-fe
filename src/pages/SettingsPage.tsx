@@ -57,6 +57,8 @@ export function SettingsPage() {
   const [showAddBank, setShowAddBank] = useState(false);
   const [bankForm, setBankForm] = useState({ bankName: "", accountNumber: "", accountHolder: "" });
   const [bankFormErrors, setBankFormErrors] = useState<Record<string, boolean>>({});
+  const [savingBank, setSavingBank] = useState(false);
+  const [bankError, setBankError] = useState<string | null>(null);
   const [bankQuery, setBankQuery] = useState("");
   const [showBankDropdown, setShowBankDropdown] = useState(false);
   const [confirmRemoveBankId, setConfirmRemoveBankId] = useState<string | null>(null);
@@ -78,24 +80,45 @@ export function SettingsPage() {
     return () => document.removeEventListener("mousedown", handle);
   }, [showBankDropdown]);
 
-  const handleAddBank = () => {
+  // Rekening punya endpoint sendiri. Versi sebelumnya memanggil
+  // settings.update({ bankAccounts }) — state lokal berubah sehingga
+  // rekeningnya terlihat tersimpan, padahal kolom itu tidak pernah ikut
+  // terkirim ke server. Hilang begitu halaman dimuat ulang, tanpa pesan apa pun.
+  const handleAddBank = async () => {
     const errs: Record<string, boolean> = {};
     if (!bankForm.bankName) errs.bankName = true;
     if (!bankForm.accountNumber.trim()) errs.accountNumber = true;
     if (!bankForm.accountHolder.trim()) errs.accountHolder = true;
     if (Object.keys(errs).length) { setBankFormErrors(errs); return; }
     setBankFormErrors({});
-    const newAcc: BankAccount = { id: genId(), ...bankForm };
-    const updated = [...settings.bankAccounts, newAcc];
-    settings.update({ bankAccounts: updated });
-    setBankForm({ bankName: "", accountNumber: "", accountHolder: "" });
-    setBankQuery("");
-    setShowAddBank(false);
+    setBankError(null);
+    setSavingBank(true);
+    try {
+      await settings.addBankAccount({ id: genId(), ...bankForm } as BankAccount);
+      // Modal baru ditutup SETELAH server mengonfirmasi. Menutupnya lebih awal
+      // adalah yang bikin gagal simpan terlihat seperti berhasil.
+      setBankForm({ bankName: "", accountNumber: "", accountHolder: "" });
+      setBankQuery("");
+      setShowAddBank(false);
+      toast.success(lang === "id" ? "Rekening tersimpan" : "Bank account saved");
+    } catch (e) {
+      setBankError((e instanceof Error && e.message) || (lang === "id"
+        ? "Gagal menyimpan rekening. Coba lagi."
+        : "Failed to save bank account. Try again."));
+    } finally {
+      setSavingBank(false);
+    }
   };
 
-  const handleRemoveBank = (id: string) => {
-    const updated = settings.bankAccounts.filter(a => a.id !== id);
-    settings.update({ bankAccounts: updated });
+  const handleRemoveBank = async (id: string) => {
+    try {
+      await settings.deleteBankAccount(id);
+      toast.success(lang === "id" ? "Rekening dihapus" : "Bank account removed");
+    } catch (e) {
+      toast.error((e instanceof Error && e.message) || (lang === "id"
+        ? "Gagal menghapus rekening."
+        : "Failed to remove bank account."));
+    }
   };
 
   // ─── Registration Modal ───
@@ -765,7 +788,7 @@ export function SettingsPage() {
       {/* MODAL: Add Bank Account                        */}
       {/* ═══════════════════════════════════════════════ */}
       {showAddBank && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center animate-fade-in" onClick={() => { setShowAddBank(false); setBankForm({ bankName: "", accountNumber: "", accountHolder: "" }); setBankQuery(""); setShowBankDropdown(false); }}>
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center animate-fade-in" onClick={() => { if (savingBank) return; setShowAddBank(false); setBankError(null); setBankForm({ bankName: "", accountNumber: "", accountHolder: "" }); setBankQuery(""); setShowBankDropdown(false); }}>
           <div className="absolute inset-0 bg-black/45 backdrop-blur-sm" />
           <div className={`relative w-full sm:max-w-md rounded-t-[28px] sm:rounded-[28px] border overflow-hidden ${th.card} ${th.bdr} animate-slide-up`} onClick={e => e.stopPropagation()}>
             <div className={`flex items-center justify-between px-6 py-4 border-b ${th.bdr}`}>
@@ -823,12 +846,23 @@ export function SettingsPage() {
                   className={`w-full px-4 py-3 text-sm rounded-2xl border ${th.inp} ${bankFormErrors.accountHolder ? "!border-[#BE123C]" : ""}`} />
                 {bankFormErrors.accountHolder && <p className="text-[#BE123C] text-xs mt-1 font-medium">{t.required}</p>}
               </div>
+              {/* Kegagalan ditampilkan di tempat kejadian, bukan lewat toast yang
+                  keburu hilang — modalnya tetap terbuka supaya isian tidak
+                  perlu diketik ulang. */}
+              {bankError && (
+                <p role="alert" className="text-[#BE123C] text-xs font-semibold leading-relaxed">
+                  {bankError}
+                </p>
+              )}
               <div className="flex gap-2 mt-1">
-                <button onClick={() => { setShowAddBank(false); setBankForm({ bankName: "", accountNumber: "", accountHolder: "" }); setBankQuery(""); setShowBankDropdown(false); }}
-                  className={`flex-1 py-3 rounded-2xl text-sm font-bold border ${th.bdr} ${th.txm}`}>{t.cancel}</button>
+                <button onClick={() => { setShowAddBank(false); setBankError(null); setBankForm({ bankName: "", accountNumber: "", accountHolder: "" }); setBankQuery(""); setShowBankDropdown(false); }}
+                  disabled={savingBank}
+                  className={`flex-1 py-3 rounded-2xl text-sm font-bold border disabled:opacity-40 ${th.bdr} ${th.txm}`}>{t.cancel}</button>
                 <button onClick={handleAddBank}
-                  disabled={!bankForm.bankName || !bankForm.accountNumber.trim() || !bankForm.accountHolder.trim()}
-                  className="flex-1 py-3 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48] disabled:opacity-40">{t.save}</button>
+                  disabled={savingBank || !bankForm.bankName || !bankForm.accountNumber.trim() || !bankForm.accountHolder.trim()}
+                  className="flex-1 py-3 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48] disabled:opacity-40">
+                  {savingBank ? (lang === "id" ? "Menyimpan…" : "Saving…") : t.save}
+                </button>
               </div>
             </div>
           </div>
