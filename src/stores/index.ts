@@ -38,7 +38,7 @@ const mapProduct = (p: any): Product => ({
   supplierId: p.supplier_id || undefined,
   purchasePrice: p.purchase_price, sellingPrice: p.selling_price,
   memberPrice: typeof p.member_price === 'number' ? p.member_price : undefined,
-  qtyPerBox: p.qty_per_box || 1, stock: p.stock, unit: p.unit,
+  qtyPerBox: p.qty_per_box || 1, stock: p.stock, location: p.location ?? "store", unit: p.unit,
   image: p.image || '', minStock: p.min_stock || 0, isActive: p.is_active !== false,
   isRedeemable: !!p.is_redeemable,
   priceTiers: Array.isArray(p.price_tiers) ? p.price_tiers.map(mapPriceTier) : [],
@@ -83,7 +83,10 @@ const mapOrder = (o: any): Order => ({
   createdAt: o.created_at, createdBy: o.created_by,
   paymentProof: o.payment_proof, orderDiscountType: o.order_discount_type,
   orderDiscountValue: o.order_discount_value, orderDiscount: o.order_discount,
-  orderSource: o.order_source === "ecom" ? "ecom" : "pos",
+  // Tiga nilai sejak 21 Okt 2026. Versi lama memetakan apa pun selain
+  // "ecom" menjadi "pos" — itu akan menelan "home" dan membuat SELURUH
+  // pemisahan toko rumah tidak berfungsi, tanpa gejala apa pun di layar.
+  orderSource: o.order_source === "ecom" ? "ecom" : o.order_source === "home" ? "home" : "pos",
   shippingCost: Number(o.shipping_cost) || 0,
   paymentsEditedAt: o.payments_edited_at || undefined,
   paymentsEditedBy: o.payments_edited_by || undefined,
@@ -1320,7 +1323,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         labelWidth: s.label_width || 40,
         labelHeight: s.label_height || 30,
         bankAccounts: (s.bank_accounts || []).map((ba: any) => ({
-          id: ba.id, bankName: ba.bank_name, accountNumber: ba.account_number, accountHolder: ba.account_holder,
+          id: ba.id, location: ba.location ?? "store",
+          bankName: ba.bank_name, accountNumber: ba.account_number, accountHolder: ba.account_holder,
         })),
       });
     } catch { /* keep defaults */ }
@@ -1340,6 +1344,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     // tidak punya apa-apa. Lempar ulang supaya pemanggil bisa menahan modal
     // tetap terbuka dengan pesan salahnya.
     await settingsApi.addBankAccount({
+      location: account.location ?? "store",
       bank_name: account.bankName, account_number: account.accountNumber, account_holder: account.accountHolder,
     });
     await get().fetchSettings();

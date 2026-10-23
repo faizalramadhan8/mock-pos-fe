@@ -57,6 +57,14 @@ export interface Product {
   memberPrice?: number;
   qtyPerBox: number;
   stock: number;
+  /**
+   * Katalog pemilik produk: "store" (Bekasi) atau "home" (toko rumah).
+   * Tiap tempat punya katalognya sendiri dan tidak melihat katalog yang
+   * lain — backend sudah menyaringnya, jadi POS tidak akan pernah menerima
+   * produk "home". Field ini ada untuk kejelasan, bukan untuk disaring lagi
+   * di sisi depan.
+   */
+  location?: "store" | "home";
   unit: UnitOfMeasure;
   image: string;
   minStock: number;
@@ -176,11 +184,19 @@ export interface Order {
   orderDiscountValue?: number;
   orderDiscount?: number;
   /** Payment edit audit (Bu Santi 12 Jul 2026). NULL = never edited. */
-  /** Asal transaksi: "pos" (toko/offline) atau "ecom" (online/storefront).
-   *  Order lama sebelum kolom ini ada bernilai undefined — perlakukan
-   *  sebagai POS. Bu Santi 17 Sep 2026: laporan digabung tapi "di kasih
-   *  tanda aja ya. Antara e commerce dan offline". */
-  orderSource?: "pos" | "ecom";
+  /**
+   * SALURAN penjualan — bukan tempatnya.
+   *   "pos"  — kasir toko Bekasi
+   *   "ecom" — storefront Bekasi (disiapkan, menyusul habis Lebaran)
+   *   "home" — storefront toko rumah
+   *
+   * Order lama sebelum kolom ini ada bernilai undefined — perlakukan
+   * sebagai POS. Untuk memisahkan TEMPAT (yang dipakai Bu Santi saat
+   * closing) pakai `orderPlace()` / `filterByPlace()` di utils, jangan
+   * membandingkan nilai ini langsung — `ecom` bertempat di Bekasi, bukan
+   * di rumah.
+   */
+  orderSource?: "pos" | "ecom" | "home";
   /** Ongkos kirim yang ditagihkan ke customer (pesanan online saja; 0 untuk
    *  POS). CATATAN: `total` pesanan online SUDAH termasuk ongkir —
    *  `total = subtotal − voucher + ongkir`. Ongkir bukan pendapatan toko,
@@ -272,6 +288,13 @@ export interface StockMovement {
 
 export interface BankAccount {
   id: string;
+  /**
+   * Tempat pemilik rekening: 'store' (Bekasi) atau 'home' (toko rumah).
+   * Storefront rumah HANYA menampilkan rekening 'home' — kalau rekening
+   * Bekasi ikut tampil, sebagian customer transfer ke sana dan pembukuan
+   * yang sengaja dipisah tercampur lagi di langkah pertama.
+   */
+  location?: "store" | "home";
   bankName: string;
   accountNumber: string;
   accountHolder: string;

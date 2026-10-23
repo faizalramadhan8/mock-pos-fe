@@ -4,7 +4,7 @@ import type { PageId } from "@/types";
 import { ProductDetailModal } from "@/components/ProductDetailModal";
 import { useThemeClasses } from "@/hooks/useThemeClasses";
 import { usePageFetch } from "@/hooks/usePageFetch";
-import { formatCurrency as $, salesTotal } from "@/utils";
+import { formatCurrency as $, salesTotal, filterByPlace } from "@/utils";
 import { AlertCircle, Clock, Package, ChevronRight, TrendingUp, TrendingDown, Receipt } from "lucide-react";
 
 type Range = "today" | "yesterday" | "week" | "month" | "custom";
@@ -62,6 +62,10 @@ export function DashboardPage({ onNavigate }: { onNavigate?: (page: PageId) => v
   const batches = useBatchStore(s => s.batches);
 
   const [range, setRange] = useState<Range>("today");
+  // Tempat usaha. Bawaannya Toko Bekasi — angka inilah yang dicocokkan
+  // dengan laci kasir saat closing. Uang toko rumah masuk rekening sendiri,
+  // jadi menggabungkannya membuat angka Beranda tidak akan pernah cocok.
+  const [tempat, setTempat] = useState<"store" | "home" | "all">("store");
   const [customFrom, setCustomFrom] = useState<string>(() => new Date().toISOString().slice(0, 10));
   const [customTo, setCustomTo] = useState<string>(() => new Date().toISOString().slice(0, 10));
   const [cashierExpandedId, setCashierExpandedId] = useState<string | null>(null);
@@ -73,7 +77,13 @@ export function DashboardPage({ onNavigate }: { onNavigate?: (page: PageId) => v
   const isCashier = user.role === "cashier";
   const isStaff = user.role === "staff";
 
-  const completedOrders = useMemo(() => orders.filter(o => o.status === "completed"), [orders]);
+  // Disaring di hulu supaya SEMUA angka turunannya ikut — hero Pendapatan,
+  // per Kasir, dan kartu Laporan Keuangan. Menyaring satu per satu di bawah
+  // hampir pasti menyisakan satu yang terlewat.
+  const completedOrders = useMemo(
+    () => filterByPlace(orders.filter(o => o.status === "completed"), tempat === "all" ? null : tempat),
+    [orders, tempat],
+  );
   const pendingOrders = useMemo(() => orders.filter(o => o.status === "pending"), [orders]);
   const outOfStock = useMemo(() => products.filter(p => p.isActive && p.stock === 0), [products]);
   const lowStock = useMemo(() => products.filter(p => p.isActive && p.stock > 0 && p.stock <= p.minStock), [products]);
@@ -168,10 +178,19 @@ export function DashboardPage({ onNavigate }: { onNavigate?: (page: PageId) => v
       // customer seolah-olah mereka kasir (atau deretan baris "(User)" kalau
       // customer-nya tidak ada di daftar pengguna POS). Baru kelihatan setelah
       // pesanan online ikut masuk ke laporan, 29 Sep 2026.
-      const isEcom = (o.orderSource ?? "pos") === "ecom";
-      const key = isEcom ? "__ecom__" : o.createdBy;
+      //
+      // Sejak 21 Okt 2026 storefront menulis `home`, bukan `ecom`. Versi
+      // sebelumnya hanya memeriksa "ecom", jadi pesanan rumah lolos ke
+      // cabang kasir dan muncul sebagai nama customer. Tidak kelihatan di
+      // tampilan bawaan (Toko Bekasi menyaringnya habis), tapi langsung
+      // muncul begitu Bu Santi memilih Online Rumah atau Gabungan.
+      const src = o.orderSource ?? "pos";
+      const isEcom = src === "ecom" || src === "home";
+      const key = isEcom ? (src === "home" ? "__home__" : "__ecom__") : o.createdBy;
       const u = isEcom ? undefined : users.find(u => u.id === o.createdBy);
-      const uname = isEcom ? "Online (E-commerce)" : (u?.name || "(User)");
+      const uname = isEcom
+        ? (src === "home" ? "Online Rumah" : "Online (Bekasi)")
+        : (u?.name || "(User)");
       const prev = byUser.get(key) || { id: key, name: uname, count: 0, total: 0, cash: 0, qris: 0, transfer: 0 };
       prev.count += 1;
       prev.total += salesTotal(o);
@@ -349,6 +368,28 @@ export function DashboardPage({ onNavigate }: { onNavigate?: (page: PageId) => v
                 }`}>{rangeLabel[r]}</button>
             ))}
           </div>
+
+          {/* Tempat usaha. Sengaja SELALU tampil, bukan disembunyikan saat
+              toko rumah belum ada transaksinya — bawaannya menyaring, dan
+              penyaring yang tidak kelihatan membuat orang mengira angkanya
+              sudah mencakup semuanya. */}
+          <div className="flex flex-wrap gap-1.5" role="group"
+            aria-label="Pilih tempat usaha">
+            {([
+              ["store", "Toko Bekasi"],
+              ["home", "Online Rumah"],
+              ["all", "Gabungan"],
+            ] as const).map(([k, label]) => (
+              <button key={k} onClick={() => setTempat(k)}
+                aria-pressed={tempat === k}
+                className={`text-sm font-bold px-3 py-1.5 rounded-xl ${
+                  tempat === k
+                    ? "text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48]"
+                    : `border ${th.bdr} ${th.txm}`
+                }`}>{label}</button>
+            ))}
+          </div>
+
           {range === "custom" && (
             <div className="grid grid-cols-2 gap-2 -mt-2">
               <div>

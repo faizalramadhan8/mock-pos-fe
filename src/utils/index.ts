@@ -443,3 +443,35 @@ export function printBarcodeLabels(products: Product[], lang: "en" | "id", size?
 <style>${labelCss(s)}</style></head><body>${labels}</body></html>`;
   printViaIframe(html);
 }
+
+/**
+ * Tempat usaha asal sebuah pesanan — BUKAN salurannya.
+ *
+ * `orderSource` menyimpan saluran: 'pos' (kasir Bekasi), 'ecom' (storefront
+ * Bekasi, menyusul habis Lebaran), 'home' (storefront rumah). Yang Bu Santi
+ * pisahkan saat closing adalah TEMPAT-nya, karena uang toko rumah masuk
+ * rekening sendiri dan tidak pernah lewat laci kasir Bekasi.
+ *
+ * Pesanan lama tanpa `orderSource` dianggap Bekasi — kolomnya baru ada
+ * setelah toko berjalan bertahun.
+ */
+export type Tempat = "store" | "home";
+
+export function orderPlace(o: { orderSource?: string }): Tempat {
+  return (o.orderSource ?? "pos") === "home" ? "home" : "store";
+}
+
+/** Saring menurut tempat. `null` = gabungan, tanpa penyaringan. */
+export function filterByPlace<T extends { orderSource?: string }>(
+  orders: T[],
+  tempat: Tempat | null,
+): T[] {
+  if (!tempat) return orders;
+  return orders.filter((o) => orderPlace(o) === tempat);
+}
+
+export const LABEL_TEMPAT: Record<string, string> = {
+  store: "Toko Bekasi",
+  home: "Online Rumah",
+  all: "Gabungan",
+};

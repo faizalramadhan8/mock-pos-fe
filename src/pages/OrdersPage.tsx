@@ -7,7 +7,7 @@ import { Modal } from "@/components/Modal";
 import { useThemeClasses } from "@/hooks/useThemeClasses";
 import { useDebounce } from "@/hooks/useDebounce";
 import { usePageFetch } from "@/hooks/usePageFetch";
-import { formatCurrency as $, formatTime, formatDate, genId, normalizePhone, salesTotal } from "@/utils";
+import { formatCurrency as $, formatTime, formatDate, genId, normalizePhone, salesTotal, filterByPlace } from "@/utils";
 import { getDateRange, type DateRange, type CustomRange } from "@/utils/dateRange";
 import { FileText, Search, Users, Trash2, Plus, Receipt, Pencil, Sparkles, MapPin, AlertCircle } from "lucide-react";
 import type { Member } from "@/types";
@@ -59,7 +59,10 @@ export function OrdersPage() {
   const [activeTab, setActiveTab] = useState<OrdersTab>("orders");
   const [statusFilter, setStatusFilter] = useState("all");
   const [paymentFilter, setPaymentFilter] = useState("all");
-  const [sourceFilter, setSourceFilter] = useState<"all" | "pos" | "ecom">("all");
+  // Bawaannya TOKO BEKASI, bukan gabungan. Yang dipakai harian untuk closing
+  // adalah angka Bekasi; uang toko rumah masuk rekening sendiri dan tidak
+  // pernah lewat laci kasir. Bu Santi 18 Okt 2026.
+  const [sourceFilter, setSourceFilter] = useState<"all" | "store" | "home">("store");
   const [dateRange, setDateRange] = useState<DateRange>("all");
   const [customRange, setCustomRange] = useState<CustomRange>({ from: "", to: "" });
   const [detailProductId, setDetailProductId] = useState<string | null>(null);
@@ -130,7 +133,7 @@ export function OrdersPage() {
   // Sejak 29 Sep 2026 order ecom ikut tampil di sini; sebelumnya di-exclude
   // di BE. Bu Santi minta digabung dengan penanda.
   const filtered = useMemo(() =>
-    sourceFilter === "all" ? paymentFiltered : paymentFiltered.filter(o => (o.orderSource ?? "pos") === sourceFilter),
+    sourceFilter === "all" ? paymentFiltered : filterByPlace(paymentFiltered, sourceFilter),
     [paymentFiltered, sourceFilter]
   );
 
@@ -231,15 +234,17 @@ export function OrdersPage() {
             disembunyikan selama belum ada satu pun pesanan online: memilih
             antara "Toko" dan "Online" tidak ada gunanya kalau semuanya toko.
             Muncul sendiri begitu pesanan online pertama masuk. */}
-        {orders.some(o => (o.orderSource ?? "pos") === "ecom") && (
+        {/* Selalu tampil, tidak lagi disembunyikan saat belum ada pesanan
+            rumah. Bawaannya "Toko Bekasi" sekarang menyaring — kalau
+            pemilihnya tersembunyi, Bu Santi tidak akan tahu ada transaksi
+            yang tidak ditampilkan. */}
         <select value={sourceFilter} onChange={e => setSourceFilter(e.target.value as typeof sourceFilter)}
-          aria-label={lang === "id" ? "Filter asal transaksi" : "Filter order source"}
+          aria-label={lang === "id" ? "Filter tempat usaha" : "Filter business location"}
           className={`px-4 py-3 text-sm font-bold rounded-2xl border appearance-none cursor-pointer ${th.inp}`}>
-          <option value="all">{lang === "id" ? "Toko + Online" : "Store + Online"}</option>
-          <option value="pos">{lang === "id" ? "Toko" : "Store"}</option>
-          <option value="ecom">{lang === "id" ? "Online" : "Online"}</option>
+          <option value="store">{lang === "id" ? "Toko Bekasi" : "Bekasi Store"}</option>
+          <option value="home">{lang === "id" ? "Online Rumah" : "Home Online"}</option>
+          <option value="all">{lang === "id" ? "Gabungan" : "Combined"}</option>
         </select>
-        )}
       </div>
 
       {/* Custom date range — muncul cuma kalau pilih "Pilih Tanggal".
@@ -336,12 +341,14 @@ export function OrdersPage() {
                         <Pencil size={11} />
                       </span>
                     )}
-                    {/* Badge Online untuk order dari ecom storefront. Bu Santi
-                        24 Jul 2026 — supaya kasir tahu ada order online masuk. */}
-                    {o.orderSource === "ecom" && (
-                      <span title="Order dari toko online"
+                    {/* Badge untuk order dari storefront. Menyebut TEMPAT-nya,
+                        bukan cuma "Online" — sejak toko rumah berdiri sendiri,
+                        "online" saja tidak lagi memberi tahu uangnya masuk ke
+                        laci yang mana. */}
+                    {(o.orderSource === "ecom" || o.orderSource === "home") && (
+                      <span title={o.orderSource === "home" ? "Pesanan toko online rumah" : "Pesanan toko online Bekasi"}
                         className={`inline-block text-xs font-bold px-1.5 py-0.5 rounded ${th.dark ? "bg-[#3A1F2A]/60 text-[#FB7185]" : "bg-[#FFE4E9] text-[#E11D48]"}`}>
-                        Online
+                        {o.orderSource === "home" ? "Rumah" : "Online"}
                       </span>
                     )}
                   </p>

@@ -55,7 +55,7 @@ export function SettingsPage() {
 
   // ─── Bank Accounts ───
   const [showAddBank, setShowAddBank] = useState(false);
-  const [bankForm, setBankForm] = useState({ bankName: "", accountNumber: "", accountHolder: "" });
+  const [bankForm, setBankForm] = useState<{ location: "store" | "home"; bankName: string; accountNumber: string; accountHolder: string }>({ location: "store", bankName: "", accountNumber: "", accountHolder: "" });
   const [bankFormErrors, setBankFormErrors] = useState<Record<string, boolean>>({});
   const [savingBank, setSavingBank] = useState(false);
   const [bankError, setBankError] = useState<string | null>(null);
@@ -97,7 +97,7 @@ export function SettingsPage() {
       await settings.addBankAccount({ id: genId(), ...bankForm } as BankAccount);
       // Modal baru ditutup SETELAH server mengonfirmasi. Menutupnya lebih awal
       // adalah yang bikin gagal simpan terlihat seperti berhasil.
-      setBankForm({ bankName: "", accountNumber: "", accountHolder: "" });
+      setBankForm({ location: "store", bankName: "", accountNumber: "", accountHolder: "" });
       setBankQuery("");
       setShowAddBank(false);
       toast.success(lang === "id" ? "Rekening tersimpan" : "Bank account saved");
@@ -507,7 +507,20 @@ export function SettingsPage() {
                           {acc.bankName.split("(")[1]?.replace(")", "").trim().slice(0, 3) || acc.bankName.slice(0, 3).toUpperCase()}
                         </div>
                         <div className="min-w-0">
-                          <p className={`text-sm font-bold truncate ${th.tx}`}>{acc.bankName}</p>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <p className={`text-sm font-bold truncate ${th.tx}`}>{acc.bankName}</p>
+                            {/* Penanda tempat selalu tampil, termasuk untuk
+                                Bekasi. Kalau hanya yang rumah diberi label,
+                                rekening tanpa label jadi ambigu — "belum
+                                diatur" atau "memang Bekasi"? */}
+                            <span className={`text-[11px] font-bold px-1.5 py-0.5 rounded ${
+                              acc.location === "home"
+                                ? "bg-[#FFE4E9] text-[#BE123C]"
+                                : `${th.elev} ${th.txm}`
+                            }`}>
+                              {acc.location === "home" ? "Online Rumah" : "Toko Bekasi"}
+                            </span>
+                          </div>
                           <p className={`text-sm font-mono mt-0.5 ${th.tx}`}>{acc.accountNumber}</p>
                           <p className={`text-xs mt-0.5 ${th.txm}`}>{acc.accountHolder}</p>
                         </div>
@@ -788,15 +801,43 @@ export function SettingsPage() {
       {/* MODAL: Add Bank Account                        */}
       {/* ═══════════════════════════════════════════════ */}
       {showAddBank && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center animate-fade-in" onClick={() => { if (savingBank) return; setShowAddBank(false); setBankError(null); setBankForm({ bankName: "", accountNumber: "", accountHolder: "" }); setBankQuery(""); setShowBankDropdown(false); }}>
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center animate-fade-in" onClick={() => { if (savingBank) return; setShowAddBank(false); setBankError(null); setBankForm({ location: "store", bankName: "", accountNumber: "", accountHolder: "" }); setBankQuery(""); setShowBankDropdown(false); }}>
           <div className="absolute inset-0 bg-black/45 backdrop-blur-sm" />
           <div className={`relative w-full sm:max-w-md rounded-t-[28px] sm:rounded-[28px] border overflow-hidden ${th.card} ${th.bdr} animate-slide-up`} onClick={e => e.stopPropagation()}>
             <div className={`flex items-center justify-between px-6 py-4 border-b ${th.bdr}`}>
               <h3 className={`font-extrabold text-base tracking-tight ${th.tx}`}>{t.addBankAccount}</h3>
-              <button onClick={() => { setShowAddBank(false); setBankForm({ bankName: "", accountNumber: "", accountHolder: "" }); setBankQuery(""); setShowBankDropdown(false); }}
+              <button onClick={() => { setShowAddBank(false); setBankForm({ location: "store", bankName: "", accountNumber: "", accountHolder: "" }); setBankQuery(""); setShowBankDropdown(false); }}
                 aria-label="Close" className={`p-1.5 rounded-lg ${th.elev} ${th.txm}`}><X size={14} strokeWidth={2.5} /></button>
             </div>
             <div className="px-6 py-5 flex flex-col gap-3">
+              {/* Tempat pemilik rekening. Ditaruh paling atas karena ini yang
+                  menentukan rekeningnya tampil di mana — salah pilih berarti
+                  customer online tidak melihat rekening apa pun, atau justru
+                  transfer ke rekening Bekasi. */}
+              <div>
+                <p className={`text-xs font-semibold mb-1.5 ${th.txm}`}>Untuk</p>
+                <div className="flex gap-2" role="group" aria-label="Tempat pemilik rekening">
+                  {([
+                    ["store", "Toko Bekasi"],
+                    ["home", "Online Rumah"],
+                  ] as const).map(([k, label]) => (
+                    <button key={k} type="button"
+                      onClick={() => setBankForm(f => ({ ...f, location: k }))}
+                      aria-pressed={bankForm.location === k}
+                      className={`flex-1 min-h-11 rounded-2xl text-sm font-bold border ${
+                        bankForm.location === k
+                          ? "text-white border-transparent bg-gradient-to-r from-[#FB7185] to-[#E11D48]"
+                          : `${th.bdr} ${th.txm}`
+                      }`}>{label}</button>
+                  ))}
+                </div>
+                <p className={`text-xs mt-1.5 leading-relaxed ${th.txf}`}>
+                  {bankForm.location === "home"
+                    ? "Ditampilkan ke customer toko online rumah saat transfer."
+                    : "Dipakai untuk invoice pending dari kasir Bekasi."}
+                </p>
+              </div>
+
               {/* Searchable bank dropdown */}
               <div>
                 <p className={`text-xs font-semibold mb-1.5 ${th.txm}`}>{t.bankName}</p>
@@ -855,7 +896,7 @@ export function SettingsPage() {
                 </p>
               )}
               <div className="flex gap-2 mt-1">
-                <button onClick={() => { setShowAddBank(false); setBankError(null); setBankForm({ bankName: "", accountNumber: "", accountHolder: "" }); setBankQuery(""); setShowBankDropdown(false); }}
+                <button onClick={() => { setShowAddBank(false); setBankError(null); setBankForm({ location: "store", bankName: "", accountNumber: "", accountHolder: "" }); setBankQuery(""); setShowBankDropdown(false); }}
                   disabled={savingBank}
                   className={`flex-1 py-3 rounded-2xl text-sm font-bold border disabled:opacity-40 ${th.bdr} ${th.txm}`}>{t.cancel}</button>
                 <button onClick={handleAddBank}

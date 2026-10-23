@@ -148,7 +148,7 @@ export const settingsApi = {
   update: (data: { store_name?: string; store_address?: string; store_phone?: string; ppn_rate?: number; label_width?: number; label_height?: number }) =>
     api.put<SettingsRes>('/settings/', data),
 
-  addBankAccount: (data: { bank_name: string; account_number: string; account_holder: string }) =>
+  addBankAccount: (data: { location?: string; bank_name: string; account_number: string; account_holder: string }) =>
     api.post<SettingsRes>('/settings/bank-accounts', data),
 
   deleteBankAccount: (id: string) => api.del<SettingsRes>(`/settings/bank-accounts/${id}`),

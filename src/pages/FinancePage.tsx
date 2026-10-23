@@ -25,26 +25,16 @@ export function FinancePage() {
   const { t, lang } = useLangStore();
   const user = useAuthStore(s => s.user);
 
-  // ── Guard: hanya superadmin. Kalau nyasar (mis. state hack), render
-  // access denied screen — 2nd defense di atas header visibility check. ──
+  // ── Guard: hanya superadmin. 2nd defense di atas header visibility check.
+  //
+  // Layar penolakannya di-render DI BAWAH, setelah semua hook. Dulu `return`
+  // ini berada di atas hook-hook berikutnya — melanggar Rules of Hooks, dan
+  // bukan cuma soal lint: `user` datang dari store yang terhidrasi
+  // asinkron, jadi render pertama bisa terjadi saat perannya belum terbaca.
+  // Begitu perannya masuk, jumlah hook berubah di tengah jalan dan React
+  // melempar "rendered fewer hooks than expected" — halaman mati total,
+  // bukan sekadar salah tampil.
   const isOwner = user?.role === "superadmin";
-  if (!isOwner) {
-    return (
-      <div className={`rounded-3xl border p-10 text-center ${th.bdr} ${th.card2}`}>
-        <div className={`w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center ${th.card}`}>
-          <Lock size={28} className={th.acc} aria-hidden />
-        </div>
-        <p className={`text-base font-black mb-1 ${th.tx}`}>
-          {lang === "id" ? "Halaman ini bersifat rahasia" : "This page is confidential"}
-        </p>
-        <p className={`text-sm ${th.txm} max-w-md mx-auto`}>
-          {lang === "id"
-            ? "Laporan Arus Kas dan Laba Rugi hanya dapat dilihat oleh Owner. Hubungi Owner kalau butuh akses."
-            : "Cash flow and profit/loss reports are visible to the Owner only. Contact the Owner if you need access."}
-        </p>
-      </div>
-    );
-  }
 
   const [tab, setTab] = useState<FinanceTab>("cashflow");
 
@@ -63,15 +53,38 @@ export function FinancePage() {
     return { from: ymd(r.start), to: ymd(r.end) };
   }, [range, customRange]);
 
+  // Tempat usaha dipegang di sini, bukan di masing-masing tab — supaya Arus
+  // Kas dan Laba Rugi tidak bisa menampilkan tempat yang berbeda tanpa
+  // disadari. Bu Santi sendiri yang minta dua angka itu klop (30 Jun 2026).
+  const [tempat, setTempat] = useState<"store" | "home" | "all">("store");
+
   const [profitLoss, setProfitLoss] = useState<ProfitLossRes | null>(null);
   useEffect(() => {
     if (tab !== "profit-loss" || !from || !to) return;
     let cancelled = false;
-    expenseApi.profitLoss({ from, to })
+    expenseApi.profitLoss({ from, to, source: tempat === "all" ? "" : tempat })
       .then(res => { if (!cancelled) setProfitLoss(res.body ?? null); })
       .catch(err => { if (!cancelled) { console.error("profit-loss failed", err); setProfitLoss(null); } });
     return () => { cancelled = true; };
-  }, [tab, from, to]);
+  }, [tab, from, to, tempat]);
+
+  if (!isOwner) {
+    return (
+      <div className={`rounded-3xl border p-10 text-center ${th.bdr} ${th.card2}`}>
+        <div className={`w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center ${th.card}`}>
+          <Lock size={28} className={th.acc} aria-hidden />
+        </div>
+        <p className={`text-base font-black mb-1 ${th.tx}`}>
+          {lang === "id" ? "Halaman ini bersifat rahasia" : "This page is confidential"}
+        </p>
+        <p className={`text-sm ${th.txm} max-w-md mx-auto`}>
+          {lang === "id"
+            ? "Laporan Arus Kas dan Laba Rugi hanya dapat dilihat oleh Owner. Hubungi Owner kalau butuh akses."
+            : "Cash flow and profit/loss reports are visible to the Owner only. Contact the Owner if you need access."}
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -147,8 +160,31 @@ export function FinancePage() {
         ))}
       </div>
 
+      {/* Tempat usaha — berlaku untuk kedua tab. */}
+      <div className="flex flex-wrap gap-1.5" role="group" aria-label="Pilih tempat usaha">
+        {([
+          ["store", "Toko Bekasi"],
+          ["home", "Online Rumah"],
+          ["all", "Gabungan"],
+        ] as const).map(([k, label]) => (
+          <button key={k} onClick={() => setTempat(k)} aria-pressed={tempat === k}
+            className={`text-sm font-bold px-3 py-1.5 rounded-xl ${
+              tempat === k
+                ? "text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48]"
+                : `border ${th.bdr} ${th.txm}`
+            }`}>{label}</button>
+        ))}
+      </div>
+      {tempat !== "all" && (
+        <p className={`text-xs leading-relaxed ${th.txm}`}>
+          Pemasukan disaring menurut tempat. <b>Pengeluaran belum</b> — tabel
+          pengeluaran belum punya penanda tempat, jadi yang dikurangkan tetap
+          seluruhnya.
+        </p>
+      )}
+
       {/* Tab content */}
-      {tab === "cashflow" && <CashflowTab />}
+      {tab === "cashflow" && <CashflowTab tempat={tempat === "all" ? null : tempat} />}
       {tab === "profit-loss" && <ProfitLossView pl={profitLoss} th={th} lang={lang} />}
     </div>
   );

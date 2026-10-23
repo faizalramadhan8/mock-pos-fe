@@ -3,7 +3,7 @@ import { useLangStore, useOrderStore, useProductStore, useExpenseStore, usePurch
 import { useThemeClasses } from "@/hooks/useThemeClasses";
 import { usePageFetch } from "@/hooks/usePageFetch";
 import { useCountUp } from "@/hooks/useCountUp";
-import { formatCurrency as $, salesTotal } from "@/utils";
+import { formatCurrency as $, salesTotal, filterByPlace, orderPlace } from "@/utils";
 import { exportOrders, exportOrderReport } from "@/utils/export";
 import { getDateRange, type DateRange, type CustomRange } from "@/utils/dateRange";
 import { orderApi, type OrderAggregateResponse } from "@/api/orders";
@@ -43,7 +43,8 @@ export function ReportsPage() {
   const products = useProductStore(s => s.products);
 
   const [tab, setTab] = useState<ReportTab>("products");
-  const [sourceFilter, setSourceFilter] = useState<"all" | "pos" | "ecom">("all");
+  // Bawaannya Toko Bekasi — sejalan dengan Beranda, Pesanan, dan Keuangan.
+  const [sourceFilter, setSourceFilter] = useState<"all" | "store" | "home">("store");
   const [dateRange, setDateRange] = useState<DateRange>("month");
   const [customRange, setCustomRange] = useState<CustomRange>({ from: "", to: "" });
   const [expandedMember, setExpandedMember] = useState<string | null>(null);
@@ -87,7 +88,7 @@ export function ReportsPage() {
     // Aman digabung karena ecom yang sudah dibayar ikut berstatus
     // "completed"; yang belum bayar tetap "pending" dan tidak terhitung.
     if (sourceFilter !== "all") {
-      completed = completed.filter(o => (o.orderSource ?? "pos") === sourceFilter);
+      completed = filterByPlace(completed, sourceFilter);
     }
     if (!range) return completed;
     return completed.filter(o => {
@@ -109,7 +110,7 @@ export function ReportsPage() {
     });
     const acc = { pos: { count: 0, total: 0 }, ecom: { count: 0, total: 0 } };
     inRange.forEach(o => {
-      const bucket = (o.orderSource ?? "pos") === "ecom" ? acc.ecom : acc.pos;
+      const bucket = orderPlace(o) === "home" ? acc.ecom : acc.pos;
       bucket.count += 1;
       bucket.total += salesTotal(o);
     });
@@ -440,16 +441,20 @@ export function ReportsPage() {
           menambah kotak berisi Rp 0. Sengaja bukan pakai saklar on/off:
           begitu pesanan online pertama masuk, kartunya muncul sendiri tanpa
           perlu ada yang ingat menyalakannya. */}
-      {sourceSplit.ecom.count > 0 && (
+      {/* Selalu tampil. Dulu disembunyikan saat belum ada pesanan online —
+          masuk akal waktu bawaannya "Semua". Sekarang bawaannya menyaring
+          ke Toko Bekasi, jadi kartunya WAJIB kelihatan; kalau tidak, Bu
+          Santi mengira angka yang tampil sudah mencakup semuanya. */}
+      {true && (
         <div className="grid grid-cols-3 gap-2">
           {([
-            { key: "all" as const, label: lang === "id" ? "Semua" : "All",
+            { key: "store" as const, label: lang === "id" ? "Toko Bekasi" : "Bekasi",
+              count: sourceSplit.pos.count, total: sourceSplit.pos.total },
+            { key: "home" as const, label: lang === "id" ? "Online Rumah" : "Home",
+              count: sourceSplit.ecom.count, total: sourceSplit.ecom.total },
+            { key: "all" as const, label: lang === "id" ? "Gabungan" : "All",
               count: sourceSplit.pos.count + sourceSplit.ecom.count,
               total: sourceSplit.pos.total + sourceSplit.ecom.total },
-            { key: "pos" as const, label: lang === "id" ? "Toko" : "Store",
-              count: sourceSplit.pos.count, total: sourceSplit.pos.total },
-            { key: "ecom" as const, label: "Online",
-              count: sourceSplit.ecom.count, total: sourceSplit.ecom.total },
           ]).map(s => {
             const active = sourceFilter === s.key;
             return (

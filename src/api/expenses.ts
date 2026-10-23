@@ -82,10 +82,12 @@ export const expenseApi = {
   updateCategory: (id: string, data: { name: string; is_active?: boolean }) =>
     api.put<ExpenseCategoryRes>(`/expenses/categories/${id}`, data),
 
-  profitLoss: (params?: { from?: string; to?: string }) => {
+  // `source`: 'store' (Bekasi) | 'home' (toko rumah) | kosong (gabungan).
+  profitLoss: (params?: { from?: string; to?: string; source?: string }) => {
     const q = new URLSearchParams();
     if (params?.from) q.set('from', params.from);
     if (params?.to) q.set('to', params.to);
+    if (params?.source) q.set('source', params.source);
     const qs = q.toString();
     return api.get<ProfitLossRes>(`/expenses/profit-loss${qs ? '?' + qs : ''}`);
   },
