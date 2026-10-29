@@ -54,7 +54,7 @@ export function SupplierDetailModal({ supplierId, onClose }: SupplierDetailModal
     <Modal open={!!supplierId} onClose={onClose} title={t.supplierDetail as string} size="lg">
       {/* Header */}
       <div className="flex flex-col items-center mb-5">
-        <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-3 ${th.dark ? "bg-[#FB7185]/15" : "bg-[#E11D48]/[0.07]"}`}>
+        <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-3 ${th.dark ? "bg-cherry-400/15" : "bg-cherry-500/[0.07]"}`}>
           <span className={`text-2xl font-black ${th.acc}`}>{supplier.name.charAt(0)}</span>
         </div>
         <p className={`text-base font-extrabold tracking-tight ${th.tx}`}>{supplier.name}</p>
@@ -150,7 +150,7 @@ export function SupplierDetailModal({ supplierId, onClose }: SupplierDetailModal
                       updatePaymentStatus(inv.id, "paid");
                       toast.success(t.paid as string);
                     }}
-                    className={`shrink-0 ml-2 flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold ${th.dark ? "bg-[#E11D48]/15 text-[#E11D48]" : "bg-[#FFE4E9] text-[#E11D48]"}`}
+                    className={`shrink-0 ml-2 flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold ${th.dark ? "bg-cherry-500/15 text-cherry-500" : "bg-cherry-100 text-cherry-500"}`}
                   >
                     <Check size={10} /> {t.markAsPaid}
                   </button>
@@ -176,7 +176,7 @@ export function SupplierDetailModal({ supplierId, onClose }: SupplierDetailModal
             return (
               <div key={m.id} className={`flex items-center justify-between px-4 py-2.5 border-b last:border-0 ${th.bdrSoft}`}>
                 <div className="flex items-center gap-2 min-w-0">
-                  <ArrowDownCircle size={13} className="shrink-0 text-[#E11D48]" />
+                  <ArrowDownCircle size={13} className="shrink-0 text-cherry-500" />
                   <div className="min-w-0">
                     <p className={`text-xs font-bold truncate ${th.tx}`}>
                       {lang === "id" ? prod?.nameId : prod?.name}
@@ -185,7 +185,7 @@ export function SupplierDetailModal({ supplierId, onClose }: SupplierDetailModal
                   </div>
                 </div>
                 <div className="text-right shrink-0">
-                  <p className={`text-xs font-bold text-[#E11D48]`}>+{m.quantity} · {$(m.unitPrice * m.quantity)}</p>
+                  <p className={`text-xs font-bold text-cherry-500`}>+{m.quantity} · {$(m.unitPrice * m.quantity)}</p>
                   <p className={`text-xs ${th.txf}`}>{formatDate(m.createdAt)} {formatTime(m.createdAt)}</p>
                 </div>
               </div>

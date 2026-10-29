@@ -11,7 +11,7 @@ import { useDebounce } from "@/hooks/useDebounce";
 import { useBarcodeScanner } from "@/hooks/useBarcodeScanner";
 import { usePageFetch } from "@/hooks/usePageFetch";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
-import { formatCurrency as $, printReceipt, compressImage, genId, formatTime, printBarcodeLabel, printBarcodeLabels, normalizePhone } from "@/utils";
+import { formatCurrency as $, printReceipt, compressImage, genId, formatTime, printBarcodeLabel, printBarcodeLabels, normalizePhone, tierBerlaku, tierTerbaik } from "@/utils";
 import { calcItemDiscount } from "@/utils/calc";
 import { orderApi } from "@/api";
 import Barcode from "react-barcode";
@@ -359,8 +359,8 @@ export function POSPage() {
   const itemDiscountsTotal = useMemo(() => cashItems.reduce((s, i) => s + calcItemDiscount(i), 0), [cashItems]);
   const cartSubtotal = useMemo(() => cashItems.reduce((s, i) => s + i.unitPrice * i.quantity, 0), [cashItems]);
   // Savings = sum(regularPrice − unitPrice) per line. Termasuk diskon member
-  // baseline DAN diskon tier (grosir all_customers / member_specific). Walk-in
-  // juga bisa dapat savings dari tier all_customers (rename 20 Jun 2026).
+  // baseline DAN diskon tier. Walk-in juga bisa dapat savings dari tier
+  // all_customers.
   const memberSavings = useMemo(() =>
     cartItems.reduce((s, i) =>
       s + (i.regularPrice && i.regularPrice > i.unitPrice ? (i.regularPrice - i.unitPrice) * i.quantity : 0), 0),
@@ -405,19 +405,12 @@ export function POSPage() {
       const product = products.find(p => p.id === ci.productId);
       if (!product) return;
       const qtySatuan = ci.unitType === "box" ? ci.quantity * ci.qtyPerBox : ci.quantity;
-      const matching = (product.priceTiers || []).filter(t => {
-        if (qtySatuan < t.minQty) return false;
-        if (t.target === "all_customers") return true;
-        if (!activeMember) return false;
-        return (t.members || []).some(m => m.id === activeMember.id);
-      });
+      const matching = (product.priceTiers || [])
+        .filter(t => tierBerlaku(t, activeMember, qtySatuan));
       if (matching.length === 0) return;
-      // Greedy selection: minQty TERBESAR yang muat (konsisten dengan
-      // computeBestUnitPrice paket logic). Tie-break by lowest price.
-      const best = matching.reduce((a, b) => {
-        if (a.minQty !== b.minQty) return a.minQty > b.minQty ? a : b;
-        return a.price <= b.price ? a : b;
-      });
+      // Greedy: minQty TERBESAR yang muat, seri dimenangkan harga terendah —
+      // aturan yang sama dengan computeBestUnitPrice dan backend.
+      const best = tierTerbaik(matching)!;
       next.set(ci.id, best.id);
       const prevId = prevTierRef.current.get(ci.id);
       // Fire toast saat tier match TRANSISI ke tier baru (atau dari no-tier).
@@ -431,7 +424,7 @@ export function POSPage() {
         toast.success(
           `Harga paket aktif: ${ci.name} — hemat Rp ${savePerLine.toLocaleString("id-ID")}`,
           {
-            icon: <TrendingDown size={16} strokeWidth={2.6} className="text-[#E11D48]" />,
+            icon: <TrendingDown size={16} strokeWidth={2.6} className="text-cherry-500" />,
             duration: 3500,
           }
         );
@@ -680,7 +673,7 @@ export function POSPage() {
           kalau pesanannya banyak"). Phone + member-price-active info kept
           but condensed; struk-WA hint removed (already obvious). */}
       {activeMember && (
-        <div className={`flex items-center justify-between gap-2 px-3 py-2 rounded-xl ${th.dark ? "bg-[#E11D48]/15" : "bg-[#FFE4E9]"}`}>
+        <div className={`flex items-center justify-between gap-2 px-3 py-2 rounded-xl ${th.dark ? "bg-cherry-500/15" : "bg-cherry-100"}`}>
           <div className="min-w-0">
             <p className={`text-sm font-extrabold truncate ${th.acc}`}>
               {activeMember.name} <span className={`text-xs font-semibold ${th.txm}`}>· Member</span>
@@ -848,9 +841,9 @@ export function POSPage() {
                   id="newmember-phone-dup-warning"
                   role="alert"
                   className="rounded-xl border border-[#BE123C]/30 bg-[#FCE4EC] dark:bg-[#BE123C]/15 p-2.5 flex items-start gap-2">
-                  <AlertCircle size={14} strokeWidth={2.4} className="text-[#BE123C] dark:text-[#FB7185] shrink-0 mt-0.5" />
+                  <AlertCircle size={14} strokeWidth={2.4} className="text-[#BE123C] dark:text-cherry-400 shrink-0 mt-0.5" />
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-bold text-[#BE123C] dark:text-[#FB7185]">
+                    <p className="text-xs font-bold text-[#BE123C] dark:text-cherry-400">
                       Nomor sudah terdaftar
                     </p>
                     <p className={`text-xs mt-0.5 ${th.txm}`}>
@@ -871,14 +864,14 @@ export function POSPage() {
                         setShowAddMember(false);
                         setShowMemberDropdown(false);
                       }}
-                      className="mt-1.5 text-xs font-bold inline-flex items-center gap-1 px-2 py-1 rounded-md bg-[#E11D48] text-white">
+                      className="mt-1.5 text-xs font-bold inline-flex items-center gap-1 px-2 py-1 rounded-md bg-cherry-500 text-white">
                       Gunakan member ini
                     </button>
                   </div>
                 </div>
               )}
               <button onClick={handleAddNewMember} disabled={!newMemberName.trim() || !!duplicate}
-                className="w-full py-2.5 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48] disabled:opacity-40">{t.save}</button>
+                className="w-full py-2.5 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-cherry-400 to-cherry-500 disabled:opacity-40">{t.save}</button>
             </div>
           </div>
         );
@@ -896,7 +889,7 @@ export function POSPage() {
             aria-pressed={compactCart}
             title={compactCart ? "Tampilkan detail lengkap" : "Ringkas — semua barang muat dalam satu layar"}
             className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold ${
-              compactCart ? "bg-[#E11D48] text-white" : `${th.elev} ${th.txm}`
+              compactCart ? "bg-cherry-500 text-white" : `${th.elev} ${th.txm}`
             }`}>
             {compactCart ? <List size={14} /> : <Rows3 size={14} />}
             {compactCart ? "Tampilan Lengkap" : "Tampilan Ringkas"}
@@ -951,7 +944,7 @@ export function POSPage() {
                   return (
                     <div key={ci.id}
                       className={`flex items-center gap-2 px-2.5 py-1 rounded-lg border ${CART_BLUE.row} ${
-                        isRedeemed ? "ring-1 ring-[#E11D48]/40" : ""
+                        isRedeemed ? "ring-1 ring-cherry-500/40" : ""
                       }`}>
                       <div className="flex-1 min-w-0">
                         <p className={`font-semibold text-sm truncate leading-tight ${th.tx}`}>{ci.name}</p>
@@ -979,14 +972,14 @@ export function POSPage() {
                         </button>
                       </div>
                       <span className={`w-20 text-right font-display text-sm font-black tabular-nums ${
-                        isRedeemed ? "text-[#E11D48]" : th.tx
+                        isRedeemed ? "text-cherry-500" : th.tx
                       }`}>
                         {isRedeemed
                           ? `−${itemGross.toLocaleString("id-ID")}`
                           : (itemGross - itemDisc).toLocaleString("id-ID")}
                       </span>
                       <button onClick={() => removeItem(ci.id)} aria-label="Hapus item"
-                        className="w-7 h-7 shrink-0 rounded-lg flex items-center justify-center bg-white/70 text-[#BE123C] active:scale-90 transition-transform dark:bg-[#E11D48]/15 dark:text-[#FB7185]">
+                        className="w-7 h-7 shrink-0 rounded-lg flex items-center justify-center bg-white/70 text-[#BE123C] active:scale-90 transition-transform dark:bg-cherry-500/15 dark:text-cherry-400">
                         <Trash2 size={13} strokeWidth={2.4} />
                       </button>
                     </div>
@@ -1008,11 +1001,11 @@ export function POSPage() {
         const otherRedeemTotal = pointsToRedeem - (isRedeemed ? itemGross : 0);
         const canRedeem = !!activeMember && isRedeemableProduct && memberPoints - otherRedeemTotal >= itemGross;
         return (
-          <div key={ci.id} className={`p-3.5 rounded-[18px] border ${CART_BLUE.row} ${isRedeemed ? "ring-2 ring-[#E11D48]/40" : ""}`}>
+          <div key={ci.id} className={`p-3.5 rounded-[18px] border ${CART_BLUE.row} ${isRedeemed ? "ring-2 ring-cherry-500/40" : ""}`}>
             <div className="flex-1 min-w-0">
               {isRedeemed && (
                 <div className="flex items-center gap-1.5 mb-1.5">
-                  <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-[#E11D48] text-white flex items-center gap-1">
+                  <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-cherry-500 text-white flex items-center gap-1">
                     <Gift size={11} strokeWidth={2.8} /> Tebus dengan poin
                   </span>
                 </div>
@@ -1028,12 +1021,11 @@ export function POSPage() {
                   // Tentukan sumber diskon untuk badge yang akurat — tier
                   // (volume/specific-member) atau member_price baseline.
                   const qtySatuan = ci.unitType === "box" ? ci.quantity * ci.qtyPerBox : ci.quantity;
-                  const tierMatched = !!product?.priceTiers?.some(t => {
-                    if (qtySatuan < t.minQty) return false;
-                    if (t.target === "all_customers") return true;
-                    if (!activeMember) return false;
-                    return (t.members || []).some(m => m.id === activeMember.id);
-                  });
+                  // Lewat tierBerlaku, jadi tier yang kedaluwarsa atau belum
+                  // mulai tidak lagi berbadge "Grosir" sementara harganya
+                  // sebenarnya normal.
+                  const tierMatched = !!product?.priceTiers?.some(
+                    t => tierBerlaku(t, activeMember, qtySatuan));
                   return (
                     <>
                       <span className={`text-xs line-through ${th.txf}`}>{$(ci.regularPrice)}</span>
@@ -1046,7 +1038,7 @@ export function POSPage() {
                 })() : (
                   <span className={`text-xs ${th.txm}`}>{$(ci.unitPrice)}</span>
                 )}
-                {ci.discountType && <span className="text-xs font-bold px-1.5 py-0.5 rounded-md bg-[#E11D48]/15 text-[#E11D48]">-{ci.discountType === "percent" ? `${ci.discountValue}%` : $(ci.discountValue || 0)}</span>}
+                {ci.discountType && <span className="text-xs font-bold px-1.5 py-0.5 rounded-md bg-cherry-500/15 text-cherry-500">-{ci.discountType === "percent" ? `${ci.discountValue}%` : $(ci.discountValue || 0)}</span>}
               </div>
               {/* Hint tier — tampilkan kalau ada tier berikutnya yang belum
                   match. Bantu kasir suggest "tambah 1 lagi lebih hemat" ke
@@ -1054,11 +1046,12 @@ export function POSPage() {
                   Tidak muncul saat row tebus poin. */}
               {!isRedeemed && product && (() => {
                 const qtySatuan = ci.unitType === "box" ? ci.quantity * ci.qtyPerBox : ci.quantity;
-                const eligibleTiers = (product.priceTiers || []).filter(t => {
-                  if (t.target === "all_customers") return true;
-                  if (!activeMember) return false;
-                  return (t.members || []).some(m => m.id === activeMember.id);
-                });
+                // qtySatuan null: yang dicari justru tier yang BELUM tercapai,
+                // jadi syarat qty dilepas — tapi jadwal dan target tetap
+                // diperiksa, supaya kasir tidak menawarkan promo yang sudah
+                // lewat atau yang baru berlaku bulan depan.
+                const eligibleTiers = (product.priceTiers || [])
+                  .filter(t => tierBerlaku(t, activeMember, null));
                 const nextTier = eligibleTiers
                   .filter(t => t.minQty > qtySatuan)
                   .sort((a, b) => a.minQty - b.minQty)[0];
@@ -1126,7 +1119,7 @@ export function POSPage() {
                       onClick={() => toggleRedeemPoints(ci.id)}
                       aria-label="Batal tebus"
                       title="Batal tebus"
-                      className="w-10 h-10 rounded-xl flex items-center justify-center bg-[#E11D48] text-white active:scale-90 transition-transform"
+                      className="w-10 h-10 rounded-xl flex items-center justify-center bg-cherry-500 text-white active:scale-90 transition-transform"
                     >
                       <Gift size={16} strokeWidth={2.4} />
                     </button>
@@ -1137,7 +1130,7 @@ export function POSPage() {
                     aria-label="Diskon item"
                     className={`w-10 h-10 rounded-xl flex items-center justify-center active:scale-90 transition-transform disabled:opacity-30 ${
                       ci.discountType
-                        ? "bg-[#FFEDD5] text-[#BE123C] dark:bg-[#E11D48]/20 dark:text-[#FB7185]"
+                        ? "bg-[#FFEDD5] text-[#BE123C] dark:bg-cherry-500/20 dark:text-cherry-400"
                         : `${th.elev} ${th.txm}`
                     }`}
                   >
@@ -1146,7 +1139,7 @@ export function POSPage() {
                   <button
                     onClick={() => removeItem(ci.id)}
                     aria-label="Hapus item"
-                    className="w-10 h-10 rounded-xl flex items-center justify-center bg-[#FCE4EC] text-[#BE123C] active:scale-90 active:bg-[#FBCFE8] transition-transform dark:bg-[#E11D48]/15 dark:text-[#FB7185]"
+                    className="w-10 h-10 rounded-xl flex items-center justify-center bg-[#FCE4EC] text-[#BE123C] active:scale-90 active:bg-[#FBCFE8] transition-transform dark:bg-cherry-500/15 dark:text-cherry-400"
                   >
                     <Trash2 size={16} strokeWidth={2.4} />
                   </button>
@@ -1155,13 +1148,13 @@ export function POSPage() {
               {discountItemId === ci.id && (
                 <div className="mt-2 flex items-center gap-1.5">
                   <div className="flex rounded-lg overflow-hidden border">
-                    <button onClick={() => setDiscountMode("percent")} aria-label="Percent discount" className={`px-2 py-1 text-xs font-bold ${discountMode === "percent" ? "bg-[#E11D48] text-white" : `${th.elev} ${th.txm}`}`}><Percent size={10} /></button>
-                    <button onClick={() => setDiscountMode("fixed")} aria-label="Fixed discount" className={`px-2 py-1 text-xs font-bold ${discountMode === "fixed" ? "bg-[#E11D48] text-white" : `${th.elev} ${th.txm}`}`}>Rp</button>
+                    <button onClick={() => setDiscountMode("percent")} aria-label="Percent discount" className={`px-2 py-1 text-xs font-bold ${discountMode === "percent" ? "bg-cherry-500 text-white" : `${th.elev} ${th.txm}`}`}><Percent size={10} /></button>
+                    <button onClick={() => setDiscountMode("fixed")} aria-label="Fixed discount" className={`px-2 py-1 text-xs font-bold ${discountMode === "fixed" ? "bg-cherry-500 text-white" : `${th.elev} ${th.txm}`}`}>Rp</button>
                   </div>
                   <input value={discountInput} onChange={e => setDiscountInput(e.target.value)} type="number" placeholder="0"
                     className={`flex-1 px-2 py-1 text-xs rounded-lg border w-16 ${th.inp}`} />
                   <button onClick={() => { setItemDiscount(ci.id, discountMode, parseFloat(discountInput) || 0); setDiscountItemId(null); }}
-                    className="px-2 py-1 rounded-lg text-xs font-bold text-white bg-[#E11D48]">{t.save}</button>
+                    className="px-2 py-1 rounded-lg text-xs font-bold text-white bg-cherry-500">{t.save}</button>
                   {ci.discountType && <button onClick={() => { setItemDiscount(ci.id, null, 0); setDiscountItemId(null); }}
                     aria-label="Remove discount" className="text-xs font-bold text-[#C4504A]"><X size={10} /></button>}
                 </div>
@@ -1195,18 +1188,18 @@ export function POSPage() {
             <div className="flex justify-between text-sm mt-1"><span className={th.acc}>Hemat</span><span className={`font-semibold ${th.acc}`}>-{$(memberSavings)}</span></div>
           )}
           {itemDiscountsTotal > 0 && (
-            <div className="flex justify-between text-sm mt-1"><span className="text-[#E11D48]">{t.itemDiscount}</span><span className="font-semibold text-[#E11D48]">-{$(itemDiscountsTotal)}</span></div>
+            <div className="flex justify-between text-sm mt-1"><span className="text-cherry-500">{t.itemDiscount}</span><span className="font-semibold text-cherry-500">-{$(itemDiscountsTotal)}</span></div>
           )}
           {orderDiscAmount > 0 && (
-            <div className="flex justify-between text-sm mt-1"><span className="text-[#E11D48]">{t.orderDiscount}</span><span className="font-semibold text-[#E11D48]">-{$(orderDiscAmount)}</span></div>
+            <div className="flex justify-between text-sm mt-1"><span className="text-cherry-500">{t.orderDiscount}</span><span className="font-semibold text-cherry-500">-{$(orderDiscAmount)}</span></div>
           )}
           {ppnRate > 0 && (
             <div className="flex justify-between text-sm mt-1"><span className={th.txm}>{t.ppn} ({ppnRate}%)</span><span className={`font-semibold ${th.tx}`}>{$(ppnAmount)}</span></div>
           )}
           {pointsToRedeem > 0 && (
             <div className="flex justify-between text-sm mt-1">
-              <span className="text-[#E11D48] flex items-center gap-1"><Gift size={11} strokeWidth={2.8} /> Tebus pakai poin</span>
-              <span className="font-semibold text-[#E11D48]">−{pointsToRedeem.toLocaleString("id-ID")} poin</span>
+              <span className="text-cherry-500 flex items-center gap-1"><Gift size={11} strokeWidth={2.8} /> Tebus pakai poin</span>
+              <span className="font-semibold text-cherry-500">−{pointsToRedeem.toLocaleString("id-ID")} poin</span>
             </div>
           )}
           <div className={`flex justify-between items-center text-base ${
@@ -1221,11 +1214,11 @@ export function POSPage() {
             <span className={`font-black text-xl ${th.dark ? "text-[#93C5FD]" : "text-[#1D4ED8]"}`}>{$(cartTotal)}</span>
           </div>
           {activeMember && pointsEarnedPreview > 0 && (
-            <div className="flex justify-between text-xs mt-1.5 px-2 py-1.5 rounded-lg bg-[#FFE4E9] dark:bg-[#E11D48]/15">
-              <span className="font-semibold text-[#9F1239] dark:text-[#FB7185] flex items-center gap-1">
+            <div className="flex justify-between text-xs mt-1.5 px-2 py-1.5 rounded-lg bg-cherry-100 dark:bg-cherry-500/15">
+              <span className="font-semibold text-cherry-700 dark:text-cherry-400 flex items-center gap-1">
                 <Sparkles size={10} strokeWidth={2.8} /> Akan dapat poin
               </span>
-              <span className="font-bold text-[#9F1239] dark:text-[#FB7185]">+{pointsEarnedPreview.toLocaleString("id-ID")}</span>
+              <span className="font-bold text-cherry-700 dark:text-cherry-400">+{pointsEarnedPreview.toLocaleString("id-ID")}</span>
             </div>
           )}
           {activeMember && hasMemberSpecificTier && (
@@ -1246,20 +1239,20 @@ export function POSPage() {
             </button>
           ) : !showOrderDiscount && orderDiscountType ? (
             <div className="mt-2 flex items-center justify-between">
-              <span className="text-xs font-bold text-[#E11D48]">{t.orderDiscount}: -{orderDiscountType === "percent" ? `${orderDiscountValue}%` : $(orderDiscountValue)}</span>
+              <span className="text-xs font-bold text-cherry-500">{t.orderDiscount}: -{orderDiscountType === "percent" ? `${orderDiscountValue}%` : $(orderDiscountValue)}</span>
               <button onClick={() => { setOrderDiscount(null, 0); }} className="text-xs font-bold text-[#C4504A]">{t.removeDiscount}</button>
             </div>
           ) : null}
           {showOrderDiscount && (
             <div className="mt-2 flex items-center gap-1.5">
               <div className="flex rounded-lg overflow-hidden border">
-                <button onClick={() => setOrderDiscMode("percent")} aria-label="Percent discount" className={`px-2 py-1 text-xs font-bold ${orderDiscMode === "percent" ? "bg-[#E11D48] text-white" : `${th.elev} ${th.txm}`}`}><Percent size={10} /></button>
-                <button onClick={() => setOrderDiscMode("fixed")} aria-label="Fixed discount" className={`px-2 py-1 text-xs font-bold ${orderDiscMode === "fixed" ? "bg-[#E11D48] text-white" : `${th.elev} ${th.txm}`}`}>Rp</button>
+                <button onClick={() => setOrderDiscMode("percent")} aria-label="Percent discount" className={`px-2 py-1 text-xs font-bold ${orderDiscMode === "percent" ? "bg-cherry-500 text-white" : `${th.elev} ${th.txm}`}`}><Percent size={10} /></button>
+                <button onClick={() => setOrderDiscMode("fixed")} aria-label="Fixed discount" className={`px-2 py-1 text-xs font-bold ${orderDiscMode === "fixed" ? "bg-cherry-500 text-white" : `${th.elev} ${th.txm}`}`}>Rp</button>
               </div>
               <input value={orderDiscInput} onChange={e => setOrderDiscInput(e.target.value)} type="number" placeholder="0"
                 className={`flex-1 px-2 py-1 text-xs rounded-lg border w-16 ${th.inp}`} />
               <button onClick={() => { setOrderDiscount(orderDiscMode, parseFloat(orderDiscInput) || 0); setShowOrderDiscount(false); }}
-                className="px-2 py-1 rounded-lg text-xs font-bold text-white bg-[#E11D48]">{t.save}</button>
+                className="px-2 py-1 rounded-lg text-xs font-bold text-white bg-cherry-500">{t.save}</button>
               <button onClick={() => setShowOrderDiscount(false)} aria-label="Close" className={th.txf}><X size={12} /></button>
             </div>
           )}
@@ -1269,7 +1262,7 @@ export function POSPage() {
           {(["cash", "card", "transfer", "qris"] as PaymentMethod[]).map(pm => (
             <button key={pm} onClick={() => { setPayment(pm); if (pm !== "qris" && pm !== "transfer") setProofImage(""); if (pm !== "transfer") setSelectedBankId(""); }}
               className={`py-3 rounded-[14px] text-xs font-bold transition-all ${
-                payment === pm ? "text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48]" : `border ${th.bdr} ${th.txm}`
+                payment === pm ? "text-white bg-gradient-to-r from-cherry-400 to-cherry-500" : `border ${th.bdr} ${th.txm}`
               }`}>{t[pm]}</button>
           ))}
         </div>
@@ -1285,11 +1278,11 @@ export function POSPage() {
             <Bookmark size={13} /> Parkir
           </button>
           <button onClick={() => setPendingOpenModal(true)}
-            className={`flex-1 py-3 rounded-2xl text-sm font-bold border-2 border-[#FFB5C0] ${th.acc}`}>
+            className={`flex-1 py-3 rounded-2xl text-sm font-bold border-2 border-cherry-300 ${th.acc}`}>
             Pending WA
           </button>
           <button onClick={() => setCheckoutOpen(true)}
-            className="flex-[2] py-3 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48]">{t.payNow} {$(cartTotal)}</button>
+            className="flex-[2] py-3 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-cherry-400 to-cherry-500">{t.payNow} {$(cartTotal)}</button>
         </div>
       </>}
     </div>
@@ -1305,7 +1298,7 @@ export function POSPage() {
         <p className={`text-lg font-black mb-2 ${th.tx}`}>{t.registerNotOpen}</p>
         <p className={`text-sm text-center max-w-sm mb-6 ${th.txm}`}>{t.registerNotOpenHint}</p>
         <button onClick={() => setOpenRegisterOpen(true)}
-          className="px-8 py-3.5 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48]">
+          className="px-8 py-3.5 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-cherry-400 to-cherry-500">
           {t.openRegister}
         </button>
 
@@ -1326,7 +1319,7 @@ export function POSPage() {
               <button onClick={() => { setOpenRegisterOpen(false); setOpeningCashInput(""); }}
                 className={`flex-1 py-3 rounded-2xl text-sm font-bold border ${th.bdr} ${th.txm}`}>{t.cancel}</button>
               <button onClick={doOpenRegister}
-                className="flex-1 py-3 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48]">{t.confirm}</button>
+                className="flex-1 py-3 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-cherry-400 to-cherry-500">{t.confirm}</button>
             </div>
           </div>
         </Modal>
@@ -1392,7 +1385,7 @@ export function POSPage() {
                 }
               }
             }}
-            className={`w-full pl-11 pr-11 py-3.5 sm:py-3 text-base sm:text-sm rounded-2xl border focus:outline-none focus:ring-2 focus:ring-[#E11D48]/20 font-medium ${th.inp}`} />
+            className={`w-full pl-11 pr-11 py-3.5 sm:py-3 text-base sm:text-sm rounded-2xl border focus:outline-none focus:ring-2 focus:ring-cherry-500/20 font-medium ${th.inp}`} />
           <ScanLine size={18} className={`absolute right-3.5 top-1/2 -translate-y-1/2 ${th.txf} pointer-events-none`} />
         </div>
         <button onClick={() => setOrderHistoryOpen(true)} aria-label={t.orderHistory as string}
@@ -1411,7 +1404,7 @@ export function POSPage() {
           className={`relative shrink-0 flex items-center justify-center w-11 py-3 rounded-2xl text-xs font-bold border ${th.bdr} ${parkedCount > 0 ? th.acc : th.txm}`}>
           <Bookmark size={14} />
           {parkedCount > 0 && (
-            <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-gradient-to-br from-[#FB7185] to-[#E11D48] text-white text-[10px] font-black flex items-center justify-center leading-none">
+            <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-gradient-to-br from-cherry-400 to-cherry-500 text-white text-[10px] font-black flex items-center justify-center leading-none">
               {parkedCount}
             </span>
           )}
@@ -1421,7 +1414,7 @@ export function POSPage() {
           className={`relative shrink-0 flex items-center justify-center w-11 py-3 rounded-2xl text-xs font-bold border ${th.bdr} ${pendingCount > 0 ? th.acc : th.txm}`}>
           <Clock size={14} />
           {pendingCount > 0 && (
-            <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-gradient-to-br from-[#FB7185] to-[#E11D48] text-white text-[10px] font-black flex items-center justify-center leading-none">
+            <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-gradient-to-br from-cherry-400 to-cherry-500 text-white text-[10px] font-black flex items-center justify-center leading-none">
               {pendingCount}
             </span>
           )}
@@ -1514,17 +1507,17 @@ export function POSPage() {
               {salesRevealed && (
                 <>
                   <div className="grid grid-cols-3 gap-2">
-                    <div className={`rounded-xl px-2 py-1.5 text-center ${th.dark ? "bg-[#E11D48]/10" : "bg-[#FFE4E9]"}`}>
-                      <p className={`text-xs font-semibold text-[#E11D48]`}>Tunai</p>
-                      <p className={`text-sm font-black text-[#E11D48] tabular-nums`}>{$(byMethod.cash || 0)}</p>
+                    <div className={`rounded-xl px-2 py-1.5 text-center ${th.dark ? "bg-cherry-500/10" : "bg-cherry-100"}`}>
+                      <p className={`text-xs font-semibold text-cherry-500`}>Tunai</p>
+                      <p className={`text-sm font-black text-cherry-500 tabular-nums`}>{$(byMethod.cash || 0)}</p>
                     </div>
-                    <div className={`rounded-xl px-2 py-1.5 text-center ${th.dark ? "bg-[#FB7185]/10" : "bg-[#FFE4E9]"}`}>
+                    <div className={`rounded-xl px-2 py-1.5 text-center ${th.dark ? "bg-cherry-400/10" : "bg-cherry-100"}`}>
                       <p className={`text-xs font-semibold ${th.acc}`}>QRIS</p>
                       <p className={`text-sm font-black ${th.acc} tabular-nums`}>{$(byMethod.qris || 0)}</p>
                     </div>
-                    <div className={`rounded-xl px-2 py-1.5 text-center ${th.dark ? "bg-[#E11D48]/10" : "bg-[#FFE4E9]"}`}>
-                      <p className={`text-xs font-semibold text-[#E11D48]`}>Transfer</p>
-                      <p className={`text-sm font-black text-[#E11D48] tabular-nums`}>{$((byMethod.transfer || 0) + (byMethod.card || 0))}</p>
+                    <div className={`rounded-xl px-2 py-1.5 text-center ${th.dark ? "bg-cherry-500/10" : "bg-cherry-100"}`}>
+                      <p className={`text-xs font-semibold text-cherry-500`}>Transfer</p>
+                      <p className={`text-sm font-black text-cherry-500 tabular-nums`}>{$((byMethod.transfer || 0) + (byMethod.card || 0))}</p>
                     </div>
                   </div>
                   {itemsSold.length > 0 && (
@@ -1564,7 +1557,7 @@ export function POSPage() {
           <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
             <button onClick={() => setCatFilter("all")}
               className={`shrink-0 px-4 py-2.5 rounded-[14px] text-xs font-bold transition-all ${
-                catFilter === "all" ? "text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48]" : `border ${th.card} ${th.bdr} ${th.txm}`
+                catFilter === "all" ? "text-white bg-gradient-to-r from-cherry-400 to-cherry-500" : `border ${th.card} ${th.bdr} ${th.txm}`
               }`}>{t.all}</button>
             {categories.map(cat => {
               const Icon = CategoryIconMap[cat.icon];
@@ -1572,7 +1565,7 @@ export function POSPage() {
               return (
                 <button key={cat.id} onClick={() => setCatFilter(cat.id)}
                   className={`shrink-0 flex items-center gap-1.5 px-3.5 py-2.5 rounded-[14px] text-xs font-bold transition-all ${
-                    active ? "text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48]" : `border ${th.card} ${th.bdr} ${th.txm}`
+                    active ? "text-white bg-gradient-to-r from-cherry-400 to-cherry-500" : `border ${th.card} ${th.bdr} ${th.txm}`
                   }`}>
                   {Icon && <Icon color={active ? "#fff" : cat.color} size={18} />}
                   {lang === "id" ? cat.nameId : cat.name}
@@ -1580,7 +1573,7 @@ export function POSPage() {
               );
             })}
           </div>
-          <div className={`absolute right-0 top-0 bottom-1 w-8 pointer-events-none bg-gradient-to-l ${th.dark ? "from-[#140B0F]" : "from-[#FBE8EE]"}`} />
+          <div className={`absolute right-0 top-0 bottom-1 w-8 pointer-events-none bg-gradient-to-l ${th.dark ? "from-shade-bg" : "from-cherry-100"}`} />
         </div>
         )}
 
@@ -1690,7 +1683,7 @@ export function POSPage() {
       {cartCount > 0 && (
         <div className={`${posLayout === "search" ? "md:hidden" : "lg:hidden"} fixed bottom-20 left-4 right-4 z-30`}>
           <button onClick={() => setCartOpen(true)}
-            className="w-full flex items-center justify-between text-white px-5 py-3.5 rounded-[20px] bg-gradient-to-r from-[#FB7185] to-[#E11D48] shadow-[0_8px_30px_rgba(160,103,60,0.3)] active:scale-[0.98] transition-transform">
+            className="w-full flex items-center justify-between text-white px-5 py-3.5 rounded-[20px] bg-gradient-to-r from-cherry-400 to-cherry-500 shadow-[0_8px_30px_rgba(160,103,60,0.3)] active:scale-[0.98] transition-transform">
             <span className="flex items-center gap-2.5">
               <ShoppingBag size={18} />
               <span className="font-bold text-sm">{t.cart} · {cartCount}</span>
@@ -1726,13 +1719,13 @@ export function POSPage() {
                 className={`w-full px-4 py-3 text-base rounded-2xl border ${th.inp}`}
                 onKeyDown={e => { if (e.key === "Enter" && parseFloat(cashRcv) >= cartTotal) doCheckout(); }} />
               {parseFloat(cashRcv) >= cartTotal && (
-                <p className="text-sm font-bold text-[#E11D48] mt-2">{t.change}: {$(parseFloat(cashRcv) - cartTotal)}</p>
+                <p className="text-sm font-bold text-cherry-500 mt-2">{t.change}: {$(parseFloat(cashRcv) - cartTotal)}</p>
               )}
               {/* Split payment — muncul kalau tunai kurang dari total. */}
               {parseFloat(cashRcv) > 0 && parseFloat(cashRcv) < cartTotal && (() => {
                 const kurang = cartTotal - parseFloat(cashRcv);
                 return (
-                  <div className={`mt-3 rounded-2xl border p-4 ${th.bdr} bg-[#FFE4E9] dark:bg-[#E11D48]/10`}>
+                  <div className={`mt-3 rounded-2xl border p-4 ${th.bdr} bg-cherry-100 dark:bg-cherry-500/10`}>
                     <div className="flex items-center gap-2 mb-2">
                       <AlertCircle size={16} className={th.acc} />
                       <p className={`text-sm font-bold ${th.acc}`}>Kurang {$(kurang)}</p>
@@ -1743,7 +1736,7 @@ export function POSPage() {
                         <button key={m} onClick={() => setSplitMethod(m)}
                           className={`py-2 rounded-xl text-xs font-bold transition-all ${
                             splitMethod === m
-                              ? "text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48]"
+                              ? "text-white bg-gradient-to-r from-cherry-400 to-cherry-500"
                               : `border ${th.bdr} ${th.tx} ${th.card}`
                           }`}>
                           {t[m]}
@@ -1770,12 +1763,12 @@ export function POSPage() {
                     <button key={acc.id} onClick={() => setSelectedBankId(acc.id)}
                       className={`w-full text-left rounded-2xl border p-3.5 transition-all ${
                         selected
-                          ? "border-[#E11D48] bg-gradient-to-r from-[#FB7185]/10 to-[#E11D48]/10"
+                          ? "border-cherry-500 bg-gradient-to-r from-cherry-400/10 to-cherry-500/10"
                           : `${th.card2} ${th.bdr}`
                       }`}>
                       <div className="flex items-center gap-3">
                         <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-xs font-extrabold shrink-0 ${
-                          selected ? "bg-gradient-to-r from-[#FB7185] to-[#E11D48] text-white" : `${th.accBg} ${th.acc}`
+                          selected ? "bg-gradient-to-r from-cherry-400 to-cherry-500 text-white" : `${th.accBg} ${th.acc}`
                         }`}>
                           {acc.bankName.split("(")[1]?.replace(")", "").trim().slice(0, 3) || acc.bankName.slice(0, 3).toUpperCase()}
                         </div>
@@ -1853,7 +1846,7 @@ export function POSPage() {
               (payment === "transfer" && bankAccounts.length > 0 && !selectedBankId)
             }
               aria-busy={checkoutProcessing}
-              className="flex-1 py-3 rounded-2xl text-sm font-bold text-white bg-[#E11D48] disabled:opacity-40 inline-flex items-center justify-center gap-2">
+              className="flex-1 py-3 rounded-2xl text-sm font-bold text-white bg-cherry-500 disabled:opacity-40 inline-flex items-center justify-center gap-2">
               {checkoutProcessing && (
                 <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" aria-hidden />
               )}
@@ -1868,7 +1861,7 @@ export function POSPage() {
         {lastOrder && (
           <div className="flex flex-col gap-4">
             <div className="text-center">
-              <div className="w-12 h-12 rounded-full bg-[#E11D48]/10 flex items-center justify-center mx-auto mb-3">
+              <div className="w-12 h-12 rounded-full bg-cherry-500/10 flex items-center justify-center mx-auto mb-3">
                 <span className="text-2xl">✓</span>
               </div>
               <p className={`text-lg font-black ${th.tx}`}>{t.orderSuccess}</p>
@@ -1879,10 +1872,10 @@ export function POSPage() {
                 <div key={i} className={`py-1.5 ${i > 0 ? `border-t ${th.bdr}` : ""}`}>
                   <div className="flex justify-between">
                     <span className={`text-sm ${th.tx} flex items-center gap-1`}>
-                      {item.redeemedWithPoints && <Gift size={10} strokeWidth={2.8} className="text-[#E11D48]" />}
+                      {item.redeemedWithPoints && <Gift size={10} strokeWidth={2.8} className="text-cherry-500" />}
                       {item.name} ×{item.quantity}
                     </span>
-                    <span className={`text-sm font-bold ${item.redeemedWithPoints ? "text-[#E11D48]" : th.tx}`}>
+                    <span className={`text-sm font-bold ${item.redeemedWithPoints ? "text-cherry-500" : th.tx}`}>
                       {item.redeemedWithPoints
                         ? `−${(item.unitPrice * item.quantity).toLocaleString("id-ID")} poin`
                         : $(item.unitPrice * item.quantity)}
@@ -1890,8 +1883,8 @@ export function POSPage() {
                   </div>
                   {(item.discountAmount || 0) > 0 && (
                     <div className="flex justify-between">
-                      <span className="text-xs text-[#E11D48]">&nbsp;&nbsp;{t.discount} {item.discountType === "percent" ? `${item.discountValue}%` : ""}</span>
-                      <span className="text-xs font-bold text-[#E11D48]">-{$(item.discountAmount || 0)}</span>
+                      <span className="text-xs text-cherry-500">&nbsp;&nbsp;{t.discount} {item.discountType === "percent" ? `${item.discountValue}%` : ""}</span>
+                      <span className="text-xs font-bold text-cherry-500">-{$(item.discountAmount || 0)}</span>
                     </div>
                   )}
                 </div>
@@ -1908,14 +1901,14 @@ export function POSPage() {
                   </div>
                   {itemDiscSum > 0 && (
                     <div className="flex justify-between py-0.5">
-                      <span className="text-sm text-[#E11D48]">{t.itemDiscount}</span>
-                      <span className="text-sm font-semibold text-[#E11D48]">-{$(itemDiscSum)}</span>
+                      <span className="text-sm text-cherry-500">{t.itemDiscount}</span>
+                      <span className="text-sm font-semibold text-cherry-500">-{$(itemDiscSum)}</span>
                     </div>
                   )}
                   {orderDisc > 0 && (
                     <div className="flex justify-between py-0.5">
-                      <span className="text-sm text-[#E11D48]">{t.orderDiscount}{lastOrder.orderDiscountType === "percent" ? ` ${lastOrder.orderDiscountValue}%` : ""}</span>
-                      <span className="text-sm font-semibold text-[#E11D48]">-{$(orderDisc)}</span>
+                      <span className="text-sm text-cherry-500">{t.orderDiscount}{lastOrder.orderDiscountType === "percent" ? ` ${lastOrder.orderDiscountValue}%` : ""}</span>
+                      <span className="text-sm font-semibold text-cherry-500">-{$(orderDisc)}</span>
                     </div>
                   )}
                   {lastOrder.ppnRate > 0 && (
@@ -1928,8 +1921,8 @@ export function POSPage() {
               })()}
               {(lastOrder.pointsUsed ?? 0) > 0 && (
                 <div className="flex justify-between text-sm mt-1">
-                  <span className="text-[#E11D48] flex items-center gap-1"><Gift size={11} strokeWidth={2.8} /> Poin dipakai</span>
-                  <span className="font-bold text-[#E11D48]">−{(lastOrder.pointsUsed || 0).toLocaleString("id-ID")}</span>
+                  <span className="text-cherry-500 flex items-center gap-1"><Gift size={11} strokeWidth={2.8} /> Poin dipakai</span>
+                  <span className="font-bold text-cherry-500">−{(lastOrder.pointsUsed || 0).toLocaleString("id-ID")}</span>
                 </div>
               )}
               <div className={`flex justify-between pt-2 mt-2 border-t ${th.bdr}`}>
@@ -1937,11 +1930,11 @@ export function POSPage() {
                 <span className={`font-black text-lg ${th.acc}`}>{$(lastOrder.total)}</span>
               </div>
               {lastOrder.member && (lastOrder.pointsEarned ?? 0) > 0 && (
-                <div className="flex justify-between text-xs mt-2 px-2 py-1.5 rounded-lg bg-[#FFE4E9] dark:bg-[#E11D48]/15">
-                  <span className="font-semibold text-[#9F1239] dark:text-[#FB7185] flex items-center gap-1">
+                <div className="flex justify-between text-xs mt-2 px-2 py-1.5 rounded-lg bg-cherry-100 dark:bg-cherry-500/15">
+                  <span className="font-semibold text-cherry-700 dark:text-cherry-400 flex items-center gap-1">
                     <Sparkles size={10} strokeWidth={2.8} /> Poin diperoleh
                   </span>
-                  <span className="font-bold text-[#9F1239] dark:text-[#FB7185]">+{(lastOrder.pointsEarned || 0).toLocaleString("id-ID")}</span>
+                  <span className="font-bold text-cherry-700 dark:text-cherry-400">+{(lastOrder.pointsEarned || 0).toLocaleString("id-ID")}</span>
                 </div>
               )}
             </div>
@@ -1990,7 +1983,7 @@ export function POSPage() {
                     )}
                   </div>
                   <button onClick={() => setLastOrder(null)}
-                    className="w-full min-h-[44px] rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48]">{t.close}</button>
+                    className="w-full min-h-[44px] rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-cherry-400 to-cherry-500">{t.close}</button>
                 </div>
               );
             })()}
@@ -2032,7 +2025,7 @@ export function POSPage() {
                   return (
                     <button key={acc.id} onClick={() => setPendingBankId(acc.id)}
                       className={`w-full text-left rounded-xl border p-3 text-sm ${
-                        selected ? "border-[#E11D48] bg-gradient-to-r from-[#FB7185]/10 to-[#E11D48]/10" : `${th.card2} ${th.bdr}`
+                        selected ? "border-cherry-500 bg-gradient-to-r from-cherry-400/10 to-cherry-500/10" : `${th.card2} ${th.bdr}`
                       }`}>
                       <p className={`font-bold ${th.tx}`}>{acc.bankName}</p>
                       <p className={`text-xs ${th.txm}`}>{acc.accountNumber} · {acc.accountHolder}</p>
@@ -2043,7 +2036,7 @@ export function POSPage() {
             </div>
           )}
           {bankAccounts.length === 0 && (
-            <p className={`text-xs ${th.txm} p-2 rounded-lg bg-[#FFE4E9]`}>
+            <p className={`text-xs ${th.txm} p-2 rounded-lg bg-cherry-100`}>
               Belum ada rekening di Settings. Pesan akan dikirim tanpa info transfer.
             </p>
           )}
@@ -2101,7 +2094,7 @@ export function POSPage() {
                 } catch { /* toast already shown */ }
               }}
               disabled={!pendingCustomerPhone.trim()}
-              className="flex-1 py-3 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48] disabled:opacity-40"
+              className="flex-1 py-3 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-cherry-400 to-cherry-500 disabled:opacity-40"
             >
               Simpan & Kirim WA
             </button>
@@ -2123,7 +2116,7 @@ export function POSPage() {
               : ageHours < 24 ? `${Math.floor(ageHours)} jam lalu`
               : `${Math.floor(ageHours / 24)} hari lalu`;
             const ageColor = ageHours > 24 ? "text-[#BE123C]"
-              : ageHours > 3 ? "text-[#E11D48]"
+              : ageHours > 3 ? "text-cherry-500"
               : th.txm;
             return (
               <div key={o.id} className={`rounded-2xl border p-4 ${th.card2} ${th.bdr}`}>
@@ -2142,7 +2135,7 @@ export function POSPage() {
                 <div className="flex gap-1.5">
                   <button
                     onClick={() => { setMarkPaidOrderId(o.id); setMarkPaidMethod("cash"); setMarkPaidCashRcv(""); setMarkPaidSplit(""); }}
-                    className="flex-1 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48]"
+                    className="flex-1 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-cherry-400 to-cherry-500"
                   >
                     Tandai Lunas
                   </button>
@@ -2153,7 +2146,7 @@ export function POSPage() {
                         toast.success("WA terkirim ulang");
                       } catch { /* toast already shown */ }
                     }}
-                    className={`py-2 px-3 rounded-xl text-xs font-bold border-2 border-[#FFB5C0] ${th.acc}`}
+                    className={`py-2 px-3 rounded-xl text-xs font-bold border-2 border-cherry-300 ${th.acc}`}
                     title="Kirim ulang rincian ke customer"
                   >
                     <Send size={12} />
@@ -2200,7 +2193,7 @@ export function POSPage() {
                 {(["cash", "card", "transfer", "qris"] as PaymentMethod[]).map(pm => (
                   <button key={pm} onClick={() => { setMarkPaidMethod(pm); setMarkPaidSplit(""); setMarkPaidCashRcv(""); }}
                     className={`py-2.5 rounded-xl text-xs font-bold ${
-                      markPaidMethod === pm ? "text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48]" : `border ${th.bdr} ${th.txm}`
+                      markPaidMethod === pm ? "text-white bg-gradient-to-r from-cherry-400 to-cherry-500" : `border ${th.bdr} ${th.txm}`
                     }`}>{t[pm]}</button>
                 ))}
               </div>
@@ -2210,16 +2203,16 @@ export function POSPage() {
                   <input type="number" value={markPaidCashRcv} onChange={e => setMarkPaidCashRcv(e.target.value)}
                     placeholder="0" className={`w-full px-4 py-3 text-base rounded-2xl border ${th.inp}`} />
                   {enoughCash && (
-                    <p className="text-sm font-bold text-[#E11D48] mt-2">Kembalian: {$(rcv - o.total)}</p>
+                    <p className="text-sm font-bold text-cherry-500 mt-2">Kembalian: {$(rcv - o.total)}</p>
                   )}
                   {needSplit && (
-                    <div className={`mt-3 rounded-2xl border p-4 ${th.bdr} bg-[#FFE4E9]`}>
+                    <div className={`mt-3 rounded-2xl border p-4 ${th.bdr} bg-cherry-100`}>
                       <p className={`text-sm font-bold mb-2 ${th.acc}`}>Kurang {$(o.total - rcv)}</p>
                       <div className="grid grid-cols-3 gap-2">
                         {(["qris", "transfer", "card"] as PaymentMethod[]).map(m => (
                           <button key={m} onClick={() => setMarkPaidSplit(m)}
                             className={`py-2 rounded-xl text-xs font-bold ${
-                              markPaidSplit === m ? "text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48]" : `border ${th.bdr} ${th.tx} ${th.card}`
+                              markPaidSplit === m ? "text-white bg-gradient-to-r from-cherry-400 to-cherry-500" : `border ${th.bdr} ${th.tx} ${th.card}`
                             }`}>{t[m]}</button>
                         ))}
                       </div>
@@ -2248,7 +2241,7 @@ export function POSPage() {
                     } catch { /* toast already shown */ }
                   }}
                   disabled={!canConfirm}
-                  className="flex-1 py-3 rounded-2xl text-sm font-bold text-white bg-[#E11D48] disabled:opacity-40"
+                  className="flex-1 py-3 rounded-2xl text-sm font-bold text-white bg-cherry-500 disabled:opacity-40"
                 >
                   Konfirmasi Lunas
                 </button>
@@ -2295,7 +2288,7 @@ export function POSPage() {
                         if (e.target.checked) next.add(p.id); else next.delete(p.id);
                         setSelectedLabels(next);
                       }}
-                      className="w-4 h-4 rounded accent-[#E11D48] shrink-0" />
+                      className="w-4 h-4 rounded accent-cherry-500 shrink-0" />
                     <div className="min-w-0 flex-1">
                       <p className={`text-base font-bold truncate ${th.tx}`}>{lang === "id" ? p.nameId : p.name}</p>
                       <p className={`text-xs font-mono ${th.txf}`}>{p.sku}</p>
@@ -2321,7 +2314,7 @@ export function POSPage() {
                   setLabelExpiryDate("");
                   setLabelConfirmOpen(true);
                 }}
-                className={`flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48]`}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-cherry-400 to-cherry-500`}
               >
                 <Printer size={14} /> Lanjut · {selectedLabels.size} label
               </button>
@@ -2341,7 +2334,7 @@ export function POSPage() {
           <label className={`flex items-center gap-2 cursor-pointer px-3 py-2.5 rounded-xl border ${th.bdr}`}>
             <input type="checkbox" checked={labelIncludeExpiry}
               onChange={e => setLabelIncludeExpiry(e.target.checked)}
-              className="w-4 h-4 rounded accent-[#E11D48]" />
+              className="w-4 h-4 rounded accent-cherry-500" />
             <span className={`text-sm font-bold ${th.tx}`}>Tampilkan tanggal kadaluarsa</span>
           </label>
 
@@ -2376,7 +2369,7 @@ export function POSPage() {
                 setLabelModalOpen(false);
                 setLabelSearch("");
               }}
-              className="flex-1 py-3 rounded-xl text-sm font-bold text-white bg-[#E11D48]"
+              className="flex-1 py-3 rounded-xl text-sm font-bold text-white bg-cherry-500"
             >
               Print
             </button>
@@ -2392,7 +2385,7 @@ export function POSPage() {
               <p className="font-semibold text-sm">{t.noOrderHistory}</p>
             </div>
           ) : sessionOrders.map(o => {
-            const statusColor = o.status === "completed" ? "text-[#E11D48]" : o.status === "cancelled" ? "text-[#C4504A]" : o.status === "refunded" ? "text-[#E11D48]" : th.txm;
+            const statusColor = o.status === "completed" ? "text-cherry-500" : o.status === "cancelled" ? "text-[#C4504A]" : o.status === "refunded" ? "text-cherry-500" : th.txm;
             const statusLabel = t[o.status as keyof typeof t] as string || o.status;
             return (
               <div key={o.id} className={`rounded-[16px] border p-3.5 ${th.card2} ${th.bdr}`}>
@@ -2443,7 +2436,7 @@ export function POSPage() {
           {/* Total Modal — hero row, computed. Shows what SHOULD be in the
               drawer (opening + all cash orders this shift). Helps kasir
               compare with physical count. */}
-          <div className={`rounded-[18px] border p-4 ${th.bdr} bg-gradient-to-br from-[#FFE4E9] to-[#FFD1DB] dark:from-[#E11D48]/15 dark:to-[#9F1239]/20`}>
+          <div className={`rounded-[18px] border p-4 ${th.bdr} bg-gradient-to-br from-cherry-100 to-cherry-200 dark:from-cherry-500/15 dark:to-cherry-700/20`}>
             <div className="flex justify-between items-baseline">
               <span className={`text-sm font-semibold uppercase tracking-wider ${th.acc}`}>Total Modal</span>
               <span className={`font-display text-2xl font-black ${th.acc}`} style={{ fontVariationSettings: '"wght" 900' }}>
@@ -2460,7 +2453,7 @@ export function POSPage() {
             <button onClick={() => { setCloseRegisterOpen(false); setActualCash(""); setRegisterNotes(""); }}
               className={`flex-1 py-3 rounded-2xl text-sm font-bold border ${th.bdr} ${th.txm}`}>{t.cancel}</button>
             <button onClick={doCloseRegister} disabled={!actualCash}
-              className="flex-1 py-3 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48] disabled:opacity-40">{t.confirm}</button>
+              className="flex-1 py-3 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-cherry-400 to-cherry-500 disabled:opacity-40">{t.confirm}</button>
           </div>
 
           {/* Today's register history */}
@@ -2531,14 +2524,14 @@ export function POSPage() {
                       onClick={() => {
                         if (disabled) return;
                         addRedeemable(it);
-                        toast.success(`Ditambahkan: ${it.name}`, { icon: <Gift size={16} strokeWidth={2.6} className="text-[#E11D48]" /> });
+                        toast.success(`Ditambahkan: ${it.name}`, { icon: <Gift size={16} strokeWidth={2.6} className="text-cherry-500" /> });
                       }}
                       disabled={disabled}
                       className={`w-full text-left flex items-start gap-3 p-3 rounded-xl border transition ${disabled ? "opacity-50" : "active:scale-[.98]"} ${th.bdr} ${th.card2}`}>
                       {it.image ? (
                         <img src={it.image} alt="" className="w-14 h-14 rounded-lg object-cover shrink-0" />
                       ) : (
-                        <div className="w-14 h-14 rounded-lg bg-[#FFE4E9] text-[#E11D48] shrink-0 flex items-center justify-center">
+                        <div className="w-14 h-14 rounded-lg bg-cherry-100 text-cherry-500 shrink-0 flex items-center justify-center">
                           <Gift size={22} strokeWidth={2.2} />
                         </div>
                       )}
@@ -2593,7 +2586,7 @@ export function POSPage() {
               setParkNameModalOpen(false);
               setParkNameInput("");
             }}
-              className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48]">
+              className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-cherry-400 to-cherry-500">
               Parkir
             </button>
           </div>

@@ -45,6 +45,8 @@ export interface AuditRes {
 }
 
 export interface SettingsRes {
+  /** Nama palet warna merek. Kosong/absen = merah muda bawaan. */
+  brand_color?: string | null;
   id: string;
   store_name: string;
   store_address?: string;
@@ -145,7 +147,7 @@ export const auditApi = {
 export const settingsApi = {
   get: () => api.get<SettingsRes>('/settings/'),
 
-  update: (data: { store_name?: string; store_address?: string; store_phone?: string; ppn_rate?: number; label_width?: number; label_height?: number }) =>
+  update: (data: { store_name?: string; store_address?: string; store_phone?: string; ppn_rate?: number; label_width?: number; label_height?: number; brand_color?: string }) =>
     api.put<SettingsRes>('/settings/', data),
 
   addBankAccount: (data: { location?: string; bank_name: string; account_number: string; account_holder: string }) =>

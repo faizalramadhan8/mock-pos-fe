@@ -90,7 +90,7 @@ export function FinancePage() {
     <div className="flex flex-col gap-4">
       {/* Header — confidential badge supaya Bu Santi aware ini page rahasia */}
       <div className="flex items-center gap-3">
-        <div className={`w-11 h-11 rounded-xl flex items-center justify-center bg-gradient-to-br from-[#FB7185] to-[#E11D48] text-white shrink-0`}>
+        <div className={`w-11 h-11 rounded-xl flex items-center justify-center bg-gradient-to-br from-cherry-400 to-cherry-500 text-white shrink-0`}>
           <Wallet size={20} aria-hidden />
         </div>
         <div className="flex-1 min-w-0">
@@ -99,7 +99,7 @@ export function FinancePage() {
               {lang === "id" ? "Keuangan" : "Finance"}
             </h1>
             <span className={`inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded ${
-              th.dark ? "bg-[#3A1F2A] text-[#FB7185] border border-[#FB7185]/30" : "bg-[#FFF4F6] text-[#BE123C] border border-[#E11D48]/30"
+              th.dark ? "bg-cherry-900 text-cherry-400 border border-cherry-400/30" : "bg-cherry-50 text-[#BE123C] border border-cherry-500/30"
             }`}>
               <Lock size={9} aria-hidden />
               {lang === "id" ? "Rahasia" : "Confidential"}
@@ -129,7 +129,7 @@ export function FinancePage() {
                 aria-pressed={range === r}
                 className={`px-3 min-h-[44px] rounded-xl text-sm font-bold transition-colors ${
                   range === r
-                    ? "text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48]"
+                    ? "text-white bg-gradient-to-r from-cherry-400 to-cherry-500"
                     : `border ${th.bdr} ${th.card} ${th.txm}`
                 }`}
               >
@@ -153,7 +153,7 @@ export function FinancePage() {
           <button key={item.id} role="tab" aria-selected={tab === item.id}
             onClick={() => setTab(item.id)}
             className={`shrink-0 inline-flex items-center gap-1.5 px-4 min-h-[44px] rounded-[14px] text-sm font-bold transition-all ${
-              tab === item.id ? "text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48]" : `border ${th.bdr} ${th.card} ${th.txm}`
+              tab === item.id ? "text-white bg-gradient-to-r from-cherry-400 to-cherry-500" : `border ${th.bdr} ${th.card} ${th.txm}`
             }`}>
             {item.icon}{item.label}
           </button>
@@ -170,7 +170,7 @@ export function FinancePage() {
           <button key={k} onClick={() => setTempat(k)} aria-pressed={tempat === k}
             className={`text-sm font-bold px-3 py-1.5 rounded-xl ${
               tempat === k
-                ? "text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48]"
+                ? "text-white bg-gradient-to-r from-cherry-400 to-cherry-500"
                 : `border ${th.bdr} ${th.txm}`
             }`}>{label}</button>
         ))}

@@ -2,9 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { useMemberStore, useProductStore } from "@/stores";
 import { productApi } from "@/api";
 import { useThemeClasses } from "@/hooks/useThemeClasses";
-import { formatCurrency as $ } from "@/utils";
+import { formatCurrency as $, statusJadwalTier } from "@/utils";
 import { Modal } from "./Modal";
-import { Plus, Trash2, Users, UserCheck, Search } from "lucide-react";
+import { Plus, Trash2, Users, UserCheck, UsersRound, Search, CalendarClock } from "lucide-react";
 import toast from "react-hot-toast";
 import type { ProductPriceTier, PriceTierTarget } from "@/types";
 import type { ProductPriceTierRes } from "@/api/products";
@@ -23,8 +23,12 @@ interface DraftTier {
   target: PriceTierTarget;
   memberIds: string[];
   note: string;
-  /** Durasi promo: 0 = tidak terbatas, 1/3/6/12/30 hari. */
-  durationDays: 0 | 1 | 3 | 6 | 12 | 30;
+  /** Periode berlaku, "YYYY-MM-DD". Kosong = tidak dibatasi di sisi itu.
+   *  Menggantikan pilihan durasi (1/3/6/12/30 hari) yang selalu mulai detik
+   *  itu juga — Bu Santi 30 Okt 2026 butuh memasang promo bulan depan dari
+   *  sekarang, dan durasi tidak bisa menyatakan itu. */
+  mulai: string;
+  sampai: string;
 }
 
 const emptyDraft: DraftTier = {
@@ -33,8 +37,61 @@ const emptyDraft: DraftTier = {
   target: "all_customers",
   memberIds: [],
   note: "",
-  durationDays: 0,
+  mulai: "",
+  sampai: "",
 };
+
+const TARGET_OPSI: { v: PriceTierTarget; label: string; jelas: string; Icon: typeof Users }[] = [
+  { v: "all_customers", label: "Semua Customer", jelas: "Siapa saja, termasuk yang bukan member", Icon: Users },
+  { v: "all_members", label: "Semua Member", jelas: "Semua member terdaftar, bukan walk-in", Icon: UsersRound },
+  { v: "member_specific", label: "Member Tertentu", jelas: "Hanya member yang dipilih di bawah", Icon: UserCheck },
+];
+
+function fmtTgl(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/** ISO dari backend → nilai untuk <input type="date">. */
+function tglMulaiInput(iso?: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? "" : fmtTgl(d);
+}
+
+/**
+ * Kebalikan dari cara backend menyimpan batas akhir: tanggal yang diketik
+ * admin disimpan sebagai 00:00 hari BERIKUTNYA (lihat parseJadwalTier) supaya
+ * hari terakhir terhitung penuh. Untuk ditampilkan lagi harus dimundurkan
+ * sehari — kalau tidak, admin membuka tier "sampai 31 Des" dan membacanya
+ * sebagai 1 Januari.
+ *
+ * Tier lama yang dibuat lewat pilihan durasi punya jam sembarang (NOW + N
+ * hari); itu ditampilkan apa adanya.
+ */
+function tglSampaiInput(iso?: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  if (d.getHours() === 0 && d.getMinutes() === 0 && d.getSeconds() === 0) {
+    d.setDate(d.getDate() - 1);
+  }
+  return fmtTgl(d);
+}
+
+/** Pintasan periode. "Bulan depan" adalah kasus yang Bu Santi sebut sendiri. */
+function pintasanPeriode(): { label: string; mulai: string; sampai: string }[] {
+  const now = new Date();
+  const akhirBulanIni = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  const awalBulanDepan = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  const akhirBulanDepan = new Date(now.getFullYear(), now.getMonth() + 2, 0);
+  const tujuhHari = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 6);
+  return [
+    { label: "Berlaku terus", mulai: "", sampai: "" },
+    { label: "7 hari ke depan", mulai: fmtTgl(now), sampai: fmtTgl(tujuhHari) },
+    { label: "Sisa bulan ini", mulai: fmtTgl(now), sampai: fmtTgl(akhirBulanIni) },
+    { label: "Bulan depan", mulai: fmtTgl(awalBulanDepan), sampai: fmtTgl(akhirBulanDepan) },
+  ];
+}
 
 function mapRes(t: ProductPriceTierRes): ProductPriceTier {
   return {
@@ -45,6 +102,7 @@ function mapRes(t: ProductPriceTierRes): ProductPriceTier {
     target: t.target_type,
     members: t.members || [],
     note: t.note,
+    startsAt: t.starts_at || undefined,
     expiresAt: t.expires_at || undefined,
     createdAt: t.created_at,
   };
@@ -110,9 +168,12 @@ export function PriceTierEditor({ productId }: Props) {
       target: t.target,
       memberIds: (t.members || []).map(m => m.id),
       note: t.note || "",
-      // Edit existing: tier durasi tidak ke-load (BE tidak return remaining days).
-      // Admin re-pick kalau mau perpanjang/ubah. Default = tidak terbatas.
-      durationDays: 0,
+      // Tanggalnya SEKARANG ikut dimuat. Dulu tidak bisa karena backend
+      // menyimpan tanggal sementara layarnya menanyakan durasi — menebak
+      // durasi dari tanggal akan salah, jadi isian itu selalu kosong dan
+      // menyimpan perubahan apa pun diam-diam menghapus masa berlakunya.
+      mulai: tglMulaiInput(t.startsAt),
+      sampai: tglSampaiInput(t.expiresAt),
     });
     setMemberQuery("");
     setEditorOpen(true);
@@ -152,6 +213,10 @@ export function PriceTierEditor({ productId }: Props) {
     if (draft.target === "member_specific" && draft.memberIds.length === 0) {
       toast.error("Pilih minimal 1 member"); return;
     }
+    // Perbandingan string aman untuk "YYYY-MM-DD".
+    if (draft.mulai && draft.sampai && draft.sampai < draft.mulai) {
+      toast.error("Tanggal selesai tidak boleh sebelum tanggal mulai"); return;
+    }
     setSaving(true);
     try {
       // Convert bundle total → per-satuan untuk storage. Pakai DECIMAL precision
@@ -163,7 +228,11 @@ export function PriceTierEditor({ productId }: Props) {
         target_type: draft.target,
         member_ids: draft.target === "member_specific" ? draft.memberIds : undefined,
         note: draft.note || undefined,
-        duration_days: draft.durationDays > 0 ? draft.durationDays : undefined,
+        // Dikirim selalu, termasuk saat kosong — string kosong adalah cara
+        // menghapus batasnya. Kalau field-nya dihilangkan saat kosong,
+        // backend menganggap "tidak diubah" dan jadwal lama menempel terus.
+        starts_at: draft.mulai,
+        expires_at: draft.sampai,
       };
       if (draft.id) {
         const res = await productApi.updateTier(productId, draft.id, payload);
@@ -209,7 +278,7 @@ export function PriceTierEditor({ productId }: Props) {
         </div>
         <button
           onClick={openAdd}
-          className="px-4 py-2.5 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48] inline-flex items-center gap-1.5 shrink-0">
+          className="px-4 py-2.5 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-cherry-400 to-cherry-500 inline-flex items-center gap-1.5 shrink-0">
           <Plus size={16} strokeWidth={2.6} /> Tambah Tier
         </button>
       </div>
@@ -232,28 +301,40 @@ export function PriceTierEditor({ productId }: Props) {
                   <span className={`text-sm ${th.txf}`}>({$(Math.round(t.price))}/satuan)</span>
                 </div>
                 <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
-                  {t.target === "all_customers" ? (
-                    <span className={`text-sm font-semibold inline-flex items-center gap-1.5 px-2 py-1 rounded-md ${th.accBg} ${th.acc}`}>
-                      <Users size={14} strokeWidth={2.8} /> Semua customer
-                    </span>
-                  ) : (
-                    <span className={`text-sm font-semibold inline-flex items-center gap-1.5 px-2 py-1 rounded-md ${th.accBg} ${th.acc}`}>
-                      <UserCheck size={14} strokeWidth={2.8} /> {(t.members || []).length} member tertentu
-                    </span>
-                  )}
                   {(() => {
-                    if (!t.expiresAt) return null;
-                    const ms = new Date(t.expiresAt).getTime();
-                    const now = Date.now();
-                    const expired = ms < now;
-                    const daysLeft = Math.ceil((ms - now) / 86400000);
-                    return expired ? (
-                      <span className="text-sm font-bold inline-flex items-center gap-1 px-2 py-1 rounded-md bg-[#FCE4EC] text-[#BE123C]">
-                        Sudah expire
+                    const opt = TARGET_OPSI.find(o => o.v === t.target) || TARGET_OPSI[0];
+                    const label = t.target === "member_specific"
+                      ? `${(t.members || []).length} member tertentu`
+                      : opt.label;
+                    return (
+                      <span className={`text-sm font-semibold inline-flex items-center gap-1.5 px-2 py-1 rounded-md ${th.accBg} ${th.acc}`}>
+                        <opt.Icon size={14} strokeWidth={2.8} /> {label}
                       </span>
-                    ) : (
+                    );
+                  })()}
+                  {(() => {
+                    const st = statusJadwalTier(t);
+                    if (st.kind === "berakhir") {
+                      return (
+                        <span className="text-sm font-bold inline-flex items-center gap-1 px-2 py-1 rounded-md bg-[#FCE4EC] text-[#BE123C]">
+                          Sudah berakhir
+                        </span>
+                      );
+                    }
+                    if (st.kind === "terjadwal") {
+                      // Promo bulan depan terlihat persis seperti promo yang
+                      // tidak jalan. Ditandai supaya tidak ada yang mengira
+                      // tiernya rusak lalu memasangnya dua kali.
+                      return (
+                        <span className={`text-sm font-bold inline-flex items-center gap-1 px-2 py-1 rounded-md ${th.elev} ${th.acc}`}>
+                          <CalendarClock size={14} strokeWidth={2.8} /> Mulai {st.hariLagi} hari lagi
+                        </span>
+                      );
+                    }
+                    if (st.hariLagi === Infinity) return null;
+                    return (
                       <span className={`text-sm font-semibold inline-flex items-center gap-1 px-2 py-1 rounded-md ${th.elev} ${th.txm}`}>
-                        Sisa {daysLeft} hari
+                        Sisa {st.hariLagi} hari
                       </span>
                     );
                   })()}
@@ -292,7 +373,7 @@ export function PriceTierEditor({ productId }: Props) {
           )}
 
           <p className={`text-sm ${th.txm} -mt-1`}>
-            <strong className={th.tx}>Aturan:</strong> Kalau customer beli minimal qty di bawah, total bayarnya sesuai harga bundle yang di-set. Pilih "Semua Customer" supaya berlaku untuk member maupun non-member, atau "Member Tertentu" untuk batasi ke member yang di-pilih.
+            <strong className={th.tx}>Aturan:</strong> Kalau customer beli minimal qty di bawah, total bayarnya sesuai harga bundle yang di-set. Lalu pilih berlaku untuk siapa, dan periode tanggalnya kalau ini promo musiman.
           </p>
 
           <div className="grid grid-cols-2 gap-2">
@@ -324,7 +405,7 @@ export function PriceTierEditor({ productId }: Props) {
             const perSatuan = totalN / minQtyN;
             if (diff > 0) {
               return (
-                <div className="text-sm px-3.5 py-2.5 rounded-lg bg-[#FFE4E9] dark:bg-[#E11D48]/15 text-[#9F1239] dark:text-[#FB7185] space-y-0.5">
+                <div className="text-sm px-3.5 py-2.5 rounded-lg bg-cherry-100 dark:bg-cherry-500/15 text-cherry-700 dark:text-cherry-400 space-y-0.5">
                   <p>Beli {minQtyN} satuan: <strong>{$(totalN)}</strong> (normal {$(normalTotal)})</p>
                   <p>Hemat <strong>{$(diff)}</strong> · efektif {$(Math.round(perSatuan))}/satuan</p>
                 </div>
@@ -346,17 +427,32 @@ export function PriceTierEditor({ productId }: Props) {
 
           <div>
             <p className={`text-sm font-semibold mb-1.5 ${th.txm}`}>Untuk siapa?</p>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setDraft({ ...draft, target: "all_customers" })}
-                className={`flex-1 py-3 rounded-xl text-sm font-bold inline-flex items-center justify-center gap-2 border ${draft.target === "all_customers" ? "bg-gradient-to-r from-[#FB7185] to-[#E11D48] text-white border-transparent" : `${th.bdr} ${th.txm}`}`}>
-                <Users size={16} strokeWidth={2.6} /> Semua Customer
-              </button>
-              <button
-                onClick={() => setDraft({ ...draft, target: "member_specific" })}
-                className={`flex-1 py-3 rounded-xl text-sm font-bold inline-flex items-center justify-center gap-2 border ${draft.target === "member_specific" ? "bg-gradient-to-r from-[#FB7185] to-[#E11D48] text-white border-transparent" : `${th.bdr} ${th.txm}`}`}>
-                <UserCheck size={16} strokeWidth={2.6} /> Member Tertentu
-              </button>
+            {/* Disusun ke bawah dengan keterangan, bukan tiga tombol
+                berdampingan. Beda "Semua Customer" dan "Semua Member" tidak
+                terbaca dari namanya saja — memilih yang salah berarti harga
+                grosir member bocor ke walk-in, dan itu baru ketahuan dari
+                omzet yang menipis. */}
+            <div className="space-y-1.5">
+              {TARGET_OPSI.map(opt => {
+                const aktif = draft.target === opt.v;
+                return (
+                  <button
+                    key={opt.v}
+                    onClick={() => setDraft({ ...draft, target: opt.v })}
+                    aria-pressed={aktif}
+                    className={`w-full text-left px-3 py-2.5 rounded-xl border inline-flex items-center gap-2.5 ${
+                      aktif
+                        ? "bg-gradient-to-r from-cherry-400 to-cherry-500 text-white border-transparent"
+                        : `${th.bdr} ${th.txm}`
+                    }`}>
+                    <opt.Icon size={18} strokeWidth={2.6} className="shrink-0" />
+                    <span className="min-w-0">
+                      <span className="block text-sm font-bold">{opt.label}</span>
+                      <span className={`block text-xs ${aktif ? "text-white/80" : th.txf}`}>{opt.jelas}</span>
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -383,7 +479,7 @@ export function PriceTierEditor({ productId }: Props) {
                       <button
                         key={m.id}
                         onClick={() => toggleMember(m.id)}
-                        className={`w-full text-left flex items-center justify-between gap-2 p-2.5 rounded-lg border transition-colors ${selected ? "bg-[#FFE4E9] dark:bg-[#E11D48]/15 border-[#E11D48]/30" : `${th.bdr}`}`}>
+                        className={`w-full text-left flex items-center justify-between gap-2 p-2.5 rounded-lg border transition-colors ${selected ? "bg-cherry-100 dark:bg-cherry-500/15 border-cherry-500/30" : `${th.bdr}`}`}>
                         <div className="min-w-0">
                           <p className={`text-sm font-bold truncate ${th.tx}`}>{m.name}</p>
                           <p className={`text-sm ${th.txf}`}>{m.phone}</p>
@@ -398,38 +494,57 @@ export function PriceTierEditor({ productId }: Props) {
           )}
 
           <div>
-            <p className={`text-sm font-semibold mb-1.5 ${th.txm}`}>Berlaku selama</p>
-            <div className="flex gap-1.5 flex-wrap">
-              {([
-                { val: 0, label: "Tidak terbatas" },
-                { val: 1, label: "1 hari" },
-                { val: 3, label: "3 hari" },
-                { val: 6, label: "6 hari" },
-                { val: 12, label: "12 hari" },
-                { val: 30, label: "30 hari" },
-              ] as const).map(opt => (
-                <button
-                  key={opt.val}
-                  onClick={() => setDraft({ ...draft, durationDays: opt.val })}
-                  className={`px-3 py-2 rounded-lg text-sm font-bold border ${
-                    draft.durationDays === opt.val
-                      ? "bg-gradient-to-r from-[#FB7185] to-[#E11D48] text-white border-transparent"
-                      : `${th.bdr} ${th.txm}`
-                  }`}>
-                  {opt.label}
-                </button>
-              ))}
+            <p className={`text-sm font-semibold mb-1.5 ${th.txm}`}>Periode berlaku</p>
+            <div className="flex gap-1.5 flex-wrap mb-2">
+              {pintasanPeriode().map(p => {
+                const aktif = draft.mulai === p.mulai && draft.sampai === p.sampai;
+                return (
+                  <button
+                    key={p.label}
+                    onClick={() => setDraft({ ...draft, mulai: p.mulai, sampai: p.sampai })}
+                    className={`px-3 py-2 rounded-lg text-sm font-bold border ${
+                      aktif
+                        ? "bg-gradient-to-r from-cherry-400 to-cherry-500 text-white border-transparent"
+                        : `${th.bdr} ${th.txm}`
+                    }`}>
+                    {p.label}
+                  </button>
+                );
+              })}
             </div>
-            {draft.id && (
-              <p className={`text-xs mt-1.5 ${th.txf}`}>
-                Pilih durasi baru kalau mau perpanjang. "Tidak terbatas" = hilangkan expiry.
-              </p>
-            )}
-            {!draft.id && draft.durationDays > 0 && (
-              <p className={`text-xs mt-1.5 ${th.acc}`}>
-                Tier akan otomatis non-aktif {draft.durationDays} hari dari sekarang.
-              </p>
-            )}
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <p className={`text-sm mb-1 ${th.txf}`}>Mulai</p>
+                <input type="date"
+                  value={draft.mulai}
+                  onChange={e => setDraft({ ...draft, mulai: e.target.value })}
+                  className={`w-full px-3 py-3 text-base rounded-xl border ${th.inp}`} />
+              </div>
+              <div>
+                <p className={`text-sm mb-1 ${th.txf}`}>Sampai</p>
+                <input type="date"
+                  value={draft.sampai}
+                  min={draft.mulai || undefined}
+                  onChange={e => setDraft({ ...draft, sampai: e.target.value })}
+                  className={`w-full px-3 py-3 text-base rounded-xl border ${th.inp}`} />
+              </div>
+            </div>
+            {/* Kalimat penutup menyebutkan AKIBATNYA, bukan mengulang isian.
+                Tanggal mulai di masa depan adalah hal yang paling mudah
+                disalahpahami: tiernya tersimpan tapi sengaja belum berlaku,
+                dan tanpa kalimat ini terlihat seperti tidak tersimpan. */}
+            <p className={`text-xs mt-1.5 ${draft.mulai && draft.mulai > fmtTgl(new Date()) ? th.acc : th.txf}`}>
+              {(() => {
+                const hariIni = fmtTgl(new Date());
+                const belumMulai = draft.mulai && draft.mulai > hariIni;
+                const tgl = (v: string) => new Date(v + "T00:00:00")
+                  .toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
+                if (belumMulai && draft.sampai) return `Belum berlaku. Harga ini aktif ${tgl(draft.mulai)} sampai ${tgl(draft.sampai)}.`;
+                if (belumMulai) return `Belum berlaku. Harga ini mulai aktif ${tgl(draft.mulai)} dan tidak dibatasi akhirnya.`;
+                if (draft.sampai) return `Berlaku sampai habis ${tgl(draft.sampai)}, lalu otomatis balik ke harga normal.`;
+                return "Kosongkan keduanya kalau harga ini berlaku terus.";
+              })()}
+            </p>
           </div>
 
           <div>
@@ -447,7 +562,7 @@ export function PriceTierEditor({ productId }: Props) {
               Batal
             </button>
             <button onClick={save} disabled={saving}
-              className="flex-1 py-3 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48] disabled:opacity-40">
+              className="flex-1 py-3 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-cherry-400 to-cherry-500 disabled:opacity-40">
               {saving ? "Menyimpan…" : draft.id ? "Update" : "Tambah"}
             </button>
           </div>

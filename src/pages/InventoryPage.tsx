@@ -112,7 +112,7 @@ export function InventoryPage() {
   });
   const [addCatOpen, setAddCatOpen] = useState(false);
   const [newCat, setNewCat] = useState({ name: "", nameId: "", color: "#F472B6" });
-  const catColors = ["#F472B6", "#BE123C", "#E11D48", "#7D5A44", "#E11D48", "#E11D48", "#E11D48", "#E11D48", "#9B59B6", "#E74C3C"];
+  const catColors = ["#F472B6", "#BE123C", "var(--color-cherry-500)", "#7D5A44", "var(--color-cherry-500)", "var(--color-cherry-500)", "var(--color-cherry-500)", "var(--color-cherry-500)", "#9B59B6", "#E74C3C"];
   const [overviewFilter, setOverviewFilter] = useState<"all" | "low" | "out" | "inactive" | "member">("all");
 
   // Dibuka dari kartu "Perlu Perhatian" di Beranda — langsung mendarat di tab
@@ -438,9 +438,9 @@ export function InventoryPage() {
                   className={`flex items-center justify-between px-5 py-3 border-b last:border-0 cursor-pointer active:opacity-70 ${th.bdrSoft}`}>
                   <div className="flex items-center gap-2.5">
                     <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${
-                      m.type === "in" ? (th.dark ? "bg-[#E11D48]/15" : "bg-[#FFE4E9]") : (th.dark ? "bg-[#C4504A]/15" : "bg-[#FCE4EC]")
+                      m.type === "in" ? (th.dark ? "bg-cherry-500/15" : "bg-cherry-100") : (th.dark ? "bg-[#C4504A]/15" : "bg-[#FCE4EC]")
                     }`}>
-                      {m.type === "in" ? <ArrowDownCircle size={14} className="text-[#E11D48]" /> : <ArrowUpCircle size={14} className="text-[#C4504A]" />}
+                      {m.type === "in" ? <ArrowDownCircle size={14} className="text-cherry-500" /> : <ArrowUpCircle size={14} className="text-[#C4504A]" />}
                     </div>
                     <div>
                       <p className={`text-sm font-semibold ${th.tx}`}>
@@ -451,7 +451,7 @@ export function InventoryPage() {
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className={`text-sm font-semibold ${m.type === "in" ? "text-[#E11D48]" : "text-[#C4504A]"}`}>{$(m.unitPrice * m.quantity)}</p>
+                    <p className={`text-sm font-semibold ${m.type === "in" ? "text-cherry-500" : "text-[#C4504A]"}`}>{$(m.unitPrice * m.quantity)}</p>
                     <p className={`text-xs ${th.txf}`}>{formatTime(m.createdAt)}</p>
                   </div>
                 </div>
@@ -653,14 +653,14 @@ export function InventoryPage() {
             <button key={tab.id} onClick={() => setActiveTab(tab.id)}
               className={`shrink-0 flex items-center gap-1.5 px-3.5 py-2.5 rounded-[14px] text-xs font-bold transition-all ${
                 activeTab === tab.id
-                  ? "text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48]"
+                  ? "text-white bg-gradient-to-r from-cherry-400 to-cherry-500"
                   : `border ${th.card} ${th.bdr} ${th.txm}`
               }`}>
               {tab.icon} {tab.label}
             </button>
           ))}
         </div>
-        <div className={`absolute right-0 top-0 bottom-1 w-8 pointer-events-none bg-gradient-to-l ${th.dark ? "from-[#140B0F]" : "from-[#FBE8EE]"}`} />
+        <div className={`absolute right-0 top-0 bottom-1 w-8 pointer-events-none bg-gradient-to-l ${th.dark ? "from-shade-bg" : "from-cherry-100"}`} />
       </div>
 
       {/* Admin-only action buttons — Tambah Produk is the primary action
@@ -680,11 +680,11 @@ export function InventoryPage() {
                 setNewProd(p => ({ ...p, sku }));
               }
             }}
-            className="press-spring py-3 rounded-2xl text-sm font-black flex items-center justify-center gap-2 text-white bg-gradient-to-br from-[#FB7185] to-[#E11D48] shadow-[0_4px_14px_-4px_rgba(225,29,72,0.45)]">
+            className="press-spring py-3 rounded-2xl text-sm font-black flex items-center justify-center gap-2 text-white bg-gradient-to-br from-cherry-400 to-cherry-500 shadow-[0_4px_14px_-4px_rgba(225,29,72,0.45)]">
             <Plus size={16} strokeWidth={3} /> {t.addProduct}
           </button>
           <button onClick={() => setAddCatOpen(true)}
-            className={`press-spring py-3 rounded-2xl text-sm font-bold border-2 border-[#FFB5C0] flex items-center justify-center gap-2 ${th.acc}`}>
+            className={`press-spring py-3 rounded-2xl text-sm font-bold border-2 border-cherry-300 flex items-center justify-center gap-2 ${th.acc}`}>
             <Plus size={16} strokeWidth={2.5} /> {t.addCategory}
           </button>
         </div>
@@ -727,11 +727,11 @@ export function InventoryPage() {
                       {$(totalJual)}
                     </p>
                   </div>
-                  <div className={`relative rounded-xl p-3 bg-gradient-to-br from-[#FFE4E9] to-[#FFD1DB] dark:from-[#E11D48]/15 dark:to-[#9F1239]/20 overflow-hidden`}>
+                  <div className={`relative rounded-xl p-3 bg-gradient-to-br from-cherry-100 to-cherry-200 dark:from-cherry-500/15 dark:to-cherry-700/20 overflow-hidden`}>
                     <div
                       aria-hidden
                       className="pointer-events-none absolute -top-4 -right-3 w-16 h-16 rounded-full blur-xl opacity-60"
-                      style={{ background: "radial-gradient(circle, #FFB5C0 0%, transparent 70%)" }}
+                      style={{ background: "radial-gradient(circle, var(--color-cherry-300) 0%, transparent 70%)" }}
                     />
                     <p className={`relative text-xs font-semibold ${th.acc}`}>Potensi Gain</p>
                     <p className={`relative font-display text-base font-black mt-1 ${th.acc}`} style={{ fontVariationSettings: '"wght" 800' }}>
@@ -750,7 +750,7 @@ export function InventoryPage() {
               <Search size={16} className={`absolute left-3.5 top-1/2 -translate-y-1/2 ${th.txf}`} />
               <input value={productSearch} onChange={e => setProductSearch(e.target.value)}
                 placeholder={t.searchProducts as string}
-                className={`w-full pl-10 pr-4 py-3 text-sm rounded-2xl border focus:outline-none focus:ring-2 focus:ring-[#E11D48]/20 font-medium ${th.inp}`} />
+                className={`w-full pl-10 pr-4 py-3 text-sm rounded-2xl border focus:outline-none focus:ring-2 focus:ring-cherry-500/20 font-medium ${th.inp}`} />
             </div>
             <select value={supplierFilter} onChange={e => setSupplierFilter(e.target.value)}
               className={`px-4 py-3 text-sm font-bold rounded-2xl border appearance-none cursor-pointer ${th.inp}`}>
@@ -777,7 +777,7 @@ export function InventoryPage() {
                 <button key={s.f} onClick={() => setOverviewFilter(s.f)}
                   className={`shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-bold transition-all ${
                     active
-                      ? "text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48]"
+                      ? "text-white bg-gradient-to-r from-cherry-400 to-cherry-500"
                       : `border ${th.bdr} ${s.alert ? "text-[#BE123C]" : th.txm}`
                   }`}>
                   <span>{s.l}</span>
@@ -800,7 +800,7 @@ export function InventoryPage() {
                       if (e.target.checked) setSelectedIds(new Set(filteredProducts.map(p => p.id)));
                       else setSelectedIds(new Set());
                     }}
-                    className="w-4 h-4 rounded accent-[#E11D48]" />
+                    className="w-4 h-4 rounded accent-cherry-500" />
                 )}
                 <p className={`text-sm font-extrabold tracking-tight ${th.tx}`}>
                   {t.product} ({filteredProducts.length})
@@ -828,7 +828,7 @@ export function InventoryPage() {
                   {canWrite && (
                     <button
                       onClick={() => categories.length === 0 ? setAddCatOpen(true) : setAddProdOpen(true)}
-                      className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48]"
+                      className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-cherry-400 to-cherry-500"
                     >
                       <Plus size={14} />
                       {categories.length === 0
@@ -856,7 +856,7 @@ export function InventoryPage() {
                         else next.delete(product.id);
                         setSelectedIds(next);
                       }}
-                      className="w-4 h-4 rounded accent-[#E11D48] shrink-0" />
+                      className="w-4 h-4 rounded accent-cherry-500 shrink-0" />
                   )}
                   <div className="min-w-0">
                     <p className={`text-[11px] font-mono uppercase tracking-[0.14em] ${th.txf}`}>{product.sku}</p>
@@ -889,7 +889,7 @@ export function InventoryPage() {
                   <div className="text-right">
                     <p className={`font-display text-2xl font-black leading-none ${
                       product.stock === 0 || product.stock <= product.minStock
-                        ? "text-[#BE123C] dark:text-[#FB7185]"
+                        ? "text-[#BE123C] dark:text-cherry-400"
                         : th.tx
                     }`} style={{ fontVariationSettings: '"opsz" 72, "wght" 800' }}>
                       {product.stock}
@@ -897,7 +897,7 @@ export function InventoryPage() {
                     </p>
                     <span className={`inline-block mt-1 text-xs font-bold px-2.5 py-1 rounded-lg ${
                       product.stock === 0 || product.stock <= product.minStock
-                        ? (th.dark ? "bg-[#BE123C]/25 text-[#FB7185]" : "bg-[#FCE4EC] text-[#BE123C]")
+                        ? (th.dark ? "bg-[#BE123C]/25 text-cherry-400" : "bg-[#FCE4EC] text-[#BE123C]")
                         : `${th.elev} ${th.txm}`
                     }`}>
                       {product.stock === 0 ? t.outOfStock : product.stock <= product.minStock ? t.lowStock : t.normalStock}
@@ -909,14 +909,14 @@ export function InventoryPage() {
                         onClick={(e) => { e.stopPropagation(); openAdjustStock(product.id); }}
                         aria-label="Sesuaikan stok"
                         title="Sesuaikan stok (repack/hilang/opname)"
-                        className={`w-7 h-7 rounded-lg flex items-center justify-center ${th.dark ? "bg-[#FFB5C0]/15 text-[#FFB5C0]" : "bg-[#FFD1DB] text-[#BE123C]"}`}
+                        className={`w-7 h-7 rounded-lg flex items-center justify-center ${th.dark ? "bg-cherry-300/15 text-cherry-300" : "bg-cherry-200 text-[#BE123C]"}`}
                       >
                         <Sliders size={12} />
                       </button>
                       <button
                         onClick={(e) => { e.stopPropagation(); openEditProduct(product.id); }}
                         aria-label="Edit product"
-                        className={`w-7 h-7 rounded-lg flex items-center justify-center ${th.dark ? "bg-[#E11D48]/15 text-[#E11D48]" : "bg-[#FFE4E9] text-[#E11D48]"}`}
+                        className={`w-7 h-7 rounded-lg flex items-center justify-center ${th.dark ? "bg-cherry-500/15 text-cherry-500" : "bg-cherry-100 text-cherry-500"}`}
                       >
                         <Pencil size={12} />
                       </button>
@@ -937,7 +937,7 @@ export function InventoryPage() {
                           toast.success(product.isActive ? t.productHidden as string : t.productShown as string);
                         }}
                         className={`w-10 h-6 rounded-full transition-colors relative ${
-                          product.isActive ? "bg-[#E11D48]" : (th.dark ? "bg-[#3D2230]" : "bg-[#F9C5D0]")
+                          product.isActive ? "bg-cherry-500" : (th.dark ? "bg-shade-elev" : "bg-cherry-200")
                         }`}
                         aria-label={product.isActive ? t.hideFromPOS as string : t.showInPOS as string}
                         title={product.isActive ? t.hideFromPOS as string : t.showInPOS as string}
@@ -1003,7 +1003,7 @@ export function InventoryPage() {
             ) : (
               <div className="grid grid-cols-2 gap-3">
                 <div className="flex items-center gap-3">
-                  <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${th.dark ? "bg-[#E11D48]/15" : "bg-[#FFE4E9]"}`}>
+                  <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${th.dark ? "bg-cherry-500/15" : "bg-cherry-100"}`}>
                     <ArrowDownCircle size={22} className={th.acc} />
                   </div>
                   <div>
@@ -1018,7 +1018,7 @@ export function InventoryPage() {
                     <ArrowUpCircle size={22} className="text-[#C4504A]" />
                   </div>
                   <div>
-                    <p className="font-display text-2xl font-black text-[#BE123C] dark:text-[#FB7185]" style={{ fontVariationSettings: '"wght" 900' }}>
+                    <p className="font-display text-2xl font-black text-[#BE123C] dark:text-cherry-400" style={{ fontVariationSettings: '"wght" 900' }}>
                       −{todayStats.todayOut}
                     </p>
                     <p className={`text-sm ${th.txm}`}>keluar</p>
@@ -1041,7 +1041,7 @@ export function InventoryPage() {
                   onClick={() => { setMovementsTypeFilter(opt.key); setMovementsVisibleCount(30); }}
                   className={`flex-1 min-h-[40px] rounded-xl text-sm font-bold transition-all ${
                     movementsTypeFilter === opt.key
-                      ? "text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48]"
+                      ? "text-white bg-gradient-to-r from-cherry-400 to-cherry-500"
                       : `border ${th.bdr} ${th.txm}`
                   }`}>
                   {opt.label}
@@ -1123,7 +1123,7 @@ export function InventoryPage() {
                       className={`flex items-start gap-3 px-5 py-3.5 cursor-pointer active:opacity-70 ${idx > 0 ? `border-t ${th.bdrSoft}` : ""}`}>
                       <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 ${
                         isIn
-                          ? (th.dark ? "bg-[#E11D48]/15" : "bg-[#FFE4E9]")
+                          ? (th.dark ? "bg-cherry-500/15" : "bg-cherry-100")
                           : (th.dark ? "bg-[#C4504A]/15" : "bg-[#FCE4EC]")
                       }`}>
                         {isIn ? <ArrowDownCircle size={18} className={th.acc} /> : <ArrowUpCircle size={18} className="text-[#C4504A]" />}
@@ -1131,7 +1131,7 @@ export function InventoryPage() {
                       <div className="flex-1 min-w-0">
                         <p className={`text-base font-bold truncate ${th.tx}`}>
                           {g.productName}
-                          <span className={`ml-2 font-display font-black ${isIn ? th.acc : "text-[#BE123C] dark:text-[#FB7185]"}`}>
+                          <span className={`ml-2 font-display font-black ${isIn ? th.acc : "text-[#BE123C] dark:text-cherry-400"}`}>
                             {isIn ? "+" : "−"}{g.qty}
                           </span>
                           {g.count > 1 && (
@@ -1145,8 +1145,8 @@ export function InventoryPage() {
                         </p>
                         {balanceAfter !== undefined && (
                           <p className={`text-sm mt-1 font-semibold inline-flex items-center gap-1 ${
-                            isEmpty ? "text-[#BE123C] dark:text-[#FB7185]"
-                            : isLow ? "text-[#BE123C] dark:text-[#FB7185]"
+                            isEmpty ? "text-[#BE123C] dark:text-cherry-400"
+                            : isLow ? "text-[#BE123C] dark:text-cherry-400"
                             : th.tx
                           }`}>
                             <span className={th.txf}>→ Sisa stok:</span>
@@ -1237,7 +1237,7 @@ export function InventoryPage() {
           {unpaidInvoices.length > 0 && (
             <div className={`rounded-[22px] border overflow-hidden ${th.card} ${th.bdr}`}>
               <div className={`px-5 py-3.5 border-b ${th.bdr} flex items-center gap-2`}>
-                <Receipt size={14} className="text-[#E11D48]" />
+                <Receipt size={14} className="text-cherry-500" />
                 <p className={`text-sm font-extrabold tracking-tight ${th.tx}`}>{t.unpaidInvoices} ({unpaidInvoices.length})</p>
               </div>
               {unpaidInvoices.map(inv => {
@@ -1259,7 +1259,7 @@ export function InventoryPage() {
                     {canWrite && (
                       <button onClick={() => { updatePaymentStatus(inv.id, "paid"); toast.success(t.paid as string); }}
                         className={`shrink-0 ml-3 px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1 ${
-                          th.dark ? "bg-[#E11D48]/15 text-[#E11D48]" : "bg-[#FFE4E9] text-[#E11D48]"
+                          th.dark ? "bg-cherry-500/15 text-cherry-500" : "bg-cherry-100 text-cherry-500"
                         }`}>
                         <Check size={12} /> {t.markAsPaid}
                       </button>
@@ -1271,7 +1271,7 @@ export function InventoryPage() {
           )}
           {unpaidInvoices.length === 0 && (
             <div className={`rounded-[18px] border p-3.5 flex items-center gap-2 ${th.card} ${th.bdr}`}>
-              <Check size={14} className="text-[#E11D48]" />
+              <Check size={14} className="text-cherry-500" />
               <p className={`text-sm font-semibold ${th.txm}`}>{t.noUnpaid}</p>
             </div>
           )}
@@ -1281,7 +1281,7 @@ export function InventoryPage() {
             <p className={`text-sm font-extrabold tracking-tight ${th.tx}`}>{t.suppliers}</p>
             {canWrite && (
               <button onClick={() => { setSupplierModal("add"); setSupForm({ name: "", phone: "", email: "", address: "" }); }}
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48]">
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-cherry-400 to-cherry-500">
                 <Plus size={13} /> {t.addSupplier}
               </button>
             )}
@@ -1313,7 +1313,7 @@ export function InventoryPage() {
                           setSupForm({ name: sup.name, phone: sup.phone, email: sup.email, address: sup.address });
                           setSupplierModal("edit");
                         }}
-                          className={`px-2.5 py-1.5 rounded-lg text-xs font-bold ${th.dark ? "bg-[#E11D48]/15 text-[#E11D48]" : "bg-[#FFE4E9] text-[#E11D48]"}`}>
+                          className={`px-2.5 py-1.5 rounded-lg text-xs font-bold ${th.dark ? "bg-cherry-500/15 text-cherry-500" : "bg-cherry-100 text-cherry-500"}`}>
                           {t.editSupplier}
                         </button>
                         {confirmDeleteSupplierId === sup.id ? (
@@ -1435,7 +1435,7 @@ export function InventoryPage() {
               const memberMargin = purchase > 0 ? ((member - purchase) / purchase * 100) : 0;
               const memberDiscount = sell > 0 ? ((sell - member) / sell * 100) : 0;
               return (
-                <p className={`text-xs mt-1 font-medium ${memberMargin < 0 ? "text-[#BE123C]" : memberMargin < 10 ? "text-[#E11D48]" : th.acc}`}>
+                <p className={`text-xs mt-1 font-medium ${memberMargin < 0 ? "text-[#BE123C]" : memberMargin < 10 ? "text-cherry-500" : th.acc}`}>
                   Diskon member: {memberDiscount.toFixed(1)}% · Margin member: {memberMargin.toFixed(1)}%
                 </p>
               );
@@ -1491,7 +1491,7 @@ export function InventoryPage() {
           <div className="flex gap-2 mt-1">
             <button onClick={() => setAddProdOpen(false)} className={`flex-1 py-3 rounded-2xl text-sm font-bold border ${th.bdr} ${th.txm}`}>{t.cancel}</button>
             <button onClick={doAddProduct} disabled={!newProd.name || !newProd.nameId || !newProd.sku}
-              className="flex-1 py-3 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48] disabled:opacity-40">{t.save}</button>
+              className="flex-1 py-3 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-cherry-400 to-cherry-500 disabled:opacity-40">{t.save}</button>
           </div>
         </div>
       </Modal>
@@ -1522,7 +1522,7 @@ export function InventoryPage() {
           <div className="flex gap-2 mt-1">
             <button onClick={() => setAddCatOpen(false)} className={`flex-1 py-3 rounded-2xl text-sm font-bold border ${th.bdr} ${th.txm}`}>{t.cancel}</button>
             <button onClick={doAddCategory} disabled={!newCat.name || !newCat.nameId}
-              className="flex-1 py-3 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48] disabled:opacity-40">{t.save}</button>
+              className="flex-1 py-3 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-cherry-400 to-cherry-500 disabled:opacity-40">{t.save}</button>
           </div>
         </div>
       </Modal>
@@ -1556,7 +1556,7 @@ export function InventoryPage() {
               className={`flex-1 py-3 rounded-2xl text-sm font-bold border ${th.bdr} ${th.txm}`}>{t.cancel}</button>
             <button onClick={supplierModal === "edit" ? doEditSupplier : doAddSupplier}
               disabled={!supForm.name.trim()}
-              className="flex-1 py-3 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48] disabled:opacity-40">{t.save}</button>
+              className="flex-1 py-3 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-cherry-400 to-cherry-500 disabled:opacity-40">{t.save}</button>
           </div>
         </div>
       </Modal>
@@ -1638,7 +1638,7 @@ export function InventoryPage() {
               const memberMargin = purchase > 0 ? ((member - purchase) / purchase * 100) : 0;
               const memberDiscount = sell > 0 ? ((sell - member) / sell * 100) : 0;
               return (
-                <p className={`text-xs mt-1 font-medium ${memberMargin < 0 ? "text-[#BE123C]" : memberMargin < 10 ? "text-[#E11D48]" : th.acc}`}>
+                <p className={`text-xs mt-1 font-medium ${memberMargin < 0 ? "text-[#BE123C]" : memberMargin < 10 ? "text-cherry-500" : th.acc}`}>
                   Diskon member: {memberDiscount.toFixed(1)}% · Margin member: {memberMargin.toFixed(1)}%
                 </p>
               );
@@ -1717,7 +1717,7 @@ export function InventoryPage() {
               : previewTone === "warn" ? "text-[#BE123C]"
               : th.txf;
             return (
-              <div className={`rounded-xl border p-3.5 ${th.bdr} bg-[#FFE4E9]/30`}>
+              <div className={`rounded-xl border p-3.5 ${th.bdr} bg-cherry-100/30`}>
                 <p className={`text-xs font-bold mb-2 ${th.acc}`}>+ Tambah Stok Baru dengan ED</p>
                 <div className="grid grid-cols-2 gap-2">
                   <div>
@@ -1741,7 +1741,7 @@ export function InventoryPage() {
           <div className="flex gap-2 mt-1">
             <button onClick={() => setEditProdOpen(false)} className={`flex-1 py-3 rounded-2xl text-sm font-bold border ${th.bdr} ${th.txm}`}>{t.cancel}</button>
             <button onClick={doEditProduct} disabled={!editProd.name || !editProd.nameId || !editProd.sku}
-              className="flex-1 py-3 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48] disabled:opacity-40">{t.save}</button>
+              className="flex-1 py-3 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-cherry-400 to-cherry-500 disabled:opacity-40">{t.save}</button>
           </div>
         </div>
       </Modal>
@@ -1827,13 +1827,13 @@ export function InventoryPage() {
                     <label key={opt.v}
                       className={`flex items-start gap-2.5 cursor-pointer px-3 py-2.5 rounded-xl border ${
                         adjustForm.reason === opt.v
-                          ? `${th.accBg} border-[#E11D48]/30`
+                          ? `${th.accBg} border-cherry-500/30`
                           : `${th.bdr}`
                       }`}>
                       <input type="radio" name="adjust-reason"
                         checked={adjustForm.reason === opt.v}
                         onChange={() => setAdjustForm({ ...adjustForm, reason: opt.v })}
-                        className="mt-0.5 w-4 h-4 accent-[#E11D48]" />
+                        className="mt-0.5 w-4 h-4 accent-cherry-500" />
                       <div className="min-w-0">
                         <p className={`text-sm font-bold ${th.tx}`}>{opt.label}</p>
                         <p className={`text-xs ${th.txm}`}>{opt.hint}</p>
@@ -1862,7 +1862,7 @@ export function InventoryPage() {
                   className={`flex-1 py-3 rounded-2xl text-sm font-bold border ${th.bdr} ${th.txm}`}>Batal</button>
                 <button onClick={doAdjustStock}
                   disabled={adjustSubmitting || diff === 0 || !Number.isFinite(newStockN) || newStockN < 0 || (adjustForm.reason === "other" && !adjustForm.note.trim())}
-                  className="flex-1 py-3 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48] disabled:opacity-40">
+                  className="flex-1 py-3 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-cherry-400 to-cherry-500 disabled:opacity-40">
                   {adjustSubmitting ? "Menyimpan..." : "Simpan"}
                 </button>
               </div>
@@ -1885,7 +1885,7 @@ export function InventoryPage() {
               </p>
 
               {/* Konsekuensi hapus — penting agar owner paham SKU lock-nya */}
-              <div className={`rounded-xl border px-3 py-3 text-xs flex items-start gap-2 ${th.dark ? "border-[#BE123C]/40 bg-[#3A1F2A]/40 text-[#FB7185]" : "border-[#BE123C]/30 bg-[#FCE4EC] text-[#BE123C]"}`}>
+              <div className={`rounded-xl border px-3 py-3 text-xs flex items-start gap-2 ${th.dark ? "border-[#BE123C]/40 bg-cherry-900/40 text-cherry-400" : "border-[#BE123C]/30 bg-[#FCE4EC] text-[#BE123C]"}`}>
                 <AlertTriangle size={14} className="shrink-0 mt-0.5" aria-hidden />
                 <div>
                   <p className="font-bold mb-1">SKU akan terkunci selamanya.</p>
@@ -1945,7 +1945,7 @@ export function InventoryPage() {
           <label className={`flex items-center gap-2 cursor-pointer px-3 py-2.5 rounded-xl border ${th.bdr}`}>
             <input type="checkbox" checked={labelIncludeExpiry}
               onChange={e => setLabelIncludeExpiry(e.target.checked)}
-              className="w-4 h-4 rounded accent-[#E11D48]" />
+              className="w-4 h-4 rounded accent-cherry-500" />
             <span className={`text-sm font-bold ${th.tx}`}>Tampilkan tanggal kadaluarsa</span>
           </label>
 
@@ -1975,7 +1975,7 @@ export function InventoryPage() {
               );
               setLabelModalOpen(false);
             }}
-              className={`flex-1 py-2.5 rounded-xl text-sm font-bold text-white bg-[#E11D48]`}>
+              className={`flex-1 py-2.5 rounded-xl text-sm font-bold text-white bg-cherry-500`}>
               Print
             </button>
           </div>

@@ -141,7 +141,7 @@ export default function App() {
     <div className={`min-h-screen flex items-center justify-center ${th.bg}`}>
       <div className="flex flex-col items-center gap-4">
         <BakeryLogo size={56} />
-        <div className="w-6 h-6 border-2 border-[#E11D48] border-t-transparent rounded-full animate-spin" />
+        <div className="w-6 h-6 border-2 border-cherry-500 border-t-transparent rounded-full animate-spin" />
       </div>
     </div>
   );
@@ -159,7 +159,7 @@ export default function App() {
     <div className={`min-h-screen ${th.bg}`}>
       {/* Header — max-width matches main so the logo/title line up with page
           content on wide screens, not floating at the extreme left edge. */}
-      <header className={`fixed top-0 left-0 right-0 z-40 h-[72px] border-b backdrop-blur-xl ${th.dark ? "bg-[#261620]/85" : "bg-white/90"} ${th.bdr}`}>
+      <header className={`fixed top-0 left-0 right-0 z-40 h-[72px] border-b backdrop-blur-xl ${th.dark ? "bg-shade-card/85" : "bg-white/90"} ${th.bdr}`}>
         <div className="h-full flex items-center justify-between px-4 sm:px-6">
           <div className="flex items-center gap-3 min-w-0">
             <BakeryLogo size={44} />
@@ -237,7 +237,7 @@ export default function App() {
       {/* Bottom Nav — active tab now has a bottom-aligned pink indicator bar
           plus a subtle scale bounce, so location is spatially obvious even
           with glance-and-tap usage. */}
-      <nav aria-label="Main navigation" className={`fixed bottom-0 left-0 right-0 z-40 border-t backdrop-blur-xl pb-safe ${th.dark ? "bg-[#261620]/92" : "bg-white/95"} ${th.bdr}`}>
+      <nav aria-label="Main navigation" className={`fixed bottom-0 left-0 right-0 z-40 border-t backdrop-blur-xl pb-safe ${th.dark ? "bg-shade-card/92" : "bg-white/95"} ${th.bdr}`}>
         <div role="tablist" className="flex items-center justify-around max-w-md mx-auto h-20">
           {navItems.map((id, idx) => {
             const active = currentPage === id;
@@ -254,7 +254,7 @@ export default function App() {
                 {active && (
                   <span
                     aria-hidden
-                    className="absolute -top-px left-1/2 -translate-x-1/2 h-[3px] w-10 rounded-full bg-gradient-to-r from-[#FFB5C0] to-[#E11D48]"
+                    className="absolute -top-px left-1/2 -translate-x-1/2 h-[3px] w-10 rounded-full bg-gradient-to-r from-cherry-300 to-cherry-500"
                   />
                 )}
               </button>

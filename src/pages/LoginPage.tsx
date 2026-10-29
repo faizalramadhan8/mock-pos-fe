@@ -148,11 +148,11 @@ export function LoginPage() {
   };
 
   return (
-    <div className={`min-h-screen flex items-center justify-center p-5 ${th.dark ? "bg-gradient-to-br from-[#2B1318] to-[#140B0F]" : "bg-gradient-to-br from-[#F0F9FF] via-[#FBE8EE] to-[#FFD1DB]/20"}`}>
+    <div className={`min-h-screen flex items-center justify-center p-5 ${th.dark ? "bg-gradient-to-br from-ink-900 to-shade-bg" : "bg-gradient-to-br from-[#F0F9FF] via-cherry-100 to-cherry-200/20"}`}>
       <div className="w-full max-w-sm">
         <div className="flex justify-center gap-2 mb-8">
           <button onClick={toggle} className={`p-2.5 rounded-xl border ${th.card} ${th.bdr} ${th.txm}`}>
-            {th.dark ? <Sun size={14} className="text-[#E11D48]" /> : <Moon size={14} />}
+            {th.dark ? <Sun size={14} className="text-cherry-500" /> : <Moon size={14} />}
           </button>
           <button onClick={() => setLang(lang === "en" ? "id" : "en")}
             className={`px-3 py-2 rounded-xl border text-xs font-bold ${th.card} ${th.bdr} ${th.tx}`}>
@@ -166,11 +166,11 @@ export function LoginPage() {
           <p className={`text-sm mt-1 ${th.txm}`}>Baking Ingredients Depot</p>
         </div>
 
-        <div className={`rounded-3xl border p-6 ${th.card} ${th.bdr} ${th.dark ? "" : "shadow-xl shadow-[#9F1239]/[0.04]"}`}>
+        <div className={`rounded-3xl border p-6 ${th.card} ${th.bdr} ${th.dark ? "" : "shadow-xl shadow-cherry-700/[0.04]"}`}>
           {err && <p className="text-xs text-[#BE123C] mb-3 flex items-center gap-1.5">⚠ {err}</p>}
           {pending ? (
             <div className="flex flex-col items-center gap-3 py-4">
-              <span className="inline-block w-10 h-10 border-4 border-[#E11D48] border-t-transparent rounded-full animate-spin" />
+              <span className="inline-block w-10 h-10 border-4 border-cherry-500 border-t-transparent rounded-full animate-spin" />
               <p className={`text-sm font-bold ${th.tx}`}>Menunggu persetujuan owner</p>
               <p className={`text-xs text-center ${th.txm}`}>
                 Device ini belum terdaftar. Owner akan menerima pesan WhatsApp untuk meng-approve. Mohon tunggu...
@@ -183,11 +183,11 @@ export function LoginPage() {
             <>
               <div className="flex flex-col gap-2.5 mb-4" onKeyDown={handleKeyDown}>
                 <input value={email} onChange={e => setEmail(e.target.value)} placeholder={t.email as string}
-                  className={`w-full px-4 py-3 text-sm rounded-2xl border focus:outline-none focus:ring-2 focus:ring-[#E11D48]/20 ${th.inp}`} />
+                  className={`w-full px-4 py-3 text-sm rounded-2xl border focus:outline-none focus:ring-2 focus:ring-cherry-500/20 ${th.inp}`} />
                 <input value={password} onChange={e => setPassword(e.target.value)} type="password" placeholder={t.password as string}
-                  className={`w-full px-4 py-3 text-sm rounded-2xl border focus:outline-none focus:ring-2 focus:ring-[#E11D48]/20 ${th.inp}`} />
+                  className={`w-full px-4 py-3 text-sm rounded-2xl border focus:outline-none focus:ring-2 focus:ring-cherry-500/20 ${th.inp}`} />
                 <button onClick={handleLogin} disabled={loading}
-                  className="w-full py-3.5 rounded-2xl font-bold text-white text-sm bg-gradient-to-r from-[#FB7185] to-[#E11D48] disabled:opacity-60">
+                  className="w-full py-3.5 rounded-2xl font-bold text-white text-sm bg-gradient-to-r from-cherry-400 to-cherry-500 disabled:opacity-60">
                   {loading ? <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : t.signIn}
                 </button>
               </div>
@@ -224,21 +224,21 @@ export function LoginPage() {
                 onKeyDown={e => { if (e.key === "Enter") handleRegister(); }}>
                 <input value={regName} onChange={e => setRegName(e.target.value)}
                   placeholder="Nama Lengkap"
-                  className={`w-full px-4 py-3 text-sm rounded-2xl border focus:outline-none focus:ring-2 focus:ring-[#E11D48]/20 ${th.inp}`} />
+                  className={`w-full px-4 py-3 text-sm rounded-2xl border focus:outline-none focus:ring-2 focus:ring-cherry-500/20 ${th.inp}`} />
                 <input value={regEmail} onChange={e => setRegEmail(e.target.value)}
                   type="email" placeholder="Email"
-                  className={`w-full px-4 py-3 text-sm rounded-2xl border focus:outline-none focus:ring-2 focus:ring-[#E11D48]/20 ${th.inp}`} />
+                  className={`w-full px-4 py-3 text-sm rounded-2xl border focus:outline-none focus:ring-2 focus:ring-cherry-500/20 ${th.inp}`} />
                 <input value={regPhone} onChange={e => setRegPhone(e.target.value)}
                   type="tel" placeholder="No. HP (08…)"
-                  className={`w-full px-4 py-3 text-sm rounded-2xl border focus:outline-none focus:ring-2 focus:ring-[#E11D48]/20 ${th.inp}`} />
+                  className={`w-full px-4 py-3 text-sm rounded-2xl border focus:outline-none focus:ring-2 focus:ring-cherry-500/20 ${th.inp}`} />
                 <input value={regPassword} onChange={e => setRegPassword(e.target.value)}
                   type="password" placeholder="Password (min. 6 karakter)"
-                  className={`w-full px-4 py-3 text-sm rounded-2xl border focus:outline-none focus:ring-2 focus:ring-[#E11D48]/20 ${th.inp}`} />
+                  className={`w-full px-4 py-3 text-sm rounded-2xl border focus:outline-none focus:ring-2 focus:ring-cherry-500/20 ${th.inp}`} />
                 <input value={regConfirm} onChange={e => setRegConfirm(e.target.value)}
                   type="password" placeholder="Ulangi password"
-                  className={`w-full px-4 py-3 text-sm rounded-2xl border focus:outline-none focus:ring-2 focus:ring-[#E11D48]/20 ${th.inp}`} />
+                  className={`w-full px-4 py-3 text-sm rounded-2xl border focus:outline-none focus:ring-2 focus:ring-cherry-500/20 ${th.inp}`} />
                 <button onClick={handleRegister} disabled={loading}
-                  className="w-full py-3.5 rounded-2xl font-bold text-white text-sm bg-gradient-to-r from-[#FB7185] to-[#E11D48] disabled:opacity-60">
+                  className="w-full py-3.5 rounded-2xl font-bold text-white text-sm bg-gradient-to-r from-cherry-400 to-cherry-500 disabled:opacity-60">
                   {loading ? <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : "Daftar & Belanja"}
                 </button>
               </div>

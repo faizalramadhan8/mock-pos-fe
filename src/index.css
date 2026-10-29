@@ -23,6 +23,119 @@
    gelap di aplikasi — satu sumber kebenaran. */
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* ── Palet merek, bisa diganti dari Pengaturan (29 Okt 2026) ──────────────
+   Bu Santi minta warna POS bisa diganti juga, seperti di storefront, dan
+   memilih biru untuk keduanya.
+
+   Dipisah dengan sengaja menjadi DUA golongan:
+
+     cherry-* / ink-* / shade-*  → IDENTITAS. Ikut berubah warna merek.
+     merah sinyal, biru keranjang → ARTI. TIDAK pernah berubah.
+
+   Yang kedua itu bukan hiasan: #BE123C menandai stok habis, galat isian,
+   dan barang rusak; #C4504A menandai aksi merusak; biru menandai zona
+   keranjang yang Bu Santi minta sendiri 6 Okt 2026. Kalau ikut berganti
+   warna merek, peringatannya kehilangan maknanya — merah yang berubah
+   jadi biru tidak lagi berbunyi "awas".
+
+   KALAU MENAMBAH PALET: isi kelima belas variabel. Melewatkan satu membuat
+   nadanya jatuh ke merah muda dan muncul sebagai elemen nyasar. */
+@theme {
+  --color-cherry-50:  #FFF4F6;
+  --color-cherry-100: #FFE4E9;
+  --color-cherry-200: #FFD1DB;
+  --color-cherry-300: #FFB5C0;
+  --color-cherry-400: #FB7185;
+  --color-cherry-500: #E11D48;
+  --color-cherry-700: #9F1239;
+  --color-cherry-900: #3A1F2A;
+
+  --color-ink-500: #A98C94;
+  --color-ink-700: #6E4E57;
+  --color-ink-900: #2B1318;
+
+  /* Permukaan mode gelap — nada hangat yang diturunkan dari warna merek. */
+  --color-shade-bg:   #140B0F;
+  --color-shade-card: #261620;
+  --color-shade-elev: #3D2230;
+}
+
+:root[data-brand="biru"] {
+  --color-cherry-50:  #EFF6FF;
+  --color-cherry-100: #DBEAFE;
+  --color-cherry-200: #BFDBFE;
+  --color-cherry-300: #93C5FD;
+  --color-cherry-400: #60A5FA;
+  --color-cherry-500: #2563EB;
+  --color-cherry-700: #1E40AF;
+  --color-cherry-900: #172554;
+
+  --color-ink-500: #94A3B8;
+  --color-ink-700: #475569;
+  --color-ink-900: #0F172A;
+
+  --color-shade-bg:   #0B1220;
+  --color-shade-card: #15203A;
+  --color-shade-elev: #1E2C4D;
+}
+
+:root[data-brand="hijau"] {
+  --color-cherry-50:  #F0FDF4;
+  --color-cherry-100: #DCFCE7;
+  --color-cherry-200: #BBF7D0;
+  --color-cherry-300: #86EFAC;
+  --color-cherry-400: #4ADE80;
+  --color-cherry-500: #16A34A;
+  --color-cherry-700: #166534;
+  --color-cherry-900: #052E16;
+
+  --color-ink-500: #9CA3AF;
+  --color-ink-700: #4B5563;
+  --color-ink-900: #111827;
+
+  --color-shade-bg:   #08140D;
+  --color-shade-card: #11241A;
+  --color-shade-elev: #1B3527;
+}
+
+:root[data-brand="ungu"] {
+  --color-cherry-50:  #FAF5FF;
+  --color-cherry-100: #F3E8FF;
+  --color-cherry-200: #E9D5FF;
+  --color-cherry-300: #D8B4FE;
+  --color-cherry-400: #C084FC;
+  --color-cherry-500: #9333EA;
+  --color-cherry-700: #6B21A8;
+  --color-cherry-900: #2E1065;
+
+  --color-ink-500: #9CA3AF;
+  --color-ink-700: #4B5563;
+  --color-ink-900: #111827;
+
+  --color-shade-bg:   #130B1E;
+  --color-shade-card: #221333;
+  --color-shade-elev: #321D49;
+}
+
+:root[data-brand="jingga"] {
+  --color-cherry-50:  #FFF7ED;
+  --color-cherry-100: #FFEDD5;
+  --color-cherry-200: #FED7AA;
+  --color-cherry-300: #FDBA74;
+  --color-cherry-400: #FB923C;
+  --color-cherry-500: #EA580C;
+  --color-cherry-700: #9A3412;
+  --color-cherry-900: #431407;
+
+  --color-ink-500: #A8A29E;
+  --color-ink-700: #57534E;
+  --color-ink-900: #1C1917;
+
+  --color-shade-bg:   #170C05;
+  --color-shade-card: #2A160B;
+  --color-shade-elev: #3D2112;
+}
+
 /* Base size: 20px for legibility on 50+ eyes. Every rem-based Tailwind size
    (text-sm, text-base, text-2xl…) scales off this. */
 html {
@@ -43,8 +156,8 @@ body {
   -moz-osx-font-smoothing: grayscale;
   overscroll-behavior: none;
   margin: 0;
-  background: #FFF4F6;
-  color: #2B1318;
+  background: var(--color-cherry-50);
+  color: var(--color-ink-900);
 }
 
 /* .font-display — same Proxima Nova family, tuned for large display usage:
@@ -136,7 +249,7 @@ input[type="number"] {
   position: absolute;
   inset: 0;
   width: var(--bar-pct, 0%);
-  background: linear-gradient(90deg, #FFB5C0 0%, #E11D48 100%);
+  background: linear-gradient(90deg, var(--color-cherry-300) 0%, var(--color-cherry-500) 100%);
   border-radius: inherit;
   transition: width .5s cubic-bezier(.2, .7, .2, 1);
 }

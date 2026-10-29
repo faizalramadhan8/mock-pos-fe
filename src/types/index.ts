@@ -80,7 +80,17 @@ export interface Product {
   createdAt: string;
 }
 
-export type PriceTierTarget = "all_customers" | "member_specific";
+/**
+ * Siapa yang berhak atas harga tier.
+ *
+ *  all_customers   — siapa saja, termasuk walk-in tanpa kartu member.
+ *  all_members     — semua member terdaftar, tapi bukan walk-in.
+ *  member_specific — hanya member yang di-whitelist.
+ *
+ * "all_members" sempat dihapus 20 Jun 2026 (di-rename jadi all_customers) lalu
+ * diminta kembali Bu Santi 30 Okt 2026 sebagai pilihan KETIGA, bukan pengganti.
+ */
+export type PriceTierTarget = "all_customers" | "all_members" | "member_specific";
 
 export interface ProductPriceTier {
   id: string;
@@ -93,8 +103,11 @@ export interface ProductPriceTier {
   /** Whitelist member kalau target='member_specific'. Kosong utk 'all_customers'. */
   members?: { id: string; name: string; phone: string }[];
   note?: string;
-  /** ISO datetime kapan tier expire. null/undefined = tidak terbatas.
-   *  Tier dengan expiresAt < now di-skip di POS compute. */
+  /** Jendela jadwal berlaku. Keduanya null/undefined = berlaku terus.
+   *  Tier di luar jendela ini di-skip SEMUA penghitung harga dan tidak
+   *  ditampilkan sebagai aktif. Pakai `tierBerlaku()` di utils — jangan
+   *  membandingkan tanggalnya sendiri-sendiri. */
+  startsAt?: string | null;
   expiresAt?: string | null;
   createdAt: string;
 }
@@ -241,6 +254,8 @@ export interface ProductPriceTierHistoryEntry {
   targetType: PriceTierTarget;
   memberIds?: string[];
   note?: string;
+  startsAt?: string | null;
+  expiresAt?: string | null;
   status: "active" | "inactive";
   action: "create" | "update" | "delete";
   startDate: string;

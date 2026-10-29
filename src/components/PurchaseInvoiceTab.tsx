@@ -186,7 +186,7 @@ export function PurchaseInvoiceTab() {
         </div>
         {canWrite && (
           <button onClick={() => setCreateOpen(true)}
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48]">
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-cherry-400 to-cherry-500">
             <Plus size={14} /> Buat Faktur
           </button>
         )}
@@ -259,7 +259,7 @@ export function PurchaseInvoiceTab() {
         )}
       </div>
       {customError && (
-        <p role="alert" className={`text-xs font-bold ${th.dark ? "text-[#FB7185]" : "text-[#BE123C]"} -mt-1`}>
+        <p role="alert" className={`text-xs font-bold ${th.dark ? "text-cherry-400" : "text-[#BE123C]"} -mt-1`}>
           {customError}
         </p>
       )}
@@ -270,8 +270,8 @@ export function PurchaseInvoiceTab() {
         <div role="alert" className={`rounded-2xl border p-3 flex items-center gap-2 ${
           th.dark ? "border-[#BE123C]/40 bg-[#BE123C]/10" : "border-[#BE123C]/30 bg-[#FCE4EC]"
         }`}>
-          <AlertTriangle size={16} className={th.dark ? "text-[#FB7185]" : "text-[#BE123C]"} aria-hidden />
-          <p className={`text-xs font-bold flex-1 ${th.dark ? "text-[#FB7185]" : "text-[#BE123C]"}`}>
+          <AlertTriangle size={16} className={th.dark ? "text-cherry-400" : "text-[#BE123C]"} aria-hidden />
+          <p className={`text-xs font-bold flex-1 ${th.dark ? "text-cherry-400" : "text-[#BE123C]"}`}>
             Gagal memuat faktur: {invoiceError}
           </p>
           <button onClick={doFetch}
@@ -340,12 +340,12 @@ export function PurchaseInvoiceTab() {
                       )}
                       <span className={`text-xs font-bold px-2 py-0.5 rounded-md ${
                         inv.paymentStatus === "paid"
-                          ? (th.dark ? "bg-[#FFB5C0]/15 text-[#FFB5C0]" : "bg-[#FFE4E9] text-[#E11D48]")
+                          ? (th.dark ? "bg-cherry-300/15 text-cherry-300" : "bg-cherry-100 text-cherry-500")
                           : overdue
-                            ? (th.dark ? "bg-[#BE123C]/20 text-[#FB7185]" : "bg-[#FCE4EC] text-[#BE123C]")
+                            ? (th.dark ? "bg-[#BE123C]/20 text-cherry-400" : "bg-[#FCE4EC] text-[#BE123C]")
                             : dueSoon
-                              ? (th.dark ? "bg-[#FB7185]/15 text-[#FB7185]" : "bg-[#FFD1DB] text-[#BE123C]")
-                              : (th.dark ? "bg-[#3D2230] text-[#9F7686]" : "bg-[#F5E1E6] text-[#6E4E57]")
+                              ? (th.dark ? "bg-cherry-400/15 text-cherry-400" : "bg-cherry-200 text-[#BE123C]")
+                              : (th.dark ? "bg-shade-elev text-ink-500" : "bg-cherry-100 text-ink-700")
                       }`}>
                         {inv.paymentStatus === "paid" ? "Lunas" : overdue ? "Lewat Tempo" : dueSoon ? "Tempo Dekat" : "Belum Lunas"}
                       </span>
@@ -413,7 +413,7 @@ export function PurchaseInvoiceTab() {
                 Faktur dari <b>{sup?.name || "supplier"}</b> tanggal <b>{formatDateDMY(inv.invoiceDate)}</b>
                 {" "}senilai <b>{$(inv.totalAmount)}</b> akan dihapus.
               </p>
-              <div className={`rounded-xl border px-3 py-2.5 text-xs flex items-start gap-2 ${th.dark ? "border-[#BE123C]/40 bg-[#3A1F2A]/40 text-[#FB7185]" : "border-[#BE123C]/30 bg-[#FCE4EC] text-[#BE123C]"}`}>
+              <div className={`rounded-xl border px-3 py-2.5 text-xs flex items-start gap-2 ${th.dark ? "border-[#BE123C]/40 bg-cherry-900/40 text-cherry-400" : "border-[#BE123C]/30 bg-[#FCE4EC] text-[#BE123C]"}`}>
                 <AlertTriangle size={14} className="shrink-0 mt-0.5" aria-hidden />
                 <span>Tindakan ini tidak bisa dibatalkan. Faktur ini hanya catatan — stok produk tidak terpengaruh.</span>
               </div>
@@ -482,8 +482,8 @@ function DetailModal({ invoice, onClose, onMarkPaid, onEdit, onDelete, canWrite 
             </div>
             <span className={`text-xs font-bold px-2.5 py-1 rounded-md ${
               invoice.paymentStatus === "paid"
-                ? (th.dark ? "bg-[#FFB5C0]/15 text-[#FFB5C0]" : "bg-[#FFE4E9] text-[#E11D48]")
-                : (th.dark ? "bg-[#BE123C]/20 text-[#FB7185]" : "bg-[#FCE4EC] text-[#BE123C]")
+                ? (th.dark ? "bg-cherry-300/15 text-cherry-300" : "bg-cherry-100 text-cherry-500")
+                : (th.dark ? "bg-[#BE123C]/20 text-cherry-400" : "bg-[#FCE4EC] text-[#BE123C]")
             }`}>
               {invoice.paymentStatus === "paid" ? "LUNAS" : "BELUM LUNAS"}
             </span>
@@ -542,7 +542,7 @@ function DetailModal({ invoice, onClose, onMarkPaid, onEdit, onDelete, canWrite 
           <div className="flex flex-col gap-2">
             {invoice.paymentStatus === "unpaid" && (
               <button onClick={() => onMarkPaid(invoice.id)}
-                className="w-full min-h-[44px] rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48] inline-flex items-center justify-center gap-2">
+                className="w-full min-h-[44px] rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-cherry-400 to-cherry-500 inline-flex items-center justify-center gap-2">
                 <Check size={14} /> Tandai Lunas
               </button>
             )}
@@ -552,7 +552,7 @@ function DetailModal({ invoice, onClose, onMarkPaid, onEdit, onDelete, canWrite 
                 <Pencil size={14} /> Edit Faktur
               </button>
               <button onClick={() => onDelete(invoice.id)}
-                className={`flex-1 min-h-[44px] rounded-2xl text-sm font-bold border inline-flex items-center justify-center gap-1.5 ${th.dark ? "border-[#BE123C]/40 text-[#FB7185]" : "border-[#BE123C]/30 text-[#BE123C]"}`}>
+                className={`flex-1 min-h-[44px] rounded-2xl text-sm font-bold border inline-flex items-center justify-center gap-1.5 ${th.dark ? "border-[#BE123C]/40 text-cherry-400" : "border-[#BE123C]/30 text-[#BE123C]"}`}>
                 <Trash2 size={14} /> Hapus
               </button>
             </div>
@@ -695,7 +695,7 @@ function CreateModal({ open, onClose, onSubmit, initialInvoice }: CreateModalPro
       <div className="flex flex-col gap-3">
         {/* Info banner — Faktur sekarang PURE RECORD (request owner):
             tidak update stok, batch, atau movement. Owner aware via banner ini. */}
-        <div className={`rounded-2xl border px-4 py-3 text-xs flex items-start gap-2 ${th.dark ? "border-[#FB7185]/30 bg-[#3A1F2A]/40" : "border-[#FFB5C0] bg-[#FFF4F6]"}`}>
+        <div className={`rounded-2xl border px-4 py-3 text-xs flex items-start gap-2 ${th.dark ? "border-cherry-400/30 bg-cherry-900/40" : "border-cherry-300 bg-cherry-50"}`}>
           <AlertTriangle size={14} className={`shrink-0 mt-0.5 ${th.acc}`} aria-hidden />
           <div className={th.txm}>
             <p className={`font-bold mb-0.5 ${th.tx}`}>Faktur ini hanya sebagai catatan</p>
@@ -784,7 +784,7 @@ function CreateModal({ open, onClose, onSubmit, initialInvoice }: CreateModalPro
                     </div>
                     {items.length > 1 && (
                       <button type="button" onClick={() => removeItem(idx)}
-                        className={`shrink-0 min-w-[40px] min-h-[40px] flex items-center justify-center rounded-xl ${th.dark ? "text-[#FB7185] hover:bg-[#BE123C]/15" : "text-[#BE123C] hover:bg-[#FCE4EC]"}`}
+                        className={`shrink-0 min-w-[40px] min-h-[40px] flex items-center justify-center rounded-xl ${th.dark ? "text-cherry-400 hover:bg-[#BE123C]/15" : "text-[#BE123C] hover:bg-[#FCE4EC]"}`}
                         aria-label={`Hapus item ${idx + 1}`}
                         title="Hapus item">
                         <Trash2 size={16} />
@@ -853,7 +853,7 @@ function CreateModal({ open, onClose, onSubmit, initialInvoice }: CreateModalPro
           <label className={`flex items-center gap-2 cursor-pointer mb-3 min-h-[36px]`}>
             <input type="checkbox" checked={ppnEnabled}
               onChange={e => setPpnEnabled(e.target.checked)}
-              className="w-5 h-5 accent-[#E11D48]" />
+              className="w-5 h-5 accent-cherry-500" />
             <span className={`text-sm font-bold ${th.tx}`}>Faktur ini ada PPN</span>
             <span className={`text-xs ${th.txm}`}>(default 11%)</span>
           </label>
@@ -901,7 +901,7 @@ function CreateModal({ open, onClose, onSubmit, initialInvoice }: CreateModalPro
             Batal
           </button>
           <button onClick={handleSubmit} disabled={!valid || submitting}
-            className="flex-1 py-3 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48] disabled:opacity-40">
+            className="flex-1 py-3 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-cherry-400 to-cherry-500 disabled:opacity-40">
             {submitting ? "Menyimpan..." : (isEdit ? "Simpan Perubahan" : "Simpan Faktur")}
           </button>
         </div>

@@ -1,12 +1,12 @@
 import { useMemo, useState } from "react";
 import { useLangStore, useProductStore } from "@/stores";
 import { useThemeClasses } from "@/hooks/useThemeClasses";
-import { formatCurrency as $ } from "@/utils";
+import { formatCurrency as $, statusJadwalTier } from "@/utils";
 import { Modal } from "./Modal";
 import { PriceTierEditor } from "./PriceTierEditor";
 import { TierHistoryModal } from "./TierHistoryModal";
 import { productApi } from "@/api";
-import { Pencil, Plus, Search, Tag, Trash2, Users, UserCheck, History, Settings } from "lucide-react";
+import { Pencil, Plus, Search, Tag, Trash2, Users, UserCheck, UsersRound, CalendarClock, History, Settings } from "lucide-react";
 import toast from "react-hot-toast";
 import type { Product, ProductPriceTier } from "@/types";
 
@@ -91,7 +91,7 @@ export function PriceTierCatalog({ canWrite }: Props) {
       {/* Info card */}
       <div className={`p-4 rounded-2xl border ${th.bdr} ${th.card2}`}>
         <div className="flex items-start gap-3">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-[#FFE4E9] text-[#E11D48] shrink-0">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-cherry-100 text-cherry-500 shrink-0">
             <Tag size={18} strokeWidth={2.4} />
           </div>
           <div>
@@ -112,7 +112,7 @@ export function PriceTierCatalog({ canWrite }: Props) {
             <button
               key={f}
               onClick={() => setFilter(f)}
-              className={`px-4 py-2.5 text-sm font-bold ${filter === f ? "bg-[#E11D48] text-white" : `${th.elev} ${th.txm}`}`}>
+              className={`px-4 py-2.5 text-sm font-bold ${filter === f ? "bg-cherry-500 text-white" : `${th.elev} ${th.txm}`}`}>
               {f === "with_tiers" ? `Sudah punya tier (${withTiersCount})` : "Semua produk"}
             </button>
           ))}
@@ -128,7 +128,7 @@ export function PriceTierCatalog({ canWrite }: Props) {
         {canWrite && (
           <button
             onClick={() => { setPickerOpen(true); setPickerQuery(""); }}
-            className="px-4 py-2.5 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48] inline-flex items-center gap-1.5">
+            className="px-4 py-2.5 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-cherry-400 to-cherry-500 inline-flex items-center gap-1.5">
             <Plus size={16} strokeWidth={2.6} /> Tambah untuk Produk Lain
           </button>
         )}
@@ -178,7 +178,7 @@ export function PriceTierCatalog({ canWrite }: Props) {
                     {canWrite && (
                       <button
                         onClick={() => setOpenProductId(p.id)}
-                        className="px-4 py-2 rounded-lg text-sm font-bold text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48] inline-flex items-center gap-1.5">
+                        className="px-4 py-2 rounded-lg text-sm font-bold text-white bg-gradient-to-r from-cherry-400 to-cherry-500 inline-flex items-center gap-1.5">
                         <Settings size={16} strokeWidth={2.6} /> Atur Tier
                       </button>
                     )}
@@ -197,23 +197,32 @@ export function PriceTierCatalog({ canWrite }: Props) {
                         <span className={`text-sm inline-flex items-center gap-1.5 px-2 py-1 rounded-md ${th.accBg} ${th.acc} font-semibold`}>
                           {t.target === "all_customers" ? (
                             <><Users size={14} strokeWidth={2.8} /> Semua customer</>
+                          ) : t.target === "all_members" ? (
+                            <><UsersRound size={14} strokeWidth={2.8} /> Semua member</>
                           ) : (
                             <><UserCheck size={14} strokeWidth={2.8} /> {(t.members || []).length} member</>
                           )}
                         </span>
                         {(() => {
-                          if (!t.expiresAt) return null;
-                          const ms = new Date(t.expiresAt).getTime();
-                          const now = Date.now();
-                          const expired = ms < now;
-                          const daysLeft = Math.ceil((ms - now) / 86400000);
-                          return expired ? (
-                            <span className="text-sm font-bold inline-flex items-center gap-1 px-2 py-1 rounded-md bg-[#FCE4EC] text-[#BE123C]">
-                              Sudah expire
-                            </span>
-                          ) : (
+                          const st = statusJadwalTier(t);
+                          if (st.kind === "berakhir") {
+                            return (
+                              <span className="text-sm font-bold inline-flex items-center gap-1 px-2 py-1 rounded-md bg-[#FCE4EC] text-[#BE123C]">
+                                Sudah berakhir
+                              </span>
+                            );
+                          }
+                          if (st.kind === "terjadwal") {
+                            return (
+                              <span className={`text-sm font-bold inline-flex items-center gap-1 px-2 py-1 rounded-md ${th.elev} ${th.acc}`}>
+                                <CalendarClock size={14} strokeWidth={2.8} /> Mulai {st.hariLagi} hari lagi
+                              </span>
+                            );
+                          }
+                          if (st.hariLagi === Infinity) return null;
+                          return (
                             <span className={`text-sm font-semibold inline-flex items-center gap-1 px-2 py-1 rounded-md ${th.elev} ${th.txm}`}>
-                              Sisa {daysLeft} hari
+                              Sisa {st.hariLagi} hari
                             </span>
                           );
                         })()}

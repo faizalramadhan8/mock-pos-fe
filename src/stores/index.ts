@@ -1,13 +1,14 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import toast from "react-hot-toast";
-import type { User, Product, CartItem, Order, OrderItem, StockMovement, StockBatch, Category, Supplier, BankAccount, Member, Refund, RefundItem, CashSession, AuditEntry, PaymentMethod, PaymentStatus, DiscountType, UnitType, Lang, PageId, AuditAction, PurchaseInvoice, PurchaseInvoiceItem, RedeemableItem } from "@/types";
+import type { User, Product, CartItem, Order, OrderItem, StockMovement, StockBatch, Category, Supplier, BankAccount, Member, Refund, RefundItem, CashSession, AuditEntry, PaymentMethod, PaymentStatus, DiscountType, UnitType, Lang, PageId, AuditAction, PurchaseInvoice, PurchaseInvoiceItem, RedeemableItem, PriceTierTarget } from "@/types";
 import { translations } from "@/i18n";
 import { ROLE_PERMISSIONS } from "@/constants";
-import { genId } from "@/utils";
+import { genId, tierBerlaku, tierTerbaik } from "@/utils";
 import { authApi, userApi, productApi, categoryApi, supplierApi, orderApi, refundApi, movementApi, batchApi, memberApi, cashSessionApi, auditApi, settingsApi, purchaseInvoiceApi, expenseApi, redeemableApi } from "@/api";
 import type { CreatePurchaseInvoiceBody, PurchaseInvoiceRes, PurchaseInvoiceItemRes, ExpenseRes, ExpenseCategoryRes, CreateExpenseBody } from "@/api";
 import { setToken, getToken } from "@/api/client";
+import { pasangBrand } from "@/lib/brandTheme";
 
 // ─── Mappers (BE → FE) ───
 const mapUser = (u: any): User => ({
@@ -21,13 +22,16 @@ const mapPriceTier = (t: any) => ({
   productId: t.product_id,
   minQty: t.min_qty,
   price: t.price,
-  // Map old 'all_members' (pre-rename) ke 'all_customers' supaya FE konsisten
-  // walaupun BE belum di-migrate. Migration 000036 backfill DB.
-  target: ((t.target_type === 'all_members' ? 'all_customers' : t.target_type) || 'all_customers') as 'all_customers' | 'member_specific',
+  // JANGAN menerjemahkan 'all_members' jadi 'all_customers' di sini.
+  // Dulu ada terjemahan seperti itu sebagai sisa rename 20 Jun 2026; sejak
+  // 30 Okt 2026 'all_members' adalah target yang SAH dan berbeda artinya —
+  // menerjemahkannya berarti harga khusus member bocor ke walk-in, diam-diam.
+  target: (t.target_type || 'all_customers') as PriceTierTarget,
   members: Array.isArray(t.members)
     ? t.members.map((m: any) => ({ id: m.id, name: m.name, phone: m.phone }))
     : [],
   note: t.note || undefined,
+  startsAt: t.starts_at || undefined,
   expiresAt: t.expires_at || undefined,
   createdAt: t.created_at,
 });
@@ -419,9 +423,10 @@ interface CartState {
 
 // computeBestUnitPrice — pricing logic dengan tier-aware lookup (PAKET mode).
 //
-// Tier 'all_customers' (rename dari 'all_members', 20 Jun 2026) berlaku untuk
-// semua customer termasuk walk-in non-member. Tier 'member_specific' tetap
-// khusus member yang di-whitelist.
+// Tiga target (lihat PriceTierTarget): 'all_customers' berlaku untuk siapa
+// saja termasuk walk-in, 'all_members' untuk semua member terdaftar, dan
+// 'member_specific' untuk member yang di-whitelist. Pemeriksaannya ada di
+// `tierBerlaku` di utils, bukan di sini.
 //
 // PAKET SEMANTICS (21 Jun 2026, per request Bu Santi):
 //   Tier berlaku HANYA dalam kelipatan minQty. Sisa unit (modulo) pakai harga
@@ -460,17 +465,11 @@ function computeBestUnitPrice(
   const qtySatuan = unitType === "box" ? qty * product.qtyPerBox : qty;
 
   const nowMs = Date.now();
-  const eligibleTiers = (product.priceTiers || []).filter(t => {
-    if (qtySatuan < t.minQty) return false;
-    // Skip tier yang sudah expire (expiresAt < now). NULL/undefined = unlimited.
-    if (t.expiresAt && new Date(t.expiresAt).getTime() < nowMs) return false;
-    if (t.target === "all_customers") return true;
-    if (t.target === "member_specific") {
-      if (!member) return false;
-      return (t.members || []).some(m => m.id === member.id);
-    }
-    return false;
-  });
+  // Kelayakan tier (qty + jadwal + target) hidup di `tierBerlaku` — satu
+  // tempat, dipakai juga oleh badge dan hint di POSPage supaya yang ditampilkan
+  // ke kasir selalu sama dengan yang ditagih.
+  const eligibleTiers = (product.priceTiers || [])
+    .filter(t => tierBerlaku(t, member, qtySatuan, nowMs));
 
   // Baseline untuk "extra" unit (sisa modulo) — member pakai memberPrice
   // kalau ada, walk-in pakai regular. Tidak pernah mahal dari regular.
@@ -492,10 +491,7 @@ function computeBestUnitPrice(
     // greedy paket lebih natural ("kalau ada paket 5, kasih paket 5 dulu;
     // sisa 2 baru paket 2 — tapi karena kita ambil 1 tier saja, paket 5 win").
     // Untuk multi-tier optimization (mix paket 5 + paket 2) lihat TODO future.
-    const best = eligibleTiers.reduce((a, b) => {
-      if (a.minQty !== b.minQty) return a.minQty > b.minQty ? a : b;
-      return a.price <= b.price ? a : b;
-    });
+    const best = tierTerbaik(eligibleTiers)!;
     const paketCount = Math.floor(qtySatuan / best.minQty);
     const extraSatuan = qtySatuan - paketCount * best.minQty;
     // best.price tersimpan per-satuan (sudah dibagi minQty saat save di editor).
@@ -513,7 +509,10 @@ function computeBestUnitPrice(
     return {
       unitPrice,
       regularPrice: regular,
-      priceSource: best.target === "member_specific" ? "tier_member" : "tier_all",
+      // 'all_members' ikut ditandai tier_member: keduanya harga yang hanya
+      // didapat karena customer-nya member, dan laporan Bundling membacanya
+      // sebagai satu golongan.
+      priceSource: best.target === "all_customers" ? "tier_all" : "tier_member",
       tierId: best.id,
       paketCount,
       extraCount: extraSatuan,
@@ -1287,6 +1286,8 @@ interface SettingsState {
   storeName: string;
   storeAddress: string;
   storePhone: string;
+  /** Nama palet warna merek. Kosong = merah muda bawaan. */
+  brandColor: string;
   ppnRate: number;
   bankAccounts: BankAccount[];
   labelWidth: number;
@@ -1299,7 +1300,7 @@ interface SettingsState {
    * sehingga rekeningnya tampak tersimpan, padahal PATCH-nya tidak pernah
    * membawa kolom itu — hilang begitu halaman dimuat ulang.
    */
-  update: (data: Partial<Pick<SettingsState, "storeName" | "storeAddress" | "storePhone" | "ppnRate" | "labelWidth" | "labelHeight">>) => void;
+  update: (data: Partial<Pick<SettingsState, "storeName" | "storeAddress" | "storePhone" | "ppnRate" | "labelWidth" | "labelHeight" | "brandColor">>) => void;
   addBankAccount: (account: BankAccount) => Promise<void>;
   deleteBankAccount: (id: string) => Promise<void>;
 }
@@ -1307,6 +1308,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   storeName: "Toko Bahan Kue Santi",
   storeAddress: "Jl. Sudirman No. 123, Jakarta",
   storePhone: "+62 812-3456-7890",
+  brandColor: "",
   ppnRate: 11,
   bankAccounts: [],
   labelWidth: 40,
@@ -1319,6 +1321,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         storeName: s.store_name || 'BakeShop',
         storeAddress: s.store_address || '',
         storePhone: s.store_phone || '',
+        brandColor: s.brand_color || '',
         ppnRate: s.ppn_rate ?? 11,
         labelWidth: s.label_width || 40,
         labelHeight: s.label_height || 30,
@@ -1327,15 +1330,22 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
           bankName: ba.bank_name, accountNumber: ba.account_number, accountHolder: ba.account_holder,
         })),
       });
+      // Warnanya dipasang dari server, bukan cuma dari ingatan browser —
+      // kalau Bu Santi menggantinya di laptop, tablet kasir ikut berubah
+      // pada pemuatan berikutnya.
+      pasangBrand(s.brand_color);
     } catch { /* keep defaults */ }
   },
   update: (data) => {
     set(s => ({ ...s, ...data }));
+    // Langsung terasa, tanpa menunggu muat ulang.
+    if (data.brandColor !== undefined) pasangBrand(data.brandColor);
     // Fire-and-forget to BE
     settingsApi.update({
       store_name: data.storeName, store_address: data.storeAddress,
       store_phone: data.storePhone, ppn_rate: data.ppnRate,
       label_width: data.labelWidth, label_height: data.labelHeight,
+      brand_color: data.brandColor,
     }).catch(() => {});
   },
   addBankAccount: async (account) => {

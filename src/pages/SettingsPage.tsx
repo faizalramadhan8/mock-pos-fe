@@ -10,6 +10,7 @@ import {
 import { genId, formatDate, formatTime, LABEL_PRESETS } from "@/utils";
 import { INDONESIAN_BANKS } from "@/constants";
 import toast from "react-hot-toast";
+import { PALET as BRAND_PALET } from "@/lib/brandTheme";
 import { authApi, deviceApi, type DeviceRes } from "@/api/auth";
 import type { Role, BankAccount } from "@/types";
 
@@ -50,6 +51,7 @@ export function SettingsPage() {
   const [storeAddress, setStoreAddress] = useState(settings.storeAddress);
   const [storePhone, setStorePhone] = useState(settings.storePhone);
   const [ppnRate, setPpnRate] = useState(String(settings.ppnRate));
+  const [brandColor, setBrandColor] = useState(settings.brandColor || "");
   const [labelWidth, setLabelWidth] = useState(settings.labelWidth);
   const [labelHeight, setLabelHeight] = useState(settings.labelHeight);
 
@@ -172,7 +174,7 @@ export function SettingsPage() {
     const rate = Math.max(0, Math.min(100, parseFloat(ppnRate) || 0));
     const lw = Math.max(30, Math.min(100, labelWidth || 60));
     const lh = Math.max(20, Math.min(80, labelHeight || 40));
-    settings.update({ storeName, storeAddress, storePhone, ppnRate: rate, labelWidth: lw, labelHeight: lh });
+    settings.update({ storeName, storeAddress, storePhone, ppnRate: rate, labelWidth: lw, labelHeight: lh, brandColor });
     setLabelWidth(lw);
     setLabelHeight(lh);
     setPpnRate(String(rate));
@@ -242,7 +244,7 @@ export function SettingsPage() {
                 onClick={() => setActiveTab(tab.id)}
                 className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-sm font-bold whitespace-nowrap transition-all ${
                   active
-                    ? "text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48] shadow-sm"
+                    ? "text-white bg-gradient-to-r from-cherry-400 to-cherry-500 shadow-sm"
                     : `${th.elev} ${th.txm}`
                 }`}
               >
@@ -275,7 +277,7 @@ export function SettingsPage() {
                 <button key={String(o.k)} onClick={() => dark !== o.k && toggle()}
                   className={`py-3.5 rounded-2xl text-sm font-bold flex items-center justify-center gap-2 transition-all ${
                     dark === o.k
-                      ? "text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48]"
+                      ? "text-white bg-gradient-to-r from-cherry-400 to-cherry-500"
                       : `border ${th.bdr} ${th.txm}`
                   }`}>{o.ic} {o.l}</button>
               ))}
@@ -293,7 +295,7 @@ export function SettingsPage() {
                 <button key={o.k} onClick={() => setLang(o.k)}
                   className={`py-3.5 rounded-2xl text-sm font-bold transition-all ${
                     lang === o.k
-                      ? "text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48]"
+                      ? "text-white bg-gradient-to-r from-cherry-400 to-cherry-500"
                       : `border ${th.bdr} ${th.txm}`
                   }`}>{o.f} {o.l}</button>
               ))}
@@ -323,7 +325,7 @@ export function SettingsPage() {
                 <button key={o.k} onClick={() => changePosLayout(o.k)}
                   className={`py-3.5 px-3 rounded-2xl text-sm font-bold transition-all text-center ${
                     posLayout === o.k
-                      ? "text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48]"
+                      ? "text-white bg-gradient-to-r from-cherry-400 to-cherry-500"
                       : `border ${th.bdr} ${th.txm}`
                   }`}>
                   <p>{o.l}</p>
@@ -377,7 +379,7 @@ export function SettingsPage() {
                     setCpLoading(false);
                   }
                 }}
-                className="w-full py-2.5 rounded-xl text-sm font-bold text-white bg-[#E11D48] disabled:opacity-40"
+                className="w-full py-2.5 rounded-xl text-sm font-bold text-white bg-cherry-500 disabled:opacity-40"
               >
                 {cpLoading
                   ? (lang === "id" ? "Menyimpan…" : "Saving…")
@@ -403,6 +405,42 @@ export function SettingsPage() {
           <div className="mb-1">
             <h3 className={`text-sm font-extrabold tracking-tight ${th.tx}`}>{t.storeInfo}</h3>
             <p className={`text-xs mt-0.5 ${th.txm}`}>{t.storeInfoDesc}</p>
+          </div>
+
+          {/* Warna aplikasi. Pilihan terbatas, bukan pemilih warna bebas:
+              tiap palet butuh belasan nada yang serasi, dan satu warna bebas
+              hampir pasti menghasilkan tulisan yang tidak terbaca di atasnya.
+
+              Yang berubah hanya warna identitas. Merah peringatan (stok
+              habis, galat isian, tombol hapus) dan biru zona keranjang
+              SENGAJA tetap — warnanya membawa arti, bukan hiasan. */}
+          <div className={`rounded-[22px] border p-5 ${th.card} ${th.bdr}`}>
+            <label className={`text-xs font-semibold mb-2 block ${th.txm}`}>
+              {lang === "id" ? "Warna Aplikasi" : "App Color"}
+            </label>
+            <div className="flex flex-wrap gap-2" role="group"
+              aria-label={lang === "id" ? "Pilih warna aplikasi" : "Choose app color"}>
+              {BRAND_PALET.map(pal => {
+                const dipilih = brandColor === pal.v;
+                return (
+                  <button key={pal.v || "bawaan"} type="button"
+                    onClick={() => setBrandColor(pal.v)}
+                    aria-pressed={dipilih}
+                    className={`inline-flex items-center gap-2 min-h-11 px-4 rounded-2xl border text-sm font-bold ${
+                      dipilih ? `${th.acc} border-current` : `${th.bdr} ${th.txm}`
+                    }`}>
+                    <span className="w-4 h-4 rounded-full shrink-0 border border-black/10"
+                      style={{ background: pal.contoh }} aria-hidden="true" />
+                    {pal.label}
+                  </button>
+                );
+              })}
+            </div>
+            <p className={`text-xs mt-2 leading-relaxed ${th.txf}`}>
+              {lang === "id"
+                ? "Berlaku di semua perangkat setelah ditekan Simpan. Warna peringatan stok dan tombol hapus tetap merah."
+                : "Applies to all devices after saving. Stock warnings and delete buttons stay red."}
+            </p>
           </div>
 
           <div className={`rounded-[22px] border p-5 ${th.card} ${th.bdr}`}>
@@ -447,7 +485,7 @@ export function SettingsPage() {
                   onClick={() => { setLabelWidth(s.width); setLabelHeight(s.height); }}
                   className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${
                     labelWidth === s.width && labelHeight === s.height
-                      ? `${th.accBg} ${th.acc} border-[#E11D48]`
+                      ? `${th.accBg} ${th.acc} border-cherry-500`
                       : `${th.card2} ${th.bdr}`
                   }`}>
                   {s.width}&times;{s.height}
@@ -472,7 +510,7 @@ export function SettingsPage() {
 
           {/* Save — clearly scoped to store info + tax */}
           <button onClick={handleSave}
-            className="w-full py-3 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48]">
+            className="w-full py-3 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-cherry-400 to-cherry-500">
             {t.save}
           </button>
 
@@ -487,7 +525,7 @@ export function SettingsPage() {
                 <p className={`text-xs mt-0.5 ${th.txm}`}>{t.bankDesc}</p>
               </div>
               <button onClick={() => setShowAddBank(true)}
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48] shrink-0">
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-cherry-400 to-cherry-500 shrink-0">
                 <Plus size={13} /> {t.addBankAccount}
               </button>
             </div>
@@ -515,7 +553,7 @@ export function SettingsPage() {
                                 diatur" atau "memang Bekasi"? */}
                             <span className={`text-[11px] font-bold px-1.5 py-0.5 rounded ${
                               acc.location === "home"
-                                ? "bg-[#FFE4E9] text-[#BE123C]"
+                                ? "bg-cherry-100 text-[#BE123C]"
                                 : `${th.elev} ${th.txm}`
                             }`}>
                               {acc.location === "home" ? "Online Rumah" : "Toko Bekasi"}
@@ -563,7 +601,7 @@ export function SettingsPage() {
               <p className={`text-xs mt-0.5 ${th.txm}`}>{t.teamDesc}</p>
             </div>
             <button onClick={() => setShowRegister(true)}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48] shrink-0">
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-cherry-400 to-cherry-500 shrink-0">
               <UserPlus size={13} /> {t.registerStaff}
             </button>
           </div>
@@ -594,8 +632,8 @@ export function SettingsPage() {
                       </div>
                       <span className={`text-xs font-bold px-2 py-0.5 rounded-md shrink-0 ${
                         u.role === "cashier"
-                          ? (th.dark ? "bg-[#E11D48]/15 text-[#E11D48]" : "bg-[#FFE4E9] text-[#E11D48]")
-                          : (th.dark ? "bg-[#E11D48]/15 text-[#E11D48]" : "bg-[#FFE4E9] text-[#E11D48]")
+                          ? (th.dark ? "bg-cherry-500/15 text-cherry-500" : "bg-cherry-100 text-cherry-500")
+                          : (th.dark ? "bg-cherry-500/15 text-cherry-500" : "bg-cherry-100 text-cherry-500")
                       }`}>{(t.roles as Record<string, string>)[u.role]}</span>
                       {expanded ? <ChevronUp size={14} className={th.txm} /> : <ChevronDown size={14} className={th.txm} />}
                     </button>
@@ -627,7 +665,7 @@ export function SettingsPage() {
                               setNewPasswordInput("");
                               toast.success(t.passwordUpdated as string);
                             }} disabled={!newPasswordInput.trim()}
-                              className="px-3 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48] disabled:opacity-40">{t.save}</button>
+                              className="px-3 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-cherry-400 to-cherry-500 disabled:opacity-40">{t.save}</button>
                           </div>
                         </div>
 
@@ -654,10 +692,10 @@ export function SettingsPage() {
                                     <div className="flex items-center gap-1.5">
                                       <span className={`text-xs font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${
                                         d.status === "approved"
-                                          ? (th.dark ? "bg-[#3A1F2A]/60 text-[#FB7185]" : "bg-[#FFE4E9] text-[#E11D48]")
+                                          ? (th.dark ? "bg-cherry-900/60 text-cherry-400" : "bg-cherry-100 text-cherry-500")
                                           : d.status === "pending"
-                                          ? (th.dark ? "bg-[#3A1F2A]/40 text-[#FB7185]" : "bg-[#FCE4EC] text-[#BE123C]")
-                                          : (th.dark ? "bg-[#3A1F2A]/40 text-[#C4504A]" : "bg-[#FCE4EC] text-[#C4504A]")
+                                          ? (th.dark ? "bg-cherry-900/40 text-cherry-400" : "bg-[#FCE4EC] text-[#BE123C]")
+                                          : (th.dark ? "bg-cherry-900/40 text-[#C4504A]" : "bg-[#FCE4EC] text-[#C4504A]")
                                       }`}>
                                         {d.status === "approved" ? (lang === "id" ? "Disetujui" : "Approved")
                                           : d.status === "pending" ? (lang === "id" ? "Menunggu" : "Pending")
@@ -679,7 +717,7 @@ export function SettingsPage() {
                                       } catch {
                                         toast.error(lang === "id" ? "Gagal menyetujui" : "Failed to approve");
                                       }
-                                    }} className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-bold text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48]">
+                                    }} className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-bold text-white bg-gradient-to-r from-cherry-400 to-cherry-500">
                                       <Check size={12} />
                                       {lang === "id" ? "Setujui" : "Approve"}
                                     </button>
@@ -714,7 +752,7 @@ export function SettingsPage() {
                             auditLog("user_toggled", user!.id, user!.name, `${u.name} → ${willDeactivate ? "inactive" : "active"}`);
                             toast.success((willDeactivate ? t.userDeactivated : t.userActivated) as string);
                           }}
-                            className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-bold border ${th.bdr} ${inactive ? "text-[#E11D48]" : "text-[#E11D48]"}`}>
+                            className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-bold border ${th.bdr} ${inactive ? "text-cherry-500" : "text-cherry-500"}`}>
                             <Power size={12} />
                             {inactive ? t.activateUser : t.deactivateUser}
                           </button>
@@ -768,11 +806,11 @@ export function SettingsPage() {
             <div className={`rounded-[22px] border overflow-hidden ${th.card} ${th.bdr}`}>
               {auditEntries.slice(0, activityVisible).map((entry, i) => {
                 const actionColor =
-                  entry.action === "order_created" ? "text-[#E11D48]"
+                  entry.action === "order_created" ? "text-cherry-500"
                   : entry.action === "order_voided" ? "text-[#C4504A]"
-                  : entry.action === "order_refunded" ? "text-[#E11D48]"
-                  : entry.action === "register_closed" ? "text-[#E11D48]"
-                  : entry.action === "product_added" || entry.action === "product_edited" ? "text-[#E11D48]"
+                  : entry.action === "order_refunded" ? "text-cherry-500"
+                  : entry.action === "register_closed" ? "text-cherry-500"
+                  : entry.action === "product_added" || entry.action === "product_edited" ? "text-cherry-500"
                   : th.txm;
                 const actionLabel = entry.action.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
                 return (
@@ -826,7 +864,7 @@ export function SettingsPage() {
                       aria-pressed={bankForm.location === k}
                       className={`flex-1 min-h-11 rounded-2xl text-sm font-bold border ${
                         bankForm.location === k
-                          ? "text-white border-transparent bg-gradient-to-r from-[#FB7185] to-[#E11D48]"
+                          ? "text-white border-transparent bg-gradient-to-r from-cherry-400 to-cherry-500"
                           : `${th.bdr} ${th.txm}`
                       }`}>{label}</button>
                   ))}
@@ -901,7 +939,7 @@ export function SettingsPage() {
                   className={`flex-1 py-3 rounded-2xl text-sm font-bold border disabled:opacity-40 ${th.bdr} ${th.txm}`}>{t.cancel}</button>
                 <button onClick={handleAddBank}
                   disabled={savingBank || !bankForm.bankName || !bankForm.accountNumber.trim() || !bankForm.accountHolder.trim()}
-                  className="flex-1 py-3 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48] disabled:opacity-40">
+                  className="flex-1 py-3 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-cherry-400 to-cherry-500 disabled:opacity-40">
                   {savingBank ? (lang === "id" ? "Menyimpan…" : "Saving…") : t.save}
                 </button>
               </div>
@@ -949,7 +987,7 @@ export function SettingsPage() {
                     <button key={r} onClick={() => setRegForm(f => ({ ...f, role: r }))}
                       className={`py-3 rounded-2xl text-sm font-bold ${
                         regForm.role === r
-                          ? "text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48]"
+                          ? "text-white bg-gradient-to-r from-cherry-400 to-cherry-500"
                           : `border ${th.bdr} ${th.txm}`
                       }`}>{(t.roles as Record<string, string>)[r]}</button>
                   ))}
@@ -957,15 +995,15 @@ export function SettingsPage() {
               </div>
 
               {/* Default password hint */}
-              <div className={`rounded-xl p-3 ${th.dark ? "bg-[#E11D48]/10" : "bg-[#FFE4E9]"}`}>
-                <p className={`text-xs font-semibold ${th.dark ? "text-[#E11D48]" : "text-[#E11D48]"}`}>
+              <div className={`rounded-xl p-3 ${th.dark ? "bg-cherry-500/10" : "bg-cherry-100"}`}>
+                <p className={`text-xs font-semibold ${th.dark ? "text-cherry-500" : "text-cherry-500"}`}>
                   {t.defaultPassword}: <span className="font-mono">{DEFAULT_PASSWORD}</span>
                 </p>
               </div>
 
               <button onClick={handleRegister}
                 disabled={!regForm.name.trim() || !regForm.email.trim()}
-                className={`w-full py-3.5 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48] mt-1 ${
+                className={`w-full py-3.5 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-cherry-400 to-cherry-500 mt-1 ${
                   !regForm.name.trim() || !regForm.email.trim() ? "opacity-40" : ""
                 }`}>{t.registerStaff}</button>
             </div>

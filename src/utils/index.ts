@@ -1,6 +1,6 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
-import type { Order, Product, PaymentTerms } from "@/types";
+import type { Order, Product, PaymentTerms, ProductPriceTier } from "@/types";
 import JsBarcode from "jsbarcode";
 import { useSettingsStore } from "@/stores";
 
@@ -475,3 +475,74 @@ export const LABEL_TEMPAT: Record<string, string> = {
   home: "Online Rumah",
   all: "Gabungan",
 };
+
+/**
+ * tierBerlaku — apakah satu tier harga grosir berlaku sekarang, untuk customer
+ * ini, pada qty ini.
+ *
+ * SATU-SATUNYA tempat aturan ini ditulis. Sebelum 30 Okt 2026 pemeriksaannya
+ * disalin di empat tempat (penghitung harga, badge "Grosir", toast transisi,
+ * hint "Tambah N lagi") dan ketiganya yang terakhir **lupa memeriksa masa
+ * berlaku** — tier kedaluwarsa tetap berbadge "Grosir" dan tetap mengajak
+ * kasir menawarkan harga yang tidak akan ditagih sistem.
+ *
+ * Kalau menambah pemeriksaan baru, tambahkan di sini saja.
+ *
+ * @param qtySatuan jumlah dalam satuan (sudah dikali qtyPerBox kalau per dus).
+ *                  Lewatkan `null` untuk melihat kelayakan tanpa syarat qty —
+ *                  dipakai hint "Tambah N lagi" yang justru mencari tier yang
+ *                  BELUM tercapai.
+ */
+export function tierBerlaku(
+  t: ProductPriceTier,
+  member: { id: string } | null,
+  qtySatuan: number | null,
+  nowMs: number = Date.now()
+): boolean {
+  if (qtySatuan !== null && qtySatuan < t.minQty) return false;
+  // Jendela jadwal. `expiresAt` dari backend bersifat eksklusif — "sampai 31
+  // Des" tersimpan sebagai 1 Januari 00:00.
+  if (t.startsAt && new Date(t.startsAt).getTime() > nowMs) return false;
+  if (t.expiresAt && new Date(t.expiresAt).getTime() <= nowMs) return false;
+  switch (t.target) {
+    case "all_customers":
+      return true;
+    case "all_members":
+      return !!member;
+    case "member_specific":
+      return !!member && (t.members || []).some(m => m.id === member.id);
+    default:
+      return false;
+  }
+}
+
+/**
+ * Tier mana yang menang kalau ada beberapa yang muat: minQty TERBESAR, seri
+ * dimenangkan harga per-satuan terendah. Sama persis dengan backend.
+ */
+export function tierTerbaik<T extends { minQty: number; price: number }>(tiers: T[]): T | null {
+  if (tiers.length === 0) return null;
+  return tiers.reduce((a, b) => {
+    if (a.minQty !== b.minQty) return a.minQty > b.minQty ? a : b;
+    return a.price <= b.price ? a : b;
+  });
+}
+
+/** Status jadwal tier untuk label di layar. */
+export function statusJadwalTier(
+  t: { startsAt?: string | null; expiresAt?: string | null },
+  nowMs: number = Date.now()
+): { kind: "aktif" | "terjadwal" | "berakhir"; hariLagi: number } {
+  if (t.startsAt) {
+    const mulai = new Date(t.startsAt).getTime();
+    if (mulai > nowMs) {
+      return { kind: "terjadwal", hariLagi: Math.ceil((mulai - nowMs) / 86400000) };
+    }
+  }
+  if (t.expiresAt) {
+    const habis = new Date(t.expiresAt).getTime();
+    if (habis <= nowMs) return { kind: "berakhir", hariLagi: 0 };
+    return { kind: "aktif", hariLagi: Math.ceil((habis - nowMs) / 86400000) };
+  }
+  return { kind: "aktif", hariLagi: Infinity };
+}

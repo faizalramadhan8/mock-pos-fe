@@ -156,7 +156,7 @@ export function MemberStatsModal({ member, onClose }: Props) {
           </div>
 
           {/* Lifetime summary */}
-          <div className={`flex justify-between items-center mb-3 px-1 py-2 rounded-xl ${th.dark ? "bg-[#E11D48]/10" : "bg-[#FFE4E9]"}`}>
+          <div className={`flex justify-between items-center mb-3 px-1 py-2 rounded-xl ${th.dark ? "bg-cherry-500/10" : "bg-cherry-100"}`}>
             <p className={`text-xs ${th.txm}`}>📈 Lifetime</p>
             <p className={`text-xs font-bold ${th.tx}`}>
               {$(stats.lifetime_spend)} · {stats.lifetime_orders}x
@@ -176,8 +176,8 @@ export function MemberStatsModal({ member, onClose }: Props) {
                         <span className={th.txm}>{m.month}</span>
                         <span className={`font-bold ${th.tx}`}>{$(m.spend)} · {m.orders}x</span>
                       </div>
-                      <div className={`h-2 rounded-full ${th.dark ? "bg-[#3D2230]" : "bg-[#F0E4D2]"}`}>
-                        <div className={`h-2 rounded-full bg-[#E11D48]`} style={{ width: `${pct}%` }} />
+                      <div className={`h-2 rounded-full ${th.dark ? "bg-shade-elev" : "bg-[#F0E4D2]"}`}>
+                        <div className={`h-2 rounded-full bg-cherry-500`} style={{ width: `${pct}%` }} />
                       </div>
                     </div>
                   );
@@ -238,7 +238,7 @@ export function MemberStatsModal({ member, onClose }: Props) {
                     </p>
                   </div>
                   <div className="text-right shrink-0">
-                    <p className={`text-xs font-black ${isPositive ? "text-[#9F1239] dark:text-[#FB7185]" : "text-[#E11D48]"}`}>
+                    <p className={`text-xs font-black ${isPositive ? "text-cherry-700 dark:text-cherry-400" : "text-cherry-500"}`}>
                       {isPositive ? "+" : ""}{mv.points.toLocaleString("id-ID")}
                     </p>
                     <p className={`text-xs ${th.txf}`}>= {mv.balance_after.toLocaleString("id-ID")}</p>

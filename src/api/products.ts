@@ -1,4 +1,5 @@
 import { api } from './client';
+import type { PriceTierTarget } from '@/types';
 
 export interface ProductRes {
   id: string;
@@ -35,9 +36,10 @@ export interface ProductPriceTierRes {
   product_id: string;
   min_qty: number;
   price: number;
-  target_type: 'all_customers' | 'member_specific';
+  target_type: PriceTierTarget;
   members?: ProductPriceTierMemberRefRes[];
   note?: string;
+  starts_at?: string | null;
   expires_at?: string | null;
   created_at: string;
 }
@@ -65,9 +67,10 @@ export interface ProductPriceTierHistoryRes {
   product_id: string;
   min_qty: number;
   price: number;
-  target_type: 'all_customers' | 'member_specific';
+  target_type: PriceTierTarget;
   member_ids?: string[];
   note?: string;
+  starts_at?: string | null;
   expires_at?: string | null;
   status: 'active' | 'inactive';
   action: 'create' | 'update' | 'delete';
@@ -161,19 +164,27 @@ export const productApi = {
   createTier: (productId: string, data: {
     min_qty: number;
     price: number;
-    target_type: 'all_customers' | 'member_specific';
+    target_type: PriceTierTarget;
     member_ids?: string[];
     note?: string;
-    duration_days?: number;
+    /** "YYYY-MM-DD" atau RFC3339. String kosong = hapus batasnya.
+     *  Backend membaca `starts_at` sebagai 00:00 hari itu dan `expires_at`
+     *  sebagai akhir hari itu, jadi "sampai 31 Des" mencakup 31 Des penuh. */
+    starts_at?: string;
+    expires_at?: string;
   }) => api.post<ProductPriceTierRes>(`/products/${productId}/tiers`, data),
 
   updateTier: (productId: string, tierId: string, data: {
     min_qty: number;
     price: number;
-    target_type: 'all_customers' | 'member_specific';
+    target_type: PriceTierTarget;
     member_ids?: string[];
     note?: string;
-    duration_days?: number;
+    /** "YYYY-MM-DD" atau RFC3339. String kosong = hapus batasnya.
+     *  Backend membaca `starts_at` sebagai 00:00 hari itu dan `expires_at`
+     *  sebagai akhir hari itu, jadi "sampai 31 Des" mencakup 31 Des penuh. */
+    starts_at?: string;
+    expires_at?: string;
   }) => api.put<ProductPriceTierRes>(`/products/${productId}/tiers/${tierId}`, data),
 
   deleteTier: (productId: string, tierId: string) =>

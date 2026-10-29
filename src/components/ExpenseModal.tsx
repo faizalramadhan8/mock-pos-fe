@@ -181,7 +181,7 @@ export function ExpenseModal({ open, onClose, expense }: Props) {
               <button key={m} type="button" onClick={() => setPaymentMethod(m)}
                 className={`flex-1 min-h-[44px] rounded-xl text-sm font-bold border ${
                   paymentMethod === m
-                    ? "text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48] border-transparent"
+                    ? "text-white bg-gradient-to-r from-cherry-400 to-cherry-500 border-transparent"
                     : `${th.bdr} ${th.card} ${th.txm}`
                 }`}>
                 {m === "cash" ? (lang === "id" ? "Tunai" : "Cash") : m.toUpperCase()}
@@ -206,7 +206,7 @@ export function ExpenseModal({ open, onClose, expense }: Props) {
           </button>
           <button onClick={handleSubmit} disabled={!valid || submitting}
             aria-busy={submitting}
-            className={`flex-1 min-h-[44px] rounded-xl text-sm font-bold text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48] disabled:opacity-50 inline-flex items-center justify-center gap-2`}>
+            className={`flex-1 min-h-[44px] rounded-xl text-sm font-bold text-white bg-gradient-to-r from-cherry-400 to-cherry-500 disabled:opacity-50 inline-flex items-center justify-center gap-2`}>
             {submitting && <Loader2 size={16} className="animate-spin" aria-hidden />}
             {submitting ? (lang === "id" ? "Menyimpan..." : "Saving...") : (lang === "id" ? "Simpan" : "Save")}
           </button>

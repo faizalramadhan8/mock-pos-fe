@@ -125,7 +125,7 @@ export function ParkedCartsModal({ open, onClose }: { open: boolean; onClose: ()
                         setConfirmLoadId(null);
                         onClose();
                       }}
-                        className="flex-1 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48]">
+                        className="flex-1 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-cherry-400 to-cherry-500">
                         Ya, muat
                       </button>
                     </div>

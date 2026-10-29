@@ -31,23 +31,23 @@ const ICON_MAP: Record<NotifType, React.ReactNode> = {
 
 const COLOR_MAP: Record<string, string> = {
   critical: "text-[#BE123C]",
-  high: "text-[#E11D48]",
-  medium: "text-[#E11D48]",
-  low: "text-[#E11D48]",
+  high: "text-cherry-500",
+  medium: "text-cherry-500",
+  low: "text-cherry-500",
 };
 
 const BG_MAP_LIGHT: Record<string, string> = {
   critical: "bg-[#FCE4EC] border-[#BE123C]",
-  high: "bg-[#FFE4E9] border-[#FFB5C0]",
-  medium: "bg-[#FFE4E9] border-[#FFB5C0]",
-  low: "bg-[#FFE4E9] border-[#FFB5C0]",
+  high: "bg-cherry-100 border-cherry-300",
+  medium: "bg-cherry-100 border-cherry-300",
+  low: "bg-cherry-100 border-cherry-300",
 };
 
 const BG_MAP_DARK: Record<string, string> = {
   critical: "bg-[#BE123C]/10 border-[#BE123C]/20",
-  high: "bg-[#E11D48]/10 border-[#FFB5C0]/20",
-  medium: "bg-[#E11D48]/10 border-[#FFB5C0]/20",
-  low: "bg-[#E11D48]/10 border-[#FFB5C0]/20",
+  high: "bg-cherry-500/10 border-cherry-300/20",
+  medium: "bg-cherry-500/10 border-cherry-300/20",
+  low: "bg-cherry-500/10 border-cherry-300/20",
 };
 
 export function NotificationBell() {
@@ -149,9 +149,9 @@ function NotifItem({ notif, onDismiss, dark }: { notif: AppNotification; onDismi
       </div>
       <div className="flex-1 min-w-0">
         <p className={`text-xs font-bold ${COLOR_MAP[notif.priority]}`}>{notif.title}</p>
-        <p className={`text-xs mt-0.5 ${dark ? "text-[#A98C94]" : "text-[#6E4E57]"} truncate`}>{notif.message}</p>
+        <p className={`text-xs mt-0.5 ${dark ? "text-ink-500" : "text-ink-700"} truncate`}>{notif.message}</p>
       </div>
-      <button onClick={onDismiss} className={`w-6 h-6 flex items-center justify-center rounded-lg shrink-0 ${dark ? "hover:bg-white/10 text-[#6E4E57]" : "hover:bg-black/5 text-[#A98C94]"}`}>
+      <button onClick={onDismiss} className={`w-6 h-6 flex items-center justify-center rounded-lg shrink-0 ${dark ? "hover:bg-white/10 text-ink-700" : "hover:bg-black/5 text-ink-500"}`}>
         <X size={12} />
       </button>
     </div>

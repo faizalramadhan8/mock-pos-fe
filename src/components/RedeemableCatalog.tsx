@@ -129,7 +129,7 @@ export function RedeemableCatalog({ canWrite }: Props) {
       {/* Info card */}
       <div className={`p-4 rounded-2xl border ${th.bdr} ${th.card2}`}>
         <div className="flex items-start gap-3">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-[#FFE4E9] text-[#E11D48] shrink-0">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-cherry-100 text-cherry-500 shrink-0">
             <Gift size={18} strokeWidth={2.4} />
           </div>
           <div>
@@ -155,7 +155,7 @@ export function RedeemableCatalog({ canWrite }: Props) {
         {canWrite && (
           <button
             onClick={openAdd}
-            className="px-4 py-2.5 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48] inline-flex items-center gap-1.5">
+            className="px-4 py-2.5 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-cherry-400 to-cherry-500 inline-flex items-center gap-1.5">
             <Plus size={16} strokeWidth={2.6} /> Tambah Item
           </button>
         )}
@@ -181,7 +181,7 @@ export function RedeemableCatalog({ canWrite }: Props) {
               {it.image ? (
                 <img src={it.image} alt="" className="w-12 h-12 rounded-lg object-cover shrink-0" />
               ) : (
-                <div className="w-12 h-12 rounded-lg bg-[#FFE4E9] text-[#E11D48] shrink-0 flex items-center justify-center">
+                <div className="w-12 h-12 rounded-lg bg-cherry-100 text-cherry-500 shrink-0 flex items-center justify-center">
                   <Gift size={20} strokeWidth={2.2} />
                 </div>
               )}
@@ -289,7 +289,7 @@ export function RedeemableCatalog({ canWrite }: Props) {
               type="checkbox"
               checked={draft.isActive}
               onChange={e => setDraft({ ...draft, isActive: e.target.checked })}
-              className="w-4 h-4 accent-[#E11D48]" />
+              className="w-4 h-4 accent-cherry-500" />
             <span className="font-semibold">Aktif (tampil di POS untuk customer tebus)</span>
           </label>
           <div className="flex gap-2 pt-1">
@@ -298,7 +298,7 @@ export function RedeemableCatalog({ canWrite }: Props) {
               Batal
             </button>
             <button onClick={save} disabled={saving}
-              className="flex-1 py-3 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48] disabled:opacity-40">
+              className="flex-1 py-3 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-cherry-400 to-cherry-500 disabled:opacity-40">
               {saving ? "Menyimpan…" : draft.id ? "Update" : "Tambah"}
             </button>
           </div>

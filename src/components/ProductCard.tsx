@@ -30,22 +30,22 @@ export const ProductCard = memo(function ProductCard({ product: p, inCart, lang,
   const lowStock = p.stock > 0 && p.stock <= p.minStock;
 
   const stockChip = outOfStock || lowStock
-    ? "bg-[#FCE4EC] text-[#BE123C] dark:bg-[#BE123C]/25 dark:text-[#FB7185]"
+    ? "bg-[#FCE4EC] text-[#BE123C] dark:bg-[#BE123C]/25 dark:text-cherry-400"
     : `${th.accBg} ${th.acc}`;
 
   return (
     <div
       className={`group relative rounded-2xl border overflow-hidden transition-all duration-200 press-spring ${
         inCart
-          ? "border-[#E11D48] ring-2 ring-[#FFB5C0]/50 shadow-[0_6px_18px_-10px_rgba(225,29,72,0.35)]"
-          : `${th.bdr} hover:border-[#FFB5C0]`
+          ? "border-cherry-500 ring-2 ring-cherry-300/50 shadow-[0_6px_18px_-10px_rgba(225,29,72,0.35)]"
+          : `${th.bdr} hover:border-cherry-300`
       } ${th.card} ${outOfStock ? "opacity-55" : ""}`}
     >
       {/* Soft blush — smaller, lower opacity so it never dominates */}
       <div
         aria-hidden
         className="pointer-events-none absolute -top-8 -right-8 w-24 h-24 rounded-full opacity-20 blur-2xl"
-        style={{ background: "radial-gradient(circle, #FFB5C0 0%, transparent 70%)" }}
+        style={{ background: "radial-gradient(circle, var(--color-cherry-300) 0%, transparent 70%)" }}
       />
 
       <div className="relative p-3.5 flex flex-col gap-2.5">
@@ -116,7 +116,7 @@ export const ProductCard = memo(function ProductCard({ product: p, inCart, lang,
         <button
           onClick={() => onAdd(p, "individual")}
           disabled={outOfStock}
-          className="press-spring flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-black text-white bg-gradient-to-br from-[#FB7185] to-[#E11D48] shadow-[0_3px_10px_-4px_rgba(225,29,72,0.45)] disabled:opacity-30 disabled:shadow-none"
+          className="press-spring flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-black text-white bg-gradient-to-br from-cherry-400 to-cherry-500 shadow-[0_3px_10px_-4px_rgba(225,29,72,0.45)] disabled:opacity-30 disabled:shadow-none"
         >
           <Plus size={14} strokeWidth={3} />
           {t.addPcs}
@@ -127,8 +127,8 @@ export const ProductCard = memo(function ProductCard({ product: p, inCart, lang,
             disabled={p.stock < p.qtyPerBox}
             className={`press-spring flex items-center justify-center gap-1 py-2 rounded-xl text-xs font-bold border-2 disabled:opacity-30 ${
               th.dark
-                ? "border-[#E11D48]/40 text-[#FB7185]"
-                : "border-[#FFB5C0] text-[#E11D48]"
+                ? "border-cherry-500/40 text-cherry-400"
+                : "border-cherry-300 text-cherry-500"
             }`}
           >
             {t.box} · {p.qtyPerBox}

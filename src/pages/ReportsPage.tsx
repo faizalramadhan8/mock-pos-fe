@@ -424,7 +424,7 @@ export function ReportsPage() {
             )}
           </div>
           {customError && (
-            <p role="alert" className={`text-xs font-bold ${th.dark ? "text-[#FB7185]" : "text-[#BE123C]"} -mt-2`}>
+            <p role="alert" className={`text-xs font-bold ${th.dark ? "text-cherry-400" : "text-[#BE123C]"} -mt-2`}>
               {customError}
             </p>
           )}
@@ -461,7 +461,7 @@ export function ReportsPage() {
               <button key={s.key} onClick={() => setSourceFilter(s.key)}
                 aria-pressed={active}
                 className={`rounded-2xl border p-3 text-left transition ${
-                  active ? "border-[#E11D48] bg-[#FFF4F6] dark:bg-[#E11D48]/10" : `${th.bdr} ${th.card2}`
+                  active ? "border-cherry-500 bg-cherry-50 dark:bg-cherry-500/10" : `${th.bdr} ${th.card2}`
                 }`}>
                 <p className={`text-xs font-bold uppercase tracking-wider ${active ? th.acc : th.txf}`}>
                   {s.label}
@@ -486,7 +486,7 @@ export function ReportsPage() {
           <button key={item.id} role="tab" aria-selected={tab === item.id}
             onClick={() => setTab(item.id)}
             className={`shrink-0 inline-flex items-center gap-1.5 px-4 min-h-[44px] rounded-[14px] text-sm font-bold transition-all ${
-              tab === item.id ? "text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48]" : `border ${th.bdr} ${th.card} ${th.txm}`
+              tab === item.id ? "text-white bg-gradient-to-r from-cherry-400 to-cherry-500" : `border ${th.bdr} ${th.card} ${th.txm}`
             }`}>
             {item.icon}{item.label}
           </button>
@@ -550,7 +550,7 @@ export function ReportsPage() {
                 <div key={p.name} className={`flex items-start gap-3 px-4 py-3.5 ${idx > 0 ? `border-t ${th.bdrSoft}` : ""}`}>
                   <span aria-hidden
                     className={`shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-xs font-black ${
-                      idx === 0 ? "text-white bg-gradient-to-br from-[#FFB5C0] to-[#E11D48] shadow-sm"
+                      idx === 0 ? "text-white bg-gradient-to-br from-cherry-300 to-cherry-500 shadow-sm"
                       : idx < 3 ? `${th.accBg} ${th.acc}`
                       : `${th.elev} ${th.txm}`
                     }`}>
@@ -566,7 +566,7 @@ export function ReportsPage() {
                     <div className="mini-bar mt-2" style={{ "--bar-pct": `${barPct}%` } as React.CSSProperties}
                       aria-hidden />
                     {showDiff && (
-                      <p className={`text-xs mt-1.5 inline-flex items-center gap-1 ${diff > 0 ? (th.dark ? "text-[#FB7185]" : "text-[#BE123C]") : (th.dark ? "text-[#FFB5C0]" : "text-[#E11D48]")}`}>
+                      <p className={`text-xs mt-1.5 inline-flex items-center gap-1 ${diff > 0 ? (th.dark ? "text-cherry-400" : "text-[#BE123C]") : (th.dark ? "text-cherry-300" : "text-cherry-500")}`}>
                         {diff > 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
                         <span className="font-bold">
                           {lang === "id" ? "Harga sekarang" : "Now"} {$(current)}
@@ -646,7 +646,7 @@ export function ReportsPage() {
                         aria-expanded={expanded} aria-controls={panelId}
                         className="w-full flex items-center gap-3 px-4 py-3 min-h-[56px] text-left">
                         <span aria-hidden className={`shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-xs font-black ${
-                          idx === 0 ? "text-white bg-gradient-to-br from-[#FFB5C0] to-[#E11D48] shadow-sm"
+                          idx === 0 ? "text-white bg-gradient-to-br from-cherry-300 to-cherry-500 shadow-sm"
                           : idx < 3 ? `${th.accBg} ${th.acc}`
                           : `${th.elev} ${th.txm}`
                         }`}>
@@ -769,7 +769,7 @@ export function ReportsPage() {
                       aria-expanded={expanded} aria-controls={panelId}
                       className="w-full flex items-start gap-3 px-4 py-3.5 text-left">
                       <span aria-hidden className={`shrink-0 w-9 h-9 rounded-full flex items-center justify-center text-sm font-black ${
-                        idx === 0 ? "text-white bg-gradient-to-br from-[#FFB5C0] to-[#E11D48] shadow-sm"
+                        idx === 0 ? "text-white bg-gradient-to-br from-cherry-300 to-cherry-500 shadow-sm"
                         : idx < 3 ? `${th.accBg} ${th.acc}`
                         : `${th.elev} ${th.txm}`
                       }`}>

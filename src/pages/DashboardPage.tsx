@@ -259,11 +259,11 @@ export function DashboardPage({ onNavigate }: { onNavigate?: (page: PageId) => v
           oleh halaman tujuan lalu dikosongkan. */}
       {/* ─── PERLU PERHATIAN ─── conditional hero alert card */}
       {(isOwner || isStaff) && hasAlerts && (
-        <div className={`relative rounded-[22px] border-2 border-[#FFB5C0] p-5 overflow-hidden ${th.card}`}>
+        <div className={`relative rounded-[22px] border-2 border-cherry-300 p-5 overflow-hidden ${th.card}`}>
           <div
             aria-hidden
             className="pointer-events-none absolute -top-8 -right-8 w-32 h-32 rounded-full opacity-30 blur-2xl"
-            style={{ background: "radial-gradient(circle, #FFB5C0 0%, transparent 70%)" }}
+            style={{ background: "radial-gradient(circle, var(--color-cherry-300) 0%, transparent 70%)" }}
           />
           <div className="relative flex items-center gap-2 mb-3">
             <AlertCircle size={18} className={th.acc} />
@@ -272,7 +272,7 @@ export function DashboardPage({ onNavigate }: { onNavigate?: (page: PageId) => v
           <div className="relative flex flex-col gap-2">
             {pendingOrders.length > 0 && (
               <button type="button" onClick={() => onNavigate?.("orders")}
-                className="w-full text-left flex items-center justify-between gap-2 rounded-xl px-1 py-0.5 hover:bg-[#FFE4E9]/60 dark:hover:bg-[#E11D48]/10 transition-colors">
+                className="w-full text-left flex items-center justify-between gap-2 rounded-xl px-1 py-0.5 hover:bg-cherry-100/60 dark:hover:bg-cherry-500/10 transition-colors">
                 <div className="flex items-center gap-2 min-w-0">
                   <Clock size={16} className={th.acc} />
                   <p className={`text-sm ${th.tx} truncate`}>
@@ -285,7 +285,7 @@ export function DashboardPage({ onNavigate }: { onNavigate?: (page: PageId) => v
             {outOfStock.length > 0 && (
               <button type="button"
                 onClick={() => { useNavIntentStore.getState().set({ inventoryFilter: "out", inventoryTab: "overview" }); onNavigate?.("inventory"); }}
-                className="w-full text-left flex items-start gap-2 rounded-xl px-1 py-0.5 hover:bg-[#FFE4E9]/60 dark:hover:bg-[#E11D48]/10 transition-colors">
+                className="w-full text-left flex items-start gap-2 rounded-xl px-1 py-0.5 hover:bg-cherry-100/60 dark:hover:bg-cherry-500/10 transition-colors">
                 <Package size={16} className="text-[#BE123C] mt-0.5 shrink-0" />
                 <p className={`text-sm ${th.tx}`}>
                   <b className="text-[#BE123C]">{outOfStock.length} produk stok habis</b>
@@ -299,7 +299,7 @@ export function DashboardPage({ onNavigate }: { onNavigate?: (page: PageId) => v
             {lowStock.length > 0 && (
               <button type="button"
                 onClick={() => { useNavIntentStore.getState().set({ inventoryFilter: "low", inventoryTab: "overview" }); onNavigate?.("inventory"); }}
-                className="w-full text-left flex items-start gap-2 rounded-xl px-1 py-0.5 hover:bg-[#FFE4E9]/60 dark:hover:bg-[#E11D48]/10 transition-colors">
+                className="w-full text-left flex items-start gap-2 rounded-xl px-1 py-0.5 hover:bg-cherry-100/60 dark:hover:bg-cherry-500/10 transition-colors">
                 <Package size={16} className={`${th.acc} mt-0.5 shrink-0`} />
                 <p className={`text-sm ${th.tx}`}>
                   <b className={th.acc}>{lowStock.length} produk stok rendah</b>
@@ -313,7 +313,7 @@ export function DashboardPage({ onNavigate }: { onNavigate?: (page: PageId) => v
             {isOwner && overdueInvoices.length > 0 && (
               <button type="button"
                 onClick={() => { useNavIntentStore.getState().set({ inventoryTab: "invoices" }); onNavigate?.("inventory"); }}
-                className="w-full text-left flex items-start gap-2 rounded-xl px-1 py-0.5 hover:bg-[#FFE4E9]/60 dark:hover:bg-[#E11D48]/10 transition-colors">
+                className="w-full text-left flex items-start gap-2 rounded-xl px-1 py-0.5 hover:bg-cherry-100/60 dark:hover:bg-cherry-500/10 transition-colors">
                 <Receipt size={16} className="text-[#BE123C] mt-0.5 shrink-0" />
                 <p className={`text-sm ${th.tx}`}>
                   <b className="text-[#BE123C]">{overdueInvoices.length} faktur lewat tempo</b>
@@ -328,7 +328,7 @@ export function DashboardPage({ onNavigate }: { onNavigate?: (page: PageId) => v
             {isOwner && upcomingInvoices.length > 0 && (
               <button type="button"
                 onClick={() => { useNavIntentStore.getState().set({ inventoryTab: "invoices" }); onNavigate?.("inventory"); }}
-                className="w-full text-left flex items-start gap-2 rounded-xl px-1 py-0.5 hover:bg-[#FFE4E9]/60 dark:hover:bg-[#E11D48]/10 transition-colors">
+                className="w-full text-left flex items-start gap-2 rounded-xl px-1 py-0.5 hover:bg-cherry-100/60 dark:hover:bg-cherry-500/10 transition-colors">
                 <Receipt size={16} className={`${th.acc} mt-0.5 shrink-0`} />
                 <p className={`text-sm ${th.tx}`}>
                   <b className={th.acc}>{upcomingInvoices.length} faktur jatuh tempo 7 hari</b>
@@ -343,7 +343,7 @@ export function DashboardPage({ onNavigate }: { onNavigate?: (page: PageId) => v
             {isOwner && expiringBatches.length > 0 && (
               <button type="button"
                 onClick={() => { useNavIntentStore.getState().set({ inventoryTab: "expiry" }); onNavigate?.("inventory"); }}
-                className="w-full text-left flex items-start gap-2 rounded-xl px-1 py-0.5 hover:bg-[#FFE4E9]/60 dark:hover:bg-[#E11D48]/10 transition-colors">
+                className="w-full text-left flex items-start gap-2 rounded-xl px-1 py-0.5 hover:bg-cherry-100/60 dark:hover:bg-cherry-500/10 transition-colors">
                 <AlertCircle size={16} className="text-[#BE123C] mt-0.5 shrink-0" />
                 <p className={`text-sm ${th.tx}`}>
                   <b className="text-[#BE123C]">{expiringBatches.length} batch</b>
@@ -363,7 +363,7 @@ export function DashboardPage({ onNavigate }: { onNavigate?: (page: PageId) => v
               <button key={r} onClick={() => setRange(r)}
                 className={`text-sm font-bold px-3 py-1.5 rounded-xl ${
                   range === r
-                    ? "text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48]"
+                    ? "text-white bg-gradient-to-r from-cherry-400 to-cherry-500"
                     : `border ${th.bdr} ${th.txm}`
                 }`}>{rangeLabel[r]}</button>
             ))}
@@ -384,7 +384,7 @@ export function DashboardPage({ onNavigate }: { onNavigate?: (page: PageId) => v
                 aria-pressed={tempat === k}
                 className={`text-sm font-bold px-3 py-1.5 rounded-xl ${
                   tempat === k
-                    ? "text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48]"
+                    ? "text-white bg-gradient-to-r from-cherry-400 to-cherry-500"
                     : `border ${th.bdr} ${th.txm}`
                 }`}>{label}</button>
             ))}
@@ -409,11 +409,11 @@ export function DashboardPage({ onNavigate }: { onNavigate?: (page: PageId) => v
 
       {/* ─── PENDAPATAN HERO (Owner/Admin only) ─── now follows unified range */}
       {isOwner && (
-        <div className="relative rounded-[24px] p-6 text-white bg-gradient-to-br from-[#FB7185] to-[#9F1239] overflow-hidden">
+        <div className="relative rounded-[24px] p-6 text-white bg-gradient-to-br from-cherry-400 to-cherry-700 overflow-hidden">
           <div
             aria-hidden
             className="pointer-events-none absolute -top-10 -right-10 w-48 h-48 rounded-full opacity-30 blur-3xl"
-            style={{ background: "radial-gradient(circle, #FFD1DB 0%, transparent 70%)" }}
+            style={{ background: "radial-gradient(circle, var(--color-cherry-200) 0%, transparent 70%)" }}
           />
           <p className="relative text-sm font-semibold uppercase tracking-wider opacity-75">Pendapatan · {rangeLabel[range]}</p>
           <p className="relative font-display text-[42px] font-black tracking-tight mt-2 leading-none" style={{ fontVariationSettings: '"wght" 900' }}>
@@ -440,7 +440,7 @@ export function DashboardPage({ onNavigate }: { onNavigate?: (page: PageId) => v
       {/* ─── CASHIER STATS (cashier only) ─── */}
       {isCashier && (
         <div className="grid grid-cols-2 gap-3">
-          <div className="rounded-[24px] p-6 text-white bg-gradient-to-br from-[#FB7185] to-[#9F1239]">
+          <div className="rounded-[24px] p-6 text-white bg-gradient-to-br from-cherry-400 to-cherry-700">
             <p className="text-sm font-semibold uppercase tracking-wider opacity-75">{t.revenue}</p>
             <p className="font-display text-[38px] font-black tracking-tight mt-2 leading-none" style={{ fontVariationSettings: '"wght" 900' }}>
               {$(completedOrders.reduce((s, o) => s + salesTotal(o), 0))}
@@ -465,7 +465,7 @@ export function DashboardPage({ onNavigate }: { onNavigate?: (page: PageId) => v
           ].map((s, i) => (
             <div key={i} className={`rounded-[20px] border p-4 ${th.card} ${th.bdr}`}>
               <p className={`text-sm font-semibold uppercase tracking-wider ${th.txm}`}>{s.label}</p>
-              <p className={`font-display text-[28px] font-black mt-1 leading-none ${s.alert ? "text-[#BE123C] dark:text-[#FB7185]" : th.tx}`} style={{ fontVariationSettings: '"wght" 900' }}>
+              <p className={`font-display text-[28px] font-black mt-1 leading-none ${s.alert ? "text-[#BE123C] dark:text-cherry-400" : th.tx}`} style={{ fontVariationSettings: '"wght" 900' }}>
                 {s.value}
               </p>
             </div>
@@ -498,11 +498,11 @@ export function DashboardPage({ onNavigate }: { onNavigate?: (page: PageId) => v
                 − {$(finReport.cogs)}
               </p>
             </div>
-            <div className="relative flex items-baseline justify-between px-5 py-5 bg-gradient-to-br from-[#FFE4E9] to-[#FFD1DB] dark:from-[#E11D48]/15 dark:to-[#9F1239]/20">
+            <div className="relative flex items-baseline justify-between px-5 py-5 bg-gradient-to-br from-cherry-100 to-cherry-200 dark:from-cherry-500/15 dark:to-cherry-700/20">
               <div
                 aria-hidden
                 className="pointer-events-none absolute -top-6 -right-4 w-24 h-24 rounded-full blur-2xl opacity-60"
-                style={{ background: "radial-gradient(circle, #FFB5C0 0%, transparent 70%)" }}
+                style={{ background: "radial-gradient(circle, var(--color-cherry-300) 0%, transparent 70%)" }}
               />
               <div className="relative">
                 <p className={`text-sm font-semibold uppercase tracking-wider ${th.acc}`}>Gain</p>
@@ -534,7 +534,7 @@ export function DashboardPage({ onNavigate }: { onNavigate?: (page: PageId) => v
                         <button key={s} onClick={() => setProfitSort(s)}
                           className={`text-xs font-bold px-2 py-0.5 rounded-md ${
                             profitSort === s
-                              ? "text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48]"
+                              ? "text-white bg-gradient-to-r from-cherry-400 to-cherry-500"
                               : `border ${th.bdr} ${th.txm}`
                           }`}>{label}</button>
                       );
@@ -644,7 +644,7 @@ export function DashboardPage({ onNavigate }: { onNavigate?: (page: PageId) => v
                           {$(m.v)}
                         </p>
                         <p className={`text-xs mt-0.5 ${th.txf}`}>{pct.toFixed(0)}%</p>
-                        <div className="absolute bottom-0 left-0 h-[3px] bg-gradient-to-r from-[#FFB5C0] to-[#E11D48]" style={{ width: `${pct}%` }} />
+                        <div className="absolute bottom-0 left-0 h-[3px] bg-gradient-to-r from-cherry-300 to-cherry-500" style={{ width: `${pct}%` }} />
                       </div>
                     );
                   })}

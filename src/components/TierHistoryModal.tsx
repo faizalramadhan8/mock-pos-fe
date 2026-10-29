@@ -6,7 +6,22 @@ import { useMemberStore, useProductStore } from "@/stores";
 import { formatCurrency as $ } from "@/utils";
 import type { ProductPriceTierHistoryEntry } from "@/types";
 import type { ProductPriceTierHistoryRes } from "@/api/products";
-import { History, Plus, Pencil, Trash2, Users, UserCheck } from "lucide-react";
+
+/**
+ * Tanggal pendek untuk timeline. `akhir=true` memundurkan sehari karena
+ * backend menyimpan batas akhir secara eksklusif (00:00 hari berikutnya) —
+ * tanpa itu riwayat menulis tanggal yang berbeda satu hari dari yang diketik
+ * admin, dan selisih sehari di catatan audit sulit dipercaya.
+ */
+function tglPendek(iso: string, akhir = false): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  if (akhir && d.getHours() === 0 && d.getMinutes() === 0 && d.getSeconds() === 0) {
+    d.setDate(d.getDate() - 1);
+  }
+  return d.toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
+}
+import { History, Plus, Pencil, Trash2, Users, UserCheck, UsersRound } from "lucide-react";
 
 interface Props {
   productId: string | null;
@@ -21,9 +36,14 @@ function mapHistory(r: ProductPriceTierHistoryRes): ProductPriceTierHistoryEntry
     productId: r.product_id,
     minQty: r.min_qty,
     price: r.price,
-    targetType: (r.target_type === "all_members" as any) ? "all_customers" : r.target_type,
+    // Tidak diterjemahkan. 'all_members' adalah target yang sah sejak
+    // 30 Okt 2026 — memetakannya ke 'all_customers' membuat riwayat audit
+    // berbohong tentang siapa yang dulu dapat harga itu.
+    targetType: r.target_type,
     memberIds: r.member_ids || [],
     note: r.note || undefined,
+    startsAt: r.starts_at,
+    expiresAt: r.expires_at,
     status: r.status,
     action: r.action,
     startDate: r.start_date,
@@ -133,7 +153,7 @@ export function TierHistoryModal({ productId, open, onClose }: Props) {
                     const actionColor =
                       v.action === "create" ? "text-[#0F766E] bg-[#CCFBF1]" :
                       v.action === "delete" ? "text-[#BE123C] bg-[#FCE4EC]" :
-                      "text-[#9F1239] bg-[#FFE4E9]";
+                      "text-cherry-700 bg-cherry-100";
                     const actionLabel =
                       v.action === "create" ? "Dibuat" :
                       v.action === "delete" ? "Dihapus" :
@@ -158,6 +178,8 @@ export function TierHistoryModal({ productId, open, onClose }: Props) {
                               <span className={`text-sm inline-flex items-center gap-1.5 px-2 py-1 rounded-md ${th.accBg} ${th.acc} font-semibold`}>
                                 {v.targetType === "all_customers" ? (
                                   <><Users size={14} strokeWidth={2.8} /> Semua customer</>
+                                ) : v.targetType === "all_members" ? (
+                                  <><UsersRound size={14} strokeWidth={2.8} /> Semua member</>
                                 ) : (
                                   <><UserCheck size={14} strokeWidth={2.8} /> {(v.memberIds || []).length} member</>
                                 )}
@@ -166,6 +188,11 @@ export function TierHistoryModal({ productId, open, onClose }: Props) {
                             {v.targetType === "member_specific" && v.memberIds && v.memberIds.length > 0 && (
                               <p className={`text-sm ${th.txm} mt-1.5 truncate`}>
                                 Member: {v.memberIds.map(memberName).join(", ")}
+                              </p>
+                            )}
+                            {(v.startsAt || v.expiresAt) && (
+                              <p className={`text-sm ${th.txf} mt-1.5`}>
+                                Periode: {v.startsAt ? tglPendek(v.startsAt) : "sejak dibuat"} — {v.expiresAt ? tglPendek(v.expiresAt, true) : "tanpa batas"}
                               </p>
                             )}
                             {v.note && (

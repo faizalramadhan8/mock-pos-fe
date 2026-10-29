@@ -119,7 +119,7 @@ export function ExpensesPage() {
         </h1>
         {canEdit && (
           <button onClick={openAdd}
-            className={`inline-flex items-center gap-1.5 px-4 min-h-[44px] rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48] shadow-sm`}>
+            className={`inline-flex items-center gap-1.5 px-4 min-h-[44px] rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-cherry-400 to-cherry-500 shadow-sm`}>
             <Plus size={16} /> {lang === "id" ? "Catat Pengeluaran" : "Add Expense"}
           </button>
         )}
@@ -166,7 +166,7 @@ export function ExpensesPage() {
         </div>
       </div>
       {customError && (
-        <p role="alert" className={`text-xs font-bold ${th.dark ? "text-[#FB7185]" : "text-[#BE123C]"} -mt-2`}>
+        <p role="alert" className={`text-xs font-bold ${th.dark ? "text-cherry-400" : "text-[#BE123C]"} -mt-2`}>
           {customError}
         </p>
       )}
@@ -204,8 +204,8 @@ export function ExpensesPage() {
                   <p className={`font-display font-bold text-sm ${th.acc}`}>{$(b.total)}</p>
                 </div>
                 <div className="flex items-center gap-2 mt-1">
-                  <div className="flex-1 h-1.5 rounded-full bg-[#FCE4EC] dark:bg-[#3A1F2A] overflow-hidden">
-                    <div className="h-full rounded-full bg-gradient-to-r from-[#FFB5C0] to-[#E11D48]"
+                  <div className="flex-1 h-1.5 rounded-full bg-[#FCE4EC] dark:bg-cherry-900 overflow-hidden">
+                    <div className="h-full rounded-full bg-gradient-to-r from-cherry-300 to-cherry-500"
                       style={{ width: `${Math.max(2, pct)}%` }} />
                   </div>
                   <span className={`text-xs font-bold ${th.txm} tabular-nums w-10 text-right`}>{pct}%</span>
@@ -304,7 +304,7 @@ export function ExpensesPage() {
                       </button>
                       <button onClick={() => handleDelete(e)}
                         aria-label={lang === "id" ? `Hapus pengeluaran ${e.description}` : `Delete expense ${e.description}`}
-                        className={`min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl ${th.dark ? "text-[#FB7185] bg-[#3A1F2A]" : "text-[#BE123C] bg-[#FCE4EC]"}`}>
+                        className={`min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl ${th.dark ? "text-cherry-400 bg-cherry-900" : "text-[#BE123C] bg-[#FCE4EC]"}`}>
                         <Trash2 size={16} />
                       </button>
                     </div>

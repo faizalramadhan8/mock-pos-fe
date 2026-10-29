@@ -35,7 +35,7 @@ function FilterPill({
       onClick={onClick}
       className={`shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-[14px] text-sm font-bold transition-all ${
         active
-          ? "text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48]"
+          ? "text-white bg-gradient-to-r from-cherry-400 to-cherry-500"
           : `border ${th.bdr} ${th.card} ${th.txm}`
       }`}
     >
@@ -208,7 +208,7 @@ export function OrdersPage() {
           <Search size={16} className={`absolute left-3.5 top-1/2 -translate-y-1/2 ${th.txf}`} />
           <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
             placeholder={t.searchOrders as string}
-            className={`w-full pl-10 pr-4 py-3 text-sm rounded-2xl border focus:outline-none focus:ring-2 focus:ring-[#E11D48]/20 font-medium ${th.inp}`} />
+            className={`w-full pl-10 pr-4 py-3 text-sm rounded-2xl border focus:outline-none focus:ring-2 focus:ring-cherry-500/20 font-medium ${th.inp}`} />
         </div>
         <select value={dateRange} onChange={e => setDateRange(e.target.value as DateRange)}
           className={`px-4 py-3 text-sm font-bold rounded-2xl border appearance-none cursor-pointer ${th.inp}`}>
@@ -268,7 +268,7 @@ export function OrdersPage() {
             Reset
           </button>
           {customError && (
-            <p role="alert" className={`w-full text-xs font-bold mt-0.5 ${th.dark ? "text-[#FB7185]" : "text-[#BE123C]"}`}>
+            <p role="alert" className={`w-full text-xs font-bold mt-0.5 ${th.dark ? "text-cherry-400" : "text-[#BE123C]"}`}>
               {customError}
             </p>
           )}
@@ -329,7 +329,7 @@ export function OrdersPage() {
             className={`px-5 py-4 border-b last:border-0 cursor-pointer active:opacity-70 ${th.bdrSoft}`}>
             <div className="flex items-center justify-between mb-1.5 gap-3">
               <div className="flex items-center gap-2.5 min-w-0">
-                <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${o.status === "completed" ? "bg-[#E11D48]" : o.status === "pending" ? "bg-[#FB7185]" : o.status === "refunded" ? "bg-[#E11D48]" : "bg-[#C4504A]"}`} />
+                <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${o.status === "completed" ? "bg-cherry-500" : o.status === "pending" ? "bg-cherry-400" : o.status === "refunded" ? "bg-cherry-500" : "bg-[#C4504A]"}`} />
                 <div className="min-w-0">
                   <p className={`text-sm font-bold font-mono truncate ${th.tx} flex items-center gap-1.5`}>
                     {o.id}
@@ -347,7 +347,7 @@ export function OrdersPage() {
                         laci yang mana. */}
                     {(o.orderSource === "ecom" || o.orderSource === "home") && (
                       <span title={o.orderSource === "home" ? "Pesanan toko online rumah" : "Pesanan toko online Bekasi"}
-                        className={`inline-block text-xs font-bold px-1.5 py-0.5 rounded ${th.dark ? "bg-[#3A1F2A]/60 text-[#FB7185]" : "bg-[#FFE4E9] text-[#E11D48]"}`}>
+                        className={`inline-block text-xs font-bold px-1.5 py-0.5 rounded ${th.dark ? "bg-cherry-900/60 text-cherry-400" : "bg-cherry-100 text-cherry-500"}`}>
                         {o.orderSource === "home" ? "Rumah" : "Online"}
                       </span>
                     )}
@@ -365,7 +365,7 @@ export function OrdersPage() {
                 <span className={`inline-block mt-1 text-sm font-bold px-2.5 py-0.5 rounded-lg ${
                   o.status === "cancelled"
                     ? (th.dark ? "bg-[#C4504A]/15 text-[#C4504A]" : "bg-[#FCE4EC] text-[#C4504A]")
-                    : (th.dark ? "bg-[#E11D48]/15 text-[#FB7185]" : "bg-[#FFE4E9] text-[#E11D48]")
+                    : (th.dark ? "bg-cherry-500/15 text-cherry-400" : "bg-cherry-100 text-cherry-500")
                 }`}>{
                   o.status === "cancelled" ? t.cancelled
                   : o.status === "refunded" ? t.refunded
@@ -407,7 +407,7 @@ export function OrdersPage() {
             </div>
             <button
               onClick={() => { setNewMember(emptyMemberForm); setAddMemberOpen(true); }}
-              className={`flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl text-xs font-bold text-white bg-[#E11D48]`}
+              className={`flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl text-xs font-bold text-white bg-cherry-500`}
             >
               <Plus size={13} /> Member
             </button>
@@ -516,7 +516,7 @@ export function OrdersPage() {
         return (
           <div className="flex flex-col gap-3">
             {/* Hero summary — total liability + member aktif */}
-            <div className={`p-5 rounded-3xl border bg-gradient-to-br from-[#FFE4E9] to-[#FFD1DB] dark:from-[#E11D48]/15 dark:to-[#9F1239]/20 ${th.bdr}`}>
+            <div className={`p-5 rounded-3xl border bg-gradient-to-br from-cherry-100 to-cherry-200 dark:from-cherry-500/15 dark:to-cherry-700/20 ${th.bdr}`}>
               <p className={`text-sm font-bold uppercase tracking-wider mb-2 ${th.acc}`}>
                 Total Poin Beredar
               </p>
@@ -544,7 +544,7 @@ export function OrdersPage() {
                   <button
                     key={f}
                     onClick={() => setPointsFilter(f)}
-                    className={`px-4 py-3 text-sm font-bold ${pointsFilter === f ? "bg-[#E11D48] text-white" : `${th.elev} ${th.txm}`}`}>
+                    className={`px-4 py-3 text-sm font-bold ${pointsFilter === f ? "bg-cherry-500 text-white" : `${th.elev} ${th.txm}`}`}>
                     {f === "with_points" ? `Punya poin (${withPointsCount})` : "Semua"}
                   </button>
                 ))}
@@ -580,7 +580,7 @@ export function OrdersPage() {
                       onClick={() => setStatsMember({ id: m.id, name: m.name, phone: m.phone })}
                       className={`w-full flex items-center gap-3 px-4 py-4 text-left ${idx > 0 ? `border-t ${th.bdrSoft}` : ""} active:opacity-70 transition-opacity min-h-[64px]`}>
                       <span aria-hidden className={`shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-base font-black ${
-                        idx === 0 ? "text-white bg-gradient-to-br from-[#FFB5C0] to-[#E11D48] shadow-sm"
+                        idx === 0 ? "text-white bg-gradient-to-br from-cherry-300 to-cherry-500 shadow-sm"
                         : idx < 3 ? `${th.accBg} ${th.acc}`
                         : `${th.elev} ${th.txm}`
                       }`}>
@@ -645,9 +645,9 @@ export function OrdersPage() {
                   id="ordersmember-phone-dup-warning"
                   role="alert"
                   className="rounded-xl border border-[#BE123C]/30 bg-[#FCE4EC] dark:bg-[#BE123C]/15 p-2.5 flex items-start gap-2">
-                  <AlertCircle size={14} strokeWidth={2.4} className="text-[#BE123C] dark:text-[#FB7185] shrink-0 mt-0.5" />
+                  <AlertCircle size={14} strokeWidth={2.4} className="text-[#BE123C] dark:text-cherry-400 shrink-0 mt-0.5" />
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-bold text-[#BE123C] dark:text-[#FB7185]">
+                    <p className="text-xs font-bold text-[#BE123C] dark:text-cherry-400">
                       Nomor sudah terdaftar
                     </p>
                     <p className={`text-xs mt-0.5 ${th.txm}`}>
@@ -684,7 +684,7 @@ export function OrdersPage() {
                     toast.success("Member berhasil ditambah");
                   }}
                   disabled={!newMember.name.trim() || !newMember.phone.trim() || !!duplicate}
-                  className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white bg-[#E11D48] disabled:opacity-40"
+                  className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white bg-cherry-500 disabled:opacity-40"
                 >
                   Simpan
                 </button>
@@ -744,7 +744,7 @@ export function OrdersPage() {
                   toast.success("Member berhasil diperbarui");
                 }}
                 disabled={!editMember.name.trim() || !editMember.phone.trim()}
-                className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white bg-[#E11D48] disabled:opacity-40"
+                className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white bg-cherry-500 disabled:opacity-40"
               >
                 Simpan
               </button>

@@ -50,11 +50,11 @@ export function OrderDetailModal({ orderId, onClose }: OrderDetailModalProps) {
   if (!order) return null;
 
   const statusColor = order.status === "completed"
-    ? (th.dark ? "bg-[#E11D48]/15 text-[#E11D48]" : "bg-[#FFE4E9] text-[#E11D48]")
+    ? (th.dark ? "bg-cherry-500/15 text-cherry-500" : "bg-cherry-100 text-cherry-500")
     : order.status === "pending"
-    ? (th.dark ? "bg-[#FB7185]/15 text-[#FB7185]" : "bg-[#FFE4E9] text-[#E11D48]")
+    ? (th.dark ? "bg-cherry-400/15 text-cherry-400" : "bg-cherry-100 text-cherry-500")
     : order.status === "refunded"
-    ? (th.dark ? "bg-[#E11D48]/15 text-[#E11D48]" : "bg-[#FFE4E9] text-[#E11D48]")
+    ? (th.dark ? "bg-cherry-500/15 text-cherry-500" : "bg-cherry-100 text-cherry-500")
     : (th.dark ? "bg-[#C4504A]/15 text-[#C4504A]" : "bg-[#FCE4EC] text-[#C4504A]");
 
   const statusText = order.status === "completed" ? t.completed
@@ -63,10 +63,10 @@ export function OrderDetailModal({ orderId, onClose }: OrderDetailModalProps) {
     : t.pending;
 
   const paymentColor = order.payment === "cash"
-    ? (th.dark ? "bg-[#E11D48]/15 text-[#E11D48]" : "bg-[#FFE4E9] text-[#E11D48]")
+    ? (th.dark ? "bg-cherry-500/15 text-cherry-500" : "bg-cherry-100 text-cherry-500")
     : order.payment === "card"
-    ? (th.dark ? "bg-[#E11D48]/15 text-[#E11D48]" : "bg-[#FFE4E9] text-[#E11D48]")
-    : (th.dark ? "bg-[#E11D48]/15 text-[#E11D48]" : "bg-[#FFE4E9] text-[#E11D48]");
+    ? (th.dark ? "bg-cherry-500/15 text-cherry-500" : "bg-cherry-100 text-cherry-500")
+    : (th.dark ? "bg-cherry-500/15 text-cherry-500" : "bg-cherry-100 text-cherry-500");
 
   // Refund calculations
   const toggleRefundItem = (idx: number) => {
@@ -223,7 +223,7 @@ export function OrderDetailModal({ orderId, onClose }: OrderDetailModalProps) {
                           <>
                             <span className="line-through opacity-60">{$(item.regularPrice)}</span>{" "}
                             <span className={th.acc}>{$(item.unitPrice)}</span>{" "}
-                            <span className="text-xs font-bold px-1 py-0.5 rounded bg-[#E11D48]/15 text-[#E11D48]">💎</span>
+                            <span className="text-xs font-bold px-1 py-0.5 rounded bg-cherry-500/15 text-cherry-500">💎</span>
                           </>
                         ) : (
                           <span>{$(item.unitPrice)}</span>
@@ -236,10 +236,10 @@ export function OrderDetailModal({ orderId, onClose }: OrderDetailModalProps) {
                 </div>
                 {disc > 0 && (
                   <div className="flex justify-between mt-0.5 ml-10">
-                    <span className="text-xs text-[#E11D48]">
+                    <span className="text-xs text-cherry-500">
                       {t.discount} {item.discountType === "percent" ? `${item.discountValue}%` : ""}
                     </span>
-                    <span className="text-xs font-bold text-[#E11D48]">-{$(disc)}</span>
+                    <span className="text-xs font-bold text-cherry-500">-{$(disc)}</span>
                   </div>
                 )}
               </div>
@@ -263,14 +263,14 @@ export function OrderDetailModal({ orderId, onClose }: OrderDetailModalProps) {
               )}
               {itemDiscTotal > 0 && (
                 <div className="flex justify-between mb-1.5">
-                  <span className="text-xs text-[#E11D48]">{t.itemDiscount}</span>
-                  <span className="text-sm font-semibold text-[#E11D48]">-{$(itemDiscTotal)}</span>
+                  <span className="text-xs text-cherry-500">{t.itemDiscount}</span>
+                  <span className="text-sm font-semibold text-cherry-500">-{$(itemDiscTotal)}</span>
                 </div>
               )}
               {orderDisc > 0 && (
                 <div className="flex justify-between mb-1.5">
-                  <span className="text-xs text-[#E11D48]">{t.orderDiscount}{order.orderDiscountType === "percent" ? ` ${order.orderDiscountValue}%` : ""}</span>
-                  <span className="text-sm font-semibold text-[#E11D48]">-{$(orderDisc)}</span>
+                  <span className="text-xs text-cherry-500">{t.orderDiscount}{order.orderDiscountType === "percent" ? ` ${order.orderDiscountValue}%` : ""}</span>
+                  <span className="text-sm font-semibold text-cherry-500">-{$(orderDisc)}</span>
                 </div>
               )}
               {order.ppnRate > 0 && (
@@ -327,7 +327,7 @@ export function OrderDetailModal({ orderId, onClose }: OrderDetailModalProps) {
         {canRefund && order.status === "completed" && !showRefund && (
           <div className="mt-4">
             <button onClick={() => { setShowRefund(true); setRefundSelections({}); setRefundReason(""); }}
-              className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-2xl text-sm font-bold text-[#E11D48] border border-[#E11D48]/20">
+              className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-2xl text-sm font-bold text-cherry-500 border border-cherry-500/20">
               <RotateCcw size={13} /> {t.refundOrder}
             </button>
           </div>
@@ -335,17 +335,17 @@ export function OrderDetailModal({ orderId, onClose }: OrderDetailModalProps) {
 
         {/* Refund panel */}
         {showRefund && (
-          <div className={`mt-4 rounded-2xl border p-4 ${th.dark ? "border-[#E11D48]/30 bg-[#E11D48]/5" : "border-[#FFB5C0] bg-[#FFE4E9]/50"}`}>
+          <div className={`mt-4 rounded-2xl border p-4 ${th.dark ? "border-cherry-500/30 bg-cherry-500/5" : "border-cherry-300 bg-cherry-100/50"}`}>
             <div className="flex items-center justify-between mb-3">
-              <p className={`text-sm font-bold ${th.dark ? "text-[#E11D48]" : "text-[#E11D48]"}`}>{t.selectItemsToRefund}</p>
-              <button onClick={refundAll} className="text-xs font-bold text-[#E11D48]">{t.refundAll}</button>
+              <p className={`text-sm font-bold ${th.dark ? "text-cherry-500" : "text-cherry-500"}`}>{t.selectItemsToRefund}</p>
+              <button onClick={refundAll} className="text-xs font-bold text-cherry-500">{t.refundAll}</button>
             </div>
             {order.items.map((item, idx) => {
               const selected = refundSelections[idx] !== undefined;
               return (
                 <div key={idx} className={`flex items-center gap-2.5 py-2 ${idx > 0 ? `border-t ${th.bdr}/30` : ""}`}>
                   <button onClick={() => toggleRefundItem(idx)} aria-label="Select item for refund" className="shrink-0">
-                    {selected ? <CheckSquare size={16} className="text-[#E11D48]" /> : <Square size={16} className={th.txf} />}
+                    {selected ? <CheckSquare size={16} className="text-cherry-500" /> : <Square size={16} className={th.txf} />}
                   </button>
                   <div className="flex-1 min-w-0">
                     <p className={`text-xs font-bold truncate ${th.tx}`}>{item.name}</p>
@@ -370,15 +370,15 @@ export function OrderDetailModal({ orderId, onClose }: OrderDetailModalProps) {
             </div>
             {selectedCount > 0 && (
               <div className={`flex justify-between mt-3 pt-3 border-t ${th.bdr}/30`}>
-                <span className={`text-sm font-bold ${th.dark ? "text-[#E11D48]" : "text-[#E11D48]"}`}>{t.refundAmount}</span>
-                <span className="text-sm font-black text-[#E11D48]">{$(refundTotal)}</span>
+                <span className={`text-sm font-bold ${th.dark ? "text-cherry-500" : "text-cherry-500"}`}>{t.refundAmount}</span>
+                <span className="text-sm font-black text-cherry-500">{$(refundTotal)}</span>
               </div>
             )}
             <div className="flex gap-2 mt-3">
               <button onClick={() => setShowRefund(false)}
                 className={`flex-1 py-2.5 rounded-xl text-sm font-bold border ${th.bdr} ${th.txm}`}>{t.cancel}</button>
               <button onClick={doRefund} disabled={selectedCount === 0 || !refundReason.trim()}
-                className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white bg-[#E11D48] disabled:opacity-40">{t.confirm}</button>
+                className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white bg-cherry-500 disabled:opacity-40">{t.confirm}</button>
             </div>
           </div>
         )}
@@ -388,7 +388,7 @@ export function OrderDetailModal({ orderId, onClose }: OrderDetailModalProps) {
             payments dengan single method = order.total. Audit trail via
             audit_log + inline paymentsEditedAt/By/Reason di order. */}
         {order.paymentsEditedAt && (
-          <div className={`mt-3 rounded-2xl border p-3 ${th.dark ? "border-[#FB7185]/30 bg-[#3A1F2A]/30" : "border-[#FFB5C0] bg-[#FFF4F6]"}`}>
+          <div className={`mt-3 rounded-2xl border p-3 ${th.dark ? "border-cherry-400/30 bg-cherry-900/30" : "border-cherry-300 bg-cherry-50"}`}>
             <div className="flex items-start gap-2">
               <Edit3 size={12} className={`mt-0.5 shrink-0 ${th.acc}`} />
               <div className="flex-1 min-w-0">
@@ -421,7 +421,7 @@ export function OrderDetailModal({ orderId, onClose }: OrderDetailModalProps) {
         )}
 
         {showEditPayment && (
-          <div className={`mt-4 rounded-2xl border p-4 ${th.dark ? "border-[#FB7185]/30 bg-[#3A1F2A]/30" : "border-[#FFB5C0] bg-[#FFF4F6]"}`}>
+          <div className={`mt-4 rounded-2xl border p-4 ${th.dark ? "border-cherry-400/30 bg-cherry-900/30" : "border-cherry-300 bg-cherry-50"}`}>
             <p className={`text-sm font-bold mb-3 ${th.acc}`}>Ubah Metode Pembayaran</p>
             <p className={`text-xs mb-3 ${th.txm}`}>Total order tetap {$(order.total)}. Pilih metode baru:</p>
             <div className="grid grid-cols-2 gap-2 mb-3">
@@ -429,7 +429,7 @@ export function OrderDetailModal({ orderId, onClose }: OrderDetailModalProps) {
                 <button key={m} onClick={() => setEditMethod(m)}
                   className={`py-2.5 rounded-xl text-xs font-bold border ${
                     editMethod === m
-                      ? "text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48] border-transparent"
+                      ? "text-white bg-gradient-to-r from-cherry-400 to-cherry-500 border-transparent"
                       : `${th.bdr} ${th.tx}`
                   }`}>
                   {m === "cash" ? "Tunai" : m === "qris" ? "QRIS" : m === "transfer" ? "Transfer" : "Kartu"}
@@ -458,7 +458,7 @@ export function OrderDetailModal({ orderId, onClose }: OrderDetailModalProps) {
                   setEditSubmitting(false);
                 }
               }} disabled={!editReason.trim() || editSubmitting}
-                className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48] disabled:opacity-40">
+                className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-cherry-400 to-cherry-500 disabled:opacity-40">
                 {editSubmitting ? "Menyimpan…" : "Simpan"}
               </button>
             </div>

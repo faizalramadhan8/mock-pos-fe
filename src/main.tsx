@@ -2,6 +2,12 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App";
 import "./index.css";
+import { pasangBrandDariIngatan } from "@/lib/brandTheme";
+
+// Warna merek dipasang sebelum render pertama — sama alasannya dengan mode
+// gelap di bawah: menunggu pengaturan dari server membuat kasir melihat
+// kedipan merah muda tiap kali membuka aplikasi.
+pasangBrandDariIngatan();
 
 // Apply persisted dark mode before first render to prevent flash
 try {

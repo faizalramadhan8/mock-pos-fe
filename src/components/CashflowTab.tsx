@@ -450,7 +450,7 @@ export function CashflowTab({ tempat = null }: { tempat?: Tempat | null }) {
               placeholder="0"
               className={`flex-1 px-3 py-2 text-sm rounded-xl border ${th.inp}`} />
             <button onClick={saveOpening} disabled={savingOpening}
-              className="px-3 py-2 rounded-xl text-xs font-bold text-white bg-[#E11D48] inline-flex items-center gap-1 disabled:opacity-50">
+              className="px-3 py-2 rounded-xl text-xs font-bold text-white bg-cherry-500 inline-flex items-center gap-1 disabled:opacity-50">
               <Save size={11} /> Simpan
             </button>
             <button onClick={() => setEditingOpening(false)}
@@ -477,13 +477,13 @@ export function CashflowTab({ tempat = null }: { tempat?: Tempat | null }) {
           </div>
           <div>
             <p className={`text-xs ${th.txm}`}>Pengeluaran</p>
-            <p className="text-lg font-black text-[#BE123C] dark:text-[#FB7185]">−{$(totalOut)}</p>
+            <p className="text-lg font-black text-[#BE123C] dark:text-cherry-400">−{$(totalOut)}</p>
             <p className={`text-xs ${th.txf}`}>operasional (listrik, plastik, dll)</p>
           </div>
         </div>
         <div className={`mt-3 pt-3 border-t ${th.bdr}`}>
           <p className={`text-xs ${th.txm}`}>Selisih Bulan Ini</p>
-          <p className={`font-display text-2xl font-black ${selisih >= 0 ? th.acc : "text-[#BE123C] dark:text-[#FB7185]"}`}>
+          <p className={`font-display text-2xl font-black ${selisih >= 0 ? th.acc : "text-[#BE123C] dark:text-cherry-400"}`}>
             {selisih >= 0 ? "+" : ""}{$(selisih)}
           </p>
           {totalCapital > 0 && (
@@ -493,7 +493,7 @@ export function CashflowTab({ tempat = null }: { tempat?: Tempat | null }) {
           )}
           {totalDrawing > 0 && (
             <p className={`text-sm mt-1 ${th.txm}`}>
-              − Prive: <strong className="text-[#BE123C] dark:text-[#FB7185]">{$(totalDrawing)}</strong>
+              − Prive: <strong className="text-[#BE123C] dark:text-cherry-400">{$(totalDrawing)}</strong>
             </p>
           )}
           <p className={`text-xs mt-2 ${th.txf}`}>
@@ -523,7 +523,7 @@ export function CashflowTab({ tempat = null }: { tempat?: Tempat | null }) {
                   setCapitalDraft({ amount: "", type: "injection", source: "Owner", note: "", date: todayStr });
                   setCapitalModalOpen(true);
                 }}
-                className="px-3 py-2.5 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48] inline-flex items-center gap-1.5">
+                className="px-3 py-2.5 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-cherry-400 to-cherry-500 inline-flex items-center gap-1.5">
                 <Plus size={16} strokeWidth={2.6} /> Tambah Modal
               </button>
               <button
@@ -532,7 +532,7 @@ export function CashflowTab({ tempat = null }: { tempat?: Tempat | null }) {
                   setCapitalDraft({ amount: "", type: "drawing", source: "Owner", note: "", date: todayStr });
                   setCapitalModalOpen(true);
                 }}
-                className={`px-3 py-2.5 rounded-xl text-sm font-bold border inline-flex items-center gap-1.5 ${th.bdr} text-[#BE123C] dark:text-[#FB7185]`}>
+                className={`px-3 py-2.5 rounded-xl text-sm font-bold border inline-flex items-center gap-1.5 ${th.bdr} text-[#BE123C] dark:text-cherry-400`}>
                 <Plus size={16} strokeWidth={2.6} /> Tambah Prive
               </button>
             </div>
@@ -550,7 +550,7 @@ export function CashflowTab({ tempat = null }: { tempat?: Tempat | null }) {
           </div>
           <div className={`p-3 rounded-xl ${th.elev}`}>
             <p className={`text-xs ${th.txm}`}>Prive (Penarikan)</p>
-            <p className={`font-display text-xl font-black mt-0.5 ${totalDrawing > 0 ? "text-[#BE123C] dark:text-[#FB7185]" : th.txf}`}>
+            <p className={`font-display text-xl font-black mt-0.5 ${totalDrawing > 0 ? "text-[#BE123C] dark:text-cherry-400" : th.txf}`}>
               −{$(totalDrawing)}
             </p>
             <p className={`text-xs ${th.txf}`}>
@@ -568,9 +568,9 @@ export function CashflowTab({ tempat = null }: { tempat?: Tempat | null }) {
       {/* Utang faktur belum lunas — liability info, tidak masuk hitungan. */}
       {unpaidInvoicesCount > 0 && (
         <div className={`rounded-2xl border border-[#BE123C]/30 p-3 ${th.card2} flex items-start gap-2`}>
-          <Info size={14} className="text-[#BE123C] dark:text-[#FB7185] mt-0.5 shrink-0" />
+          <Info size={14} className="text-[#BE123C] dark:text-cherry-400 mt-0.5 shrink-0" />
           <div className="flex-1">
-            <p className={`text-xs font-bold text-[#BE123C] dark:text-[#FB7185]`}>Utang Faktur Belum Lunas</p>
+            <p className={`text-xs font-bold text-[#BE123C] dark:text-cherry-400`}>Utang Faktur Belum Lunas</p>
             <p className={`text-xs mt-0.5 ${th.txm}`}>
               <strong className={th.tx}>{$(unpaidInvoicesValue)}</strong> dari {unpaidInvoicesCount} faktur — belum dibayar.
             </p>
@@ -609,7 +609,7 @@ export function CashflowTab({ tempat = null }: { tempat?: Tempat | null }) {
                     <>
                       <tr key={row.no}
                         onClick={() => isExpandable && setExpandedRow(isExpanded ? null : row.no)}
-                        className={`border-t ${th.bdrSoft} ${isExpandable ? "cursor-pointer hover:opacity-70" : ""} ${row.type === "opening" ? "bg-[#FFE4E9]/40 dark:bg-[#E11D48]/10 font-semibold" : ""} ${row.type === "invoice" ? "opacity-60" : ""}`}>
+                        className={`border-t ${th.bdrSoft} ${isExpandable ? "cursor-pointer hover:opacity-70" : ""} ${row.type === "opening" ? "bg-cherry-100/40 dark:bg-cherry-500/10 font-semibold" : ""} ${row.type === "invoice" ? "opacity-60" : ""}`}>
                         <td className={`px-3 py-2 ${th.txm} font-mono`}>{row.no}</td>
                         <td className={`px-3 py-2 ${th.tx} whitespace-nowrap`}>{dayLabel(row.dateStr, lang)}</td>
                         <td className={`px-3 py-2 ${th.tx}`}>
@@ -621,7 +621,7 @@ export function CashflowTab({ tempat = null }: { tempat?: Tempat | null }) {
                             <span className={`ml-1.5 text-xs ${th.acc} italic`}>(setoran owner)</span>
                           )}
                           {row.type === "drawing" && (
-                            <span className={`ml-1.5 text-xs italic text-[#BE123C] dark:text-[#FB7185]`}>(prive owner)</span>
+                            <span className={`ml-1.5 text-xs italic text-[#BE123C] dark:text-cherry-400`}>(prive owner)</span>
                           )}
                           {(row.type === "capital" || row.type === "drawing") && canWrite && row.capitalId && (
                             <button
@@ -645,10 +645,10 @@ export function CashflowTab({ tempat = null }: { tempat?: Tempat | null }) {
                         <td className={`px-3 py-2 text-right font-bold ${row.in ? th.acc : th.txf}`}>
                           {row.in ? `+${$(row.in)}` : "—"}
                         </td>
-                        <td className={`px-3 py-2 text-right font-bold ${row.out ? (row.type === "invoice" ? `${th.txm} line-through` : "text-[#BE123C] dark:text-[#FB7185]") : th.txf}`}>
+                        <td className={`px-3 py-2 text-right font-bold ${row.out ? (row.type === "invoice" ? `${th.txm} line-through` : "text-[#BE123C] dark:text-cherry-400") : th.txf}`}>
                           {row.out ? `−${$(row.out)}` : "—"}
                         </td>
-                        <td className={`px-3 py-2 text-right font-bold ${row.balance < 0 ? "text-[#BE123C] dark:text-[#FB7185]" : th.tx}`}>
+                        <td className={`px-3 py-2 text-right font-bold ${row.balance < 0 ? "text-[#BE123C] dark:text-cherry-400" : th.tx}`}>
                           {$(row.balance)}
                           {row.balance < 0 && <span className="ml-1 text-xs font-normal">(minus)</span>}
                         </td>
@@ -684,7 +684,7 @@ export function CashflowTab({ tempat = null }: { tempat?: Tempat | null }) {
         title={capitalDraft.type === "drawing" ? "Tambah Prive (Penarikan)" : "Tambah Modal (Setoran)"}>
         <div className="space-y-3.5">
           <div className={`p-3 rounded-xl ${capitalDraft.type === "drawing" ? "bg-[#FCE4EC] dark:bg-[#BE123C]/15" : th.accBg}`}>
-            <p className={`text-sm font-bold ${capitalDraft.type === "drawing" ? "text-[#BE123C] dark:text-[#FB7185]" : th.acc}`}>
+            <p className={`text-sm font-bold ${capitalDraft.type === "drawing" ? "text-[#BE123C] dark:text-cherry-400" : th.acc}`}>
               {capitalDraft.type === "drawing"
                 ? "Prive = owner tarik uang dari kas (mengurangi saldo)"
                 : "Tambahan Modal = owner setor uang ke kas (menambah saldo)"}
@@ -721,7 +721,7 @@ export function CashflowTab({ tempat = null }: { tempat?: Tempat | null }) {
                   onClick={() => setCapitalDraft({ ...capitalDraft, source: opt })}
                   className={`px-3 py-2 rounded-lg text-sm font-bold border ${
                     capitalDraft.source === opt
-                      ? "bg-gradient-to-r from-[#FB7185] to-[#E11D48] text-white border-transparent"
+                      ? "bg-gradient-to-r from-cherry-400 to-cherry-500 text-white border-transparent"
                       : `${th.bdr} ${th.txm}`
                   }`}>
                   {opt}
@@ -748,7 +748,7 @@ export function CashflowTab({ tempat = null }: { tempat?: Tempat | null }) {
               Batal
             </button>
             <button onClick={saveCapital} disabled={savingCapital}
-              className="flex-1 py-3 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-[#FB7185] to-[#E11D48] disabled:opacity-40">
+              className="flex-1 py-3 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-cherry-400 to-cherry-500 disabled:opacity-40">
               {savingCapital ? "Menyimpan…" : "Simpan"}
             </button>
           </div>

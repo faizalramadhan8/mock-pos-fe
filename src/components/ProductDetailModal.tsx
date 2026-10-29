@@ -18,18 +18,18 @@ interface ProductDetailModalProps {
 // REASON_BADGE — visual mapping per reason value supaya Recent Movements
 // gampang scanned. lightClass = light mode, darkClass = dark mode.
 const REASON_BADGE: Record<string, { label: string; lightClass: string; darkClass: string }> = {
-  restock:  { label: "Stok Masuk",  lightClass: "bg-[#FFE4E9] text-[#E11D48]", darkClass: "bg-[#E11D48]/15 text-[#E11D48]" },
-  initial:  { label: "Stok Awal",   lightClass: "bg-[#FFE4E9] text-[#E11D48]", darkClass: "bg-[#E11D48]/15 text-[#E11D48]" },
-  sale:     { label: "Penjualan",   lightClass: "bg-[#FCE4EC] text-[#BE123C]", darkClass: "bg-[#FB7185]/15 text-[#FB7185]" },
-  repack:   { label: "Repack",      lightClass: "bg-[#FFD1DB] text-[#BE123C]", darkClass: "bg-[#FFB5C0]/15 text-[#FFB5C0]" },
-  lost:     { label: "Hilang",      lightClass: "bg-[#FCE4EC] text-[#BE123C]", darkClass: "bg-[#BE123C]/20 text-[#FB7185]" },
-  damaged:  { label: "Rusak",       lightClass: "bg-[#FCE4EC] text-[#BE123C]", darkClass: "bg-[#BE123C]/20 text-[#FB7185]" },
-  opname:   { label: "Opname",      lightClass: "bg-[#FFE4E9] text-[#E11D48]", darkClass: "bg-[#E11D48]/15 text-[#E11D48]" },
-  sample:   { label: "Sample",      lightClass: "bg-[#FFD1DB] text-[#BE123C]", darkClass: "bg-[#FFB5C0]/15 text-[#FFB5C0]" },
-  cancel:   { label: "Batal",       lightClass: "bg-[#FCE4EC] text-[#BE123C]", darkClass: "bg-[#FB7185]/15 text-[#FB7185]" },
-  refund:   { label: "Refund",      lightClass: "bg-[#FCE4EC] text-[#BE123C]", darkClass: "bg-[#FB7185]/15 text-[#FB7185]" },
-  other:    { label: "Lainnya",     lightClass: "bg-[#F5E1E6] text-[#6E4E57]", darkClass: "bg-[#3D2230] text-[#9F7686]" },
-  default:  { label: "—",           lightClass: "bg-[#F5E1E6] text-[#6E4E57]", darkClass: "bg-[#3D2230] text-[#9F7686]" },
+  restock:  { label: "Stok Masuk",  lightClass: "bg-cherry-100 text-cherry-500", darkClass: "bg-cherry-500/15 text-cherry-500" },
+  initial:  { label: "Stok Awal",   lightClass: "bg-cherry-100 text-cherry-500", darkClass: "bg-cherry-500/15 text-cherry-500" },
+  sale:     { label: "Penjualan",   lightClass: "bg-[#FCE4EC] text-[#BE123C]", darkClass: "bg-cherry-400/15 text-cherry-400" },
+  repack:   { label: "Repack",      lightClass: "bg-cherry-200 text-[#BE123C]", darkClass: "bg-cherry-300/15 text-cherry-300" },
+  lost:     { label: "Hilang",      lightClass: "bg-[#FCE4EC] text-[#BE123C]", darkClass: "bg-[#BE123C]/20 text-cherry-400" },
+  damaged:  { label: "Rusak",       lightClass: "bg-[#FCE4EC] text-[#BE123C]", darkClass: "bg-[#BE123C]/20 text-cherry-400" },
+  opname:   { label: "Opname",      lightClass: "bg-cherry-100 text-cherry-500", darkClass: "bg-cherry-500/15 text-cherry-500" },
+  sample:   { label: "Sample",      lightClass: "bg-cherry-200 text-[#BE123C]", darkClass: "bg-cherry-300/15 text-cherry-300" },
+  cancel:   { label: "Batal",       lightClass: "bg-[#FCE4EC] text-[#BE123C]", darkClass: "bg-cherry-400/15 text-cherry-400" },
+  refund:   { label: "Refund",      lightClass: "bg-[#FCE4EC] text-[#BE123C]", darkClass: "bg-cherry-400/15 text-cherry-400" },
+  other:    { label: "Lainnya",     lightClass: "bg-cherry-100 text-ink-700", darkClass: "bg-shade-elev text-ink-500" },
+  default:  { label: "—",           lightClass: "bg-cherry-100 text-ink-700", darkClass: "bg-shade-elev text-ink-500" },
 };
 
 export function ProductDetailModal({ productId, onClose }: ProductDetailModalProps) {
@@ -239,7 +239,7 @@ export function ProductDetailModal({ productId, onClose }: ProductDetailModalPro
               </div>
               <div className="flex justify-between items-baseline">
                 <span className={`text-xs ${th.txm}`}>{t.profitMargin}</span>
-                <span className={`text-sm font-bold ${margin > 0 ? "text-[#E11D48]" : "text-[#BE123C]"}`}>{margin}%</span>
+                <span className={`text-sm font-bold ${margin > 0 ? "text-cherry-500" : "text-[#BE123C]"}`}>{margin}%</span>
               </div>
             </>
           )}
@@ -301,9 +301,9 @@ export function ProductDetailModal({ productId, onClose }: ProductDetailModalPro
             <div className="space-y-1.5 max-h-64 overflow-y-auto" role="list">
               {filteredHistory.map(h => {
                 const tagBg = h.price_type === "purchase"
-                  ? (th.dark ? "bg-[#FB7185]/15 text-[#FB7185]" : "bg-[#FFE4E9] text-[#BE123C]")
+                  ? (th.dark ? "bg-cherry-400/15 text-cherry-400" : "bg-cherry-100 text-[#BE123C]")
                   : h.price_type === "member"
-                    ? (th.dark ? "bg-[#FFB5C0]/15 text-[#FFB5C0]" : "bg-[#FFD1DB] text-[#E11D48]")
+                    ? (th.dark ? "bg-cherry-300/15 text-cherry-300" : "bg-cherry-200 text-cherry-500")
                     : (th.accBg + " " + th.acc);
                 const label = h.price_type === "regular" ? (lang === "id" ? "Jual" : "Sell")
                   : h.price_type === "member" ? "Member"
@@ -347,10 +347,10 @@ export function ProductDetailModal({ productId, onClose }: ProductDetailModalPro
               <span className={`text-xs font-bold px-2 py-0.5 rounded-md ${th.dark ? "bg-[#BE123C]/15 text-[#BE123C]" : "bg-[#FCE4EC] text-[#BE123C]"}`}>{t.outOfStock}</span>
             )}
             {product.stock > 0 && product.stock <= product.minStock && (
-              <span className={`text-xs font-bold px-2 py-0.5 rounded-md ${th.dark ? "bg-[#FB7185]/15 text-[#FB7185]" : "bg-[#FFE4E9] text-[#E11D48]"}`}>{t.lowStock}</span>
+              <span className={`text-xs font-bold px-2 py-0.5 rounded-md ${th.dark ? "bg-cherry-400/15 text-cherry-400" : "bg-cherry-100 text-cherry-500"}`}>{t.lowStock}</span>
             )}
             {product.stock > product.minStock && (
-              <span className={`text-xs font-bold px-2 py-0.5 rounded-md ${th.dark ? "bg-[#E11D48]/15 text-[#E11D48]" : "bg-[#F0F8EC] text-[#E11D48]"}`}>{t.normalStock}</span>
+              <span className={`text-xs font-bold px-2 py-0.5 rounded-md ${th.dark ? "bg-cherry-500/15 text-cherry-500" : "bg-[#F0F8EC] text-cherry-500"}`}>{t.normalStock}</span>
             )}
             {!product.isActive && (
               <span className={`text-xs font-bold px-2 py-0.5 rounded-md ${th.elev} ${th.txf}`}>{t.inactive}</span>
@@ -412,8 +412,8 @@ export function ProductDetailModal({ productId, onClose }: ProductDetailModalPro
                       isExpired
                         ? (th.dark ? "bg-[#BE123C]/15 text-[#BE123C]" : "bg-[#FCE4EC] text-[#BE123C]")
                         : isUrgent
-                          ? (th.dark ? "bg-[#FB7185]/15 text-[#FB7185]" : "bg-[#FFE4E9] text-[#E11D48]")
-                          : (th.dark ? "bg-[#E11D48]/15 text-[#E11D48]" : "bg-[#F0F8EC] text-[#E11D48]")
+                          ? (th.dark ? "bg-cherry-400/15 text-cherry-400" : "bg-cherry-100 text-cherry-500")
+                          : (th.dark ? "bg-cherry-500/15 text-cherry-500" : "bg-[#F0F8EC] text-cherry-500")
                     }`}>
                       {isExpired ? (t.expired as string) : `${days} ${t.days}`}
                     </span>
@@ -446,7 +446,7 @@ export function ProductDetailModal({ productId, onClose }: ProductDetailModalPro
             <span className={`text-xs ${th.txm}`}>
               <span className={`font-bold ${th.acc}`}>+{movementSummary.totalIn} masuk</span>
               <span className={`mx-1.5 ${th.txf}`}>·</span>
-              <span className={`font-bold text-[#BE123C] dark:text-[#FB7185]`}>−{movementSummary.totalOut} keluar</span>
+              <span className={`font-bold text-[#BE123C] dark:text-cherry-400`}>−{movementSummary.totalOut} keluar</span>
             </span>
           )}
         </div>
@@ -483,8 +483,8 @@ export function ProductDetailModal({ productId, onClose }: ProductDetailModalPro
                         {formatDateDMY(dateYMD)}
                       </p>
                       <p className={`text-xs font-semibold inline-flex items-center gap-1 ${
-                        endBalance <= 0 ? "text-[#BE123C] dark:text-[#FB7185]"
-                        : dayLow ? "text-[#BE123C] dark:text-[#FB7185]"
+                        endBalance <= 0 ? "text-[#BE123C] dark:text-cherry-400"
+                        : dayLow ? "text-[#BE123C] dark:text-cherry-400"
                         : th.tx
                       }`}>
                         <span className={th.txf}>Saldo akhir hari:</span>
@@ -503,7 +503,7 @@ export function ProductDetailModal({ productId, onClose }: ProductDetailModalPro
                           <div key={g.key} className={`flex items-start gap-2 px-3 py-2 ${th.bdrSoft}`}>
                             <div className="shrink-0 mt-0.5 flex flex-col items-center gap-0.5">
                               {isIn
-                                ? <ArrowDownCircle size={14} className="text-[#E11D48]" />
+                                ? <ArrowDownCircle size={14} className="text-cherry-500" />
                                 : <ArrowUpCircle size={14} className="text-[#BE123C]" />
                               }
                               <span className={`text-xs font-mono ${th.txf}`}>

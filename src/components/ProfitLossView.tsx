@@ -73,7 +73,7 @@ export function ProfitLossView({ pl, th, lang }: { pl: ProfitLossRes | null; th:
           {lang === "id" ? "Saldo Laba/Rugi" : "Balance"}
         </p>
         <p className={`font-display text-3xl sm:text-4xl font-black tracking-tight ${
-          netPositive ? th.acc : (th.dark ? "text-[#FB7185]" : "text-[#BE123C]")
+          netPositive ? th.acc : (th.dark ? "text-cherry-400" : "text-[#BE123C]")
         }`}>
           Rp {netDisplay.toLocaleString("id-ID")}
         </p>
@@ -160,21 +160,21 @@ export function ProfitLossView({ pl, th, lang }: { pl: ProfitLossRes | null; th:
 
         <div className={`px-4 py-4 flex items-center justify-between gap-3 border-t-2 ${
           netPositive
-            ? (th.dark ? "border-[#FB7185] bg-[#3A1F2A]/40" : "border-[#E11D48] bg-[#FFF4F6]")
-            : (th.dark ? "border-[#BE123C] bg-[#3A1F2A]/40" : "border-[#BE123C] bg-[#FCE4EC]/40")
+            ? (th.dark ? "border-cherry-400 bg-cherry-900/40" : "border-cherry-500 bg-cherry-50")
+            : (th.dark ? "border-[#BE123C] bg-cherry-900/40" : "border-[#BE123C] bg-[#FCE4EC]/40")
         }`}>
           <div className="flex items-center gap-2">
             {netPositive
               ? <TrendingUp size={18} className={th.acc} aria-hidden />
-              : <TrendingDown size={18} className={th.dark ? "text-[#FB7185]" : "text-[#BE123C]"} aria-hidden />}
+              : <TrendingDown size={18} className={th.dark ? "text-cherry-400" : "text-[#BE123C]"} aria-hidden />}
             <p className={`font-black text-base uppercase tracking-wider ${
-              netPositive ? th.acc : (th.dark ? "text-[#FB7185]" : "text-[#BE123C]")
+              netPositive ? th.acc : (th.dark ? "text-cherry-400" : "text-[#BE123C]")
             }`}>
               = {lang === "id" ? "Saldo Laba/Rugi" : "Balance"}
             </p>
           </div>
           <p className={`font-display font-black text-lg ${
-            netPositive ? th.acc : (th.dark ? "text-[#FB7185]" : "text-[#BE123C]")
+            netPositive ? th.acc : (th.dark ? "text-cherry-400" : "text-[#BE123C]")
           }`}>
             Rp {netDisplay.toLocaleString("id-ID")}
           </p>
