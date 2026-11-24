@@ -4,7 +4,7 @@ import type { PageId } from "@/types";
 import { ProductDetailModal } from "@/components/ProductDetailModal";
 import { useThemeClasses } from "@/hooks/useThemeClasses";
 import { usePageFetch } from "@/hooks/usePageFetch";
-import { formatCurrency as $, salesTotal, filterByPlace } from "@/utils";
+import { formatCurrency as $, salesTotal, filterByChannel } from "@/utils";
 import { AlertCircle, Clock, Package, ChevronRight, TrendingUp, TrendingDown, Receipt } from "lucide-react";
 
 type Range = "today" | "yesterday" | "week" | "month" | "custom";
@@ -62,10 +62,6 @@ export function DashboardPage({ onNavigate }: { onNavigate?: (page: PageId) => v
   const batches = useBatchStore(s => s.batches);
 
   const [range, setRange] = useState<Range>("today");
-  // Tempat usaha. Bawaannya Toko Bekasi — angka inilah yang dicocokkan
-  // dengan laci kasir saat closing. Uang toko rumah masuk rekening sendiri,
-  // jadi menggabungkannya membuat angka Beranda tidak akan pernah cocok.
-  const [tempat, setTempat] = useState<"store" | "home" | "all">("store");
   const [customFrom, setCustomFrom] = useState<string>(() => new Date().toISOString().slice(0, 10));
   const [customTo, setCustomTo] = useState<string>(() => new Date().toISOString().slice(0, 10));
   const [cashierExpandedId, setCashierExpandedId] = useState<string | null>(null);
@@ -77,12 +73,17 @@ export function DashboardPage({ onNavigate }: { onNavigate?: (page: PageId) => v
   const isCashier = user.role === "cashier";
   const isStaff = user.role === "staff";
 
+  // POS adalah aplikasi KASIR, jadi angkanya SELALU transaksi kasir saja.
+  // Penjualan online — Bekasi maupun rumah — punya Keuangannya sendiri di
+  // panel /shop/admin. Disaring per SALURAN, bukan per tempat: penyaring
+  // tempat ikut memasukkan online Bekasi, karena raknya memang sama.
+  //
   // Disaring di hulu supaya SEMUA angka turunannya ikut — hero Pendapatan,
   // per Kasir, dan kartu Laporan Keuangan. Menyaring satu per satu di bawah
   // hampir pasti menyisakan satu yang terlewat.
   const completedOrders = useMemo(
-    () => filterByPlace(orders.filter(o => o.status === "completed"), tempat === "all" ? null : tempat),
-    [orders, tempat],
+    () => filterByChannel(orders.filter(o => o.status === "completed"), ["pos"]),
+    [orders],
   );
   const pendingOrders = useMemo(() => orders.filter(o => o.status === "pending"), [orders]);
   const outOfStock = useMemo(() => products.filter(p => p.isActive && p.stock === 0), [products]);
@@ -181,9 +182,10 @@ export function DashboardPage({ onNavigate }: { onNavigate?: (page: PageId) => v
       //
       // Sejak 21 Okt 2026 storefront menulis `home`, bukan `ecom`. Versi
       // sebelumnya hanya memeriksa "ecom", jadi pesanan rumah lolos ke
-      // cabang kasir dan muncul sebagai nama customer. Tidak kelihatan di
-      // tampilan bawaan (Toko Bekasi menyaringnya habis), tapi langsung
-      // muncul begitu Bu Santi memilih Online Rumah atau Gabungan.
+      // cabang kasir dan muncul sebagai nama customer. Sekarang pesanan
+      // rumah memang tidak pernah sampai ke sini (Beranda dikunci ke Toko
+      // Bekasi), tapi cabang `home` dipertahankan: menghapusnya membuat bug
+      // yang sama kembali kalau penyaringnya suatu saat dilonggarkan.
       const src = o.orderSource ?? "pos";
       const isEcom = src === "ecom" || src === "home";
       const key = isEcom ? (src === "home" ? "__home__" : "__ecom__") : o.createdBy;
@@ -366,27 +368,6 @@ export function DashboardPage({ onNavigate }: { onNavigate?: (page: PageId) => v
                     ? "text-white bg-gradient-to-r from-cherry-400 to-cherry-500"
                     : `border ${th.bdr} ${th.txm}`
                 }`}>{rangeLabel[r]}</button>
-            ))}
-          </div>
-
-          {/* Tempat usaha. Sengaja SELALU tampil, bukan disembunyikan saat
-              toko rumah belum ada transaksinya — bawaannya menyaring, dan
-              penyaring yang tidak kelihatan membuat orang mengira angkanya
-              sudah mencakup semuanya. */}
-          <div className="flex flex-wrap gap-1.5" role="group"
-            aria-label="Pilih tempat usaha">
-            {([
-              ["store", "Toko Bekasi"],
-              ["home", "Online Rumah"],
-              ["all", "Gabungan"],
-            ] as const).map(([k, label]) => (
-              <button key={k} onClick={() => setTempat(k)}
-                aria-pressed={tempat === k}
-                className={`text-sm font-bold px-3 py-1.5 rounded-xl ${
-                  tempat === k
-                    ? "text-white bg-gradient-to-r from-cherry-400 to-cherry-500"
-                    : `border ${th.bdr} ${th.txm}`
-                }`}>{label}</button>
             ))}
           </div>
 

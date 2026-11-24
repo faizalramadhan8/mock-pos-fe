@@ -4,7 +4,7 @@ import { productApi } from "@/api";
 import { useThemeClasses } from "@/hooks/useThemeClasses";
 import { formatCurrency as $, statusJadwalTier } from "@/utils";
 import { Modal } from "./Modal";
-import { Plus, Trash2, Users, UserCheck, UsersRound, Search, CalendarClock } from "lucide-react";
+import { Plus, Trash2, Users, UserCheck, UsersRound, Crown, Medal, Award, Search, CalendarClock } from "lucide-react";
 import toast from "react-hot-toast";
 import type { ProductPriceTier, PriceTierTarget } from "@/types";
 import type { ProductPriceTierRes } from "@/api/products";
@@ -44,6 +44,12 @@ const emptyDraft: DraftTier = {
 const TARGET_OPSI: { v: PriceTierTarget; label: string; jelas: string; Icon: typeof Users }[] = [
   { v: "all_customers", label: "Semua Customer", jelas: "Siapa saja, termasuk yang bukan member", Icon: Users },
   { v: "all_members", label: "Semua Member", jelas: "Semua member terdaftar, bukan walk-in", Icon: UsersRound },
+  // Kelas member (4 Nov 2026). Cocok PERSIS, tanpa urutan bertingkat:
+  // Platinum tidak otomatis kebagian tier Gold. Kalau satu harga untuk dua
+  // kelas, buat tiernya dua kali.
+  { v: "class_platinum", label: "Platinum", jelas: "Hanya member berkelas Platinum", Icon: Crown },
+  { v: "class_gold", label: "Gold", jelas: "Hanya member berkelas Gold", Icon: Medal },
+  { v: "class_silver", label: "Silver", jelas: "Hanya member berkelas Silver", Icon: Award },
   { v: "member_specific", label: "Member Tertentu", jelas: "Hanya member yang dipilih di bawah", Icon: UserCheck },
 ];
 

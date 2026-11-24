@@ -7,10 +7,11 @@ import { Modal } from "@/components/Modal";
 import { useThemeClasses } from "@/hooks/useThemeClasses";
 import { useDebounce } from "@/hooks/useDebounce";
 import { usePageFetch } from "@/hooks/usePageFetch";
-import { formatCurrency as $, formatTime, formatDate, genId, normalizePhone, salesTotal, filterByPlace } from "@/utils";
+import { formatCurrency as $, formatTime, formatDate, genId, normalizePhone, salesTotal, filterByChannel } from "@/utils";
 import { getDateRange, type DateRange, type CustomRange } from "@/utils/dateRange";
 import { FileText, Search, Users, Trash2, Plus, Receipt, Pencil, Sparkles, MapPin, AlertCircle } from "lucide-react";
-import type { Member } from "@/types";
+import type { Member, MemberClass } from "@/types";
+import { MEMBER_CLASSES } from "@/types";
 import toast from "react-hot-toast";
 
 type OrdersTab = "orders" | "members" | "points";
@@ -62,7 +63,6 @@ export function OrdersPage() {
   // Bawaannya TOKO BEKASI, bukan gabungan. Yang dipakai harian untuk closing
   // adalah angka Bekasi; uang toko rumah masuk rekening sendiri dan tidak
   // pernah lewat laci kasir. Bu Santi 18 Okt 2026.
-  const [sourceFilter, setSourceFilter] = useState<"all" | "store" | "home">("store");
   const [dateRange, setDateRange] = useState<DateRange>("all");
   const [customRange, setCustomRange] = useState<CustomRange>({ from: "", to: "" });
   const [detailProductId, setDetailProductId] = useState<string | null>(null);
@@ -88,6 +88,11 @@ export function OrdersPage() {
   const emptyMemberForm = { name: "", phone: "", address: "", memberNumber: "" };
   const [newMember, setNewMember] = useState(emptyMemberForm);
   const [editMember, setEditMember] = useState<Member | null>(null);
+  // Pemilih kelas cepat di daftar member. Bu Santi menandai 289 member satu
+  // per satu, jadi jalurnya harus dua ketukan: buka lalu pilih. Sengaja BUKAN
+  // tombol yang berputar tiap diketuk — salah ketuk pada cara itu tidak
+  // kelihatan dan baru ketahuan dari harga yang salah di kasir.
+  const [classPickerFor, setClassPickerFor] = useState<string | null>(null);
   const [confirmDeleteMemberId, setConfirmDeleteMemberId] = useState<string | null>(null);
 
   // Filter by date range
@@ -133,12 +138,15 @@ export function OrdersPage() {
   // Sejak 29 Sep 2026 order ecom ikut tampil di sini; sebelumnya di-exclude
   // di BE. Bu Santi minta digabung dengan penanda.
   const filtered = useMemo(() =>
-    sourceFilter === "all" ? paymentFiltered : filterByPlace(paymentFiltered, sourceFilter),
-    [paymentFiltered, sourceFilter]
+    // Daftar Pesanan POS = transaksi KASIR saja. Pesanan online punya alur
+    // sendiri (resi, kurir, bukti transfer) yang tidak bisa dikerjakan dari
+    // layar ini, dan dikelola dari panel /shop/admin.
+    filterByChannel(paymentFiltered, ["pos"]),
+    [paymentFiltered]
   );
 
   // Reset pagination when filters change
-  const filterKey = `${dateRange}-${statusFilter}-${paymentFilter}-${sourceFilter}-${debouncedSearch}`;
+  const filterKey = `${dateRange}-${statusFilter}-${paymentFilter}-${debouncedSearch}`;
   if (filterKey !== prevFilterKey) {
     setPrevFilterKey(filterKey);
     setVisibleCount(ORDERS_PAGE_SIZE);
@@ -228,22 +236,6 @@ export function OrdersPage() {
           <option value="cash">{lang === "id" ? "Tunai" : "Cash"}</option>
           <option value="transfer">Transfer</option>
           <option value="qris">QRIS</option>
-        </select>
-        {/* Asal transaksi — toko vs online. Order ecom ikut tampil di sini
-            sejak 29 Sep 2026 (sebelumnya di-exclude di BE). Filter-nya
-            disembunyikan selama belum ada satu pun pesanan online: memilih
-            antara "Toko" dan "Online" tidak ada gunanya kalau semuanya toko.
-            Muncul sendiri begitu pesanan online pertama masuk. */}
-        {/* Selalu tampil, tidak lagi disembunyikan saat belum ada pesanan
-            rumah. Bawaannya "Toko Bekasi" sekarang menyaring — kalau
-            pemilihnya tersembunyi, Bu Santi tidak akan tahu ada transaksi
-            yang tidak ditampilkan. */}
-        <select value={sourceFilter} onChange={e => setSourceFilter(e.target.value as typeof sourceFilter)}
-          aria-label={lang === "id" ? "Filter tempat usaha" : "Filter business location"}
-          className={`px-4 py-3 text-sm font-bold rounded-2xl border appearance-none cursor-pointer ${th.inp}`}>
-          <option value="store">{lang === "id" ? "Toko Bekasi" : "Bekasi Store"}</option>
-          <option value="home">{lang === "id" ? "Online Rumah" : "Home Online"}</option>
-          <option value="all">{lang === "id" ? "Gabungan" : "Combined"}</option>
         </select>
       </div>
 
@@ -444,7 +436,7 @@ export function OrdersPage() {
                 {filteredMembers.map(m => (
                   <div key={m.id}
                     onClick={() => setStatsMember({ id: m.id, name: m.name, phone: m.phone })}
-                    className={`flex items-center justify-between px-4 py-3 border-b last:border-0 cursor-pointer active:opacity-70 ${th.bdrSoft}`}>
+                    className={`relative flex items-center justify-between px-4 py-3 border-b last:border-0 cursor-pointer active:opacity-70 ${th.bdrSoft}`}>
                     <div className="flex items-center gap-3 min-w-0 flex-1">
                       <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-black ${th.accBg} ${th.acc}`}>
                         {m.name.charAt(0).toUpperCase()}
@@ -467,6 +459,57 @@ export function OrdersPage() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
+                      {(() => {
+                        const kelas = MEMBER_CLASSES.find(c => c.v === m.memberClass);
+                        const terbuka = classPickerFor === m.id;
+                        return (
+                          <>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setClassPickerFor(terbuka ? null : m.id); }}
+                              aria-label={`Kelas member ${m.name}`}
+                              aria-expanded={terbuka}
+                              className={`px-2 py-1 rounded-lg text-xs font-bold border whitespace-nowrap ${
+                                kelas ? "text-white border-transparent" : `${th.bdr} ${th.txf}`
+                              }`}
+                              style={kelas ? { background: kelas.warna } : undefined}>
+                              {kelas ? kelas.label : "Kelas"}
+                            </button>
+                            {terbuka && (
+                              <>
+                                {/* Tirai penutup: ketuk di mana pun menutup pemilihnya,
+                                    tanpa ikut membuka statistik member di baris itu. */}
+                                <div className="fixed inset-0 z-40"
+                                  onClick={(e) => { e.stopPropagation(); setClassPickerFor(null); }} />
+                                <div onClick={(e) => e.stopPropagation()}
+                                  className={`absolute right-4 top-full -mt-1 z-50 rounded-xl border shadow-lg p-1.5 flex flex-col gap-1 ${th.bdr} ${th.card}`}>
+                                  {([{ v: null as MemberClass | null, label: "Tanpa kelas", warna: "" },
+                                     ...MEMBER_CLASSES]).map(opt => {
+                                    const aktif = (m.memberClass ?? null) === opt.v;
+                                    return (
+                                      <button key={opt.label}
+                                        onClick={async (e) => {
+                                          e.stopPropagation();
+                                          setClassPickerFor(null);
+                                          if (aktif) return;
+                                          await updateMemberAction(m.id, { memberClass: opt.v });
+                                        }}
+                                        className={`px-3 py-2 rounded-lg text-xs font-bold text-left whitespace-nowrap ${
+                                          aktif ? "bg-cherry-500 text-white" : `${th.txm} hover:${th.accBg}`
+                                        }`}>
+                                        {opt.warna && (
+                                          <span className="inline-block w-2 h-2 rounded-full mr-1.5 align-middle"
+                                            style={{ background: opt.warna }} />
+                                        )}
+                                        {opt.label}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              </>
+                            )}
+                          </>
+                        );
+                      })()}
                       <p className={`text-xs ${th.txf} hidden sm:block`}>
                         Sejak {formatDate(m.createdAt)}
                       </p>
@@ -726,6 +769,30 @@ export function OrdersPage() {
                 className={`w-full px-3.5 py-2.5 text-sm rounded-xl border resize-none ${th.inp}`}
                 placeholder="Alamat lengkap" />
             </div>
+            <div>
+              <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>Kelas Member</p>
+              <div className="flex gap-2 flex-wrap">
+                {([{ v: null, label: "Tanpa kelas" },
+                   ...MEMBER_CLASSES.map(c => ({ v: c.v as MemberClass | null, label: c.label }))]
+                ).map(opt => {
+                  const aktif = (editMember.memberClass ?? null) === opt.v;
+                  return (
+                    <button key={opt.label} type="button"
+                      onClick={() => setEditMember({ ...editMember, memberClass: opt.v })}
+                      aria-pressed={aktif}
+                      className={`px-3 py-2 rounded-xl text-sm font-bold border ${
+                        aktif ? "bg-cherry-500 text-white border-transparent" : `${th.bdr} ${th.txm}`
+                      }`}>
+                      {opt.label}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className={`text-xs mt-1.5 ${th.txf}`}>
+                Dipakai untuk harga grosir khusus kelas. Member tanpa kelas tetap
+                dapat harga Semua Member dan Semua Customer.
+              </p>
+            </div>
             <div className="flex gap-2 mt-2">
               <button onClick={() => setEditMember(null)}
                 className={`flex-1 py-2.5 rounded-xl text-sm font-bold border ${th.bdr} ${th.txm}`}>
@@ -739,6 +806,7 @@ export function OrdersPage() {
                     phone: editMember.phone.trim(),
                     address: (editMember.address || "").trim(),
                     memberNumber: (editMember.memberNumber || "").trim(),
+                    memberClass: editMember.memberClass ?? null,
                   });
                   setEditMember(null);
                   toast.success("Member berhasil diperbarui");

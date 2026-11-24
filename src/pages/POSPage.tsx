@@ -16,6 +16,7 @@ import { calcItemDiscount } from "@/utils/calc";
 import { orderApi } from "@/api";
 import Barcode from "react-barcode";
 import type { PaymentMethod, UnitType, DiscountType, Product, Order, Member } from "@/types";
+import { MEMBER_CLASSES } from "@/types";
 import toast from "react-hot-toast";
 import {
   Search, ScanLine, ShoppingBag, Minus, Plus, Trash2, ImagePlus, X, UserPlus, Tag, Percent, Wallet, FileText, Printer, Barcode as BarcodeIcon, Clock, Send, AlertCircle, Eye, EyeOff, Gift, Sparkles, TrendingDown, Bookmark, List, Rows3, Copy,
@@ -314,7 +315,7 @@ export function POSPage() {
     ).slice(0, 5);
   }, [members, memberQuery]);
 
-  const handleAddNewMember = () => {
+  const handleAddNewMember = async () => {
     if (!newMemberName.trim()) return;
     const member: Member = {
       id: genId(),
@@ -325,7 +326,14 @@ export function POSPage() {
       points: 0,
       createdAt: new Date().toISOString(),
     };
-    addMember(member);
+    // Ditunggu dulu. Sebelumnya tidak, jadi form tertutup dan toast sukses
+    // muncul walaupun penyimpanannya gagal — kasir mengira membernya sudah
+    // terdaftar, dan baru ketahuan tidak ada saat dicari lagi.
+    try {
+      await addMember(member);
+    } catch {
+      return; // pesan galatnya sudah ditampilkan store
+    }
     setCustomer(member.name + (member.phone ? ` (${member.phone})` : ""));
     setMemberQuery("");
     setNewMemberName("");
@@ -677,6 +685,16 @@ export function POSPage() {
           <div className="min-w-0">
             <p className={`text-sm font-extrabold truncate ${th.acc}`}>
               {activeMember.name} <span className={`text-xs font-semibold ${th.txm}`}>· Member</span>
+              {/* Kelasnya ikut tampil supaya kasir tahu kenapa harganya beda
+                  dari member lain, tanpa harus membuka daftar member. */}
+              {(() => {
+                const k = MEMBER_CLASSES.find(c => c.v === activeMember.memberClass);
+                if (!k) return null;
+                return (
+                  <span className="ml-1.5 align-middle text-[10px] font-black px-1.5 py-0.5 rounded text-white"
+                    style={{ background: k.warna }}>{k.label}</span>
+                );
+              })()}
             </p>
             <p className={`text-xs ${th.txm} truncate`}>{activeMember.phone}</p>
             <p className={`text-xs font-bold mt-0.5 ${th.acc} flex items-center gap-1`}>
@@ -726,7 +744,7 @@ export function POSPage() {
           {showMemberDropdown && (
             <div className={`absolute top-full left-0 right-0 z-20 mt-1 rounded-xl border shadow-lg overflow-hidden ${th.card} ${th.bdr}`}>
               {filteredMembers.length > 0 && filteredMembers.map(m => (
-                <button key={m.id} onClick={() => { setMember({ id: m.id, name: m.name, phone: m.phone, points: m.points || 0 }); setMemberQuery(""); setShowMemberDropdown(false); setCustomer(""); setCustomerPhone(""); }}
+                <button key={m.id} onClick={() => { setMember({ id: m.id, name: m.name, phone: m.phone, points: m.points || 0, memberClass: m.memberClass ?? null }); setMemberQuery(""); setShowMemberDropdown(false); setCustomer(""); setCustomerPhone(""); }}
                   className={`w-full text-left px-4 py-2.5 flex items-center justify-between hover:opacity-70 border-b last:border-0 ${th.bdrSoft}`}>
                   <div className="min-w-0">
                     <p className={`text-sm font-bold truncate ${th.tx}`}>{m.name}</p>
@@ -854,7 +872,7 @@ export function POSPage() {
                     </p>
                     <button
                       onClick={() => {
-                        setMember({ id: duplicate.id, name: duplicate.name, phone: duplicate.phone, points: duplicate.points || 0 });
+                        setMember({ id: duplicate.id, name: duplicate.name, phone: duplicate.phone, points: duplicate.points || 0, memberClass: duplicate.memberClass ?? null });
                         setCustomer(duplicate.name + (duplicate.phone ? ` (${duplicate.phone})` : ""));
                         setMemberQuery("");
                         setNewMemberName("");

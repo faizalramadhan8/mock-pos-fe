@@ -1,6 +1,7 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
-import type { Order, Product, PaymentTerms, ProductPriceTier } from "@/types";
+import type { Order, Product, PaymentTerms, ProductPriceTier, MemberClass } from "@/types";
+import { kelasDariTarget } from "@/types";
 import JsBarcode from "jsbarcode";
 import { useSettingsStore } from "@/stores";
 
@@ -461,6 +462,33 @@ export function orderPlace(o: { orderSource?: string }): Tempat {
   return (o.orderSource ?? "pos") === "home" ? "home" : "store";
 }
 
+/**
+ * SALURAN pesanan, bukan tempat. Dua sumbu yang berbeda:
+ *
+ *   saluran : pos · ecom · home   — lewat mana pesanannya masuk
+ *   tempat  : store · home        — barangnya dari rak mana
+ *
+ * POS memakai SALURAN (`pos` saja) sejak 24 Nov 2026: Arus Kas kasir harus
+ * cocok dengan uang di laci, dan penjualan online tidak pernah lewat laci.
+ * Penyaring TEMPAT yang dipakai sebelumnya ikut memasukkan penjualan online
+ * Bekasi, karena tempatnya memang sama-sama Bekasi.
+ */
+export type SaluranPesanan = "pos" | "ecom" | "home";
+
+export function orderChannel(o: { orderSource?: string }): SaluranPesanan {
+  const v = o.orderSource ?? "pos";
+  return v === "ecom" || v === "home" ? v : "pos";
+}
+
+/** Saring menurut saluran. `null` = tanpa penyaringan. */
+export function filterByChannel<T extends { orderSource?: string }>(
+  orders: T[],
+  saluran: SaluranPesanan[] | null,
+): T[] {
+  if (!saluran || saluran.length === 0) return orders;
+  return orders.filter((o) => saluran.includes(orderChannel(o)));
+}
+
 /** Saring menurut tempat. `null` = gabungan, tanpa penyaringan. */
 export function filterByPlace<T extends { orderSource?: string }>(
   orders: T[],
@@ -495,7 +523,7 @@ export const LABEL_TEMPAT: Record<string, string> = {
  */
 export function tierBerlaku(
   t: ProductPriceTier,
-  member: { id: string } | null,
+  member: { id: string; memberClass?: MemberClass | null } | null,
   qtySatuan: number | null,
   nowMs: number = Date.now()
 ): boolean {
@@ -504,16 +532,17 @@ export function tierBerlaku(
   // Des" tersimpan sebagai 1 Januari 00:00.
   if (t.startsAt && new Date(t.startsAt).getTime() > nowMs) return false;
   if (t.expiresAt && new Date(t.expiresAt).getTime() <= nowMs) return false;
-  switch (t.target) {
-    case "all_customers":
-      return true;
-    case "all_members":
-      return !!member;
-    case "member_specific":
-      return !!member && (t.members || []).some(m => m.id === member.id);
-    default:
-      return false;
+  if (t.target === "all_customers") return true;
+  if (!member) return false;
+  if (t.target === "all_members") return true;
+  if (t.target === "member_specific") {
+    return (t.members || []).some(m => m.id === member.id);
   }
+  // Target kelas: cocok PERSIS. Member tanpa kelas tidak pernah cocok, dan
+  // Platinum tidak ikut kebagian tier Gold. Lihat PriceTierTarget di types.
+  const kelas = kelasDariTarget(t.target);
+  if (kelas) return member.memberClass === kelas;
+  return false;
 }
 
 /**

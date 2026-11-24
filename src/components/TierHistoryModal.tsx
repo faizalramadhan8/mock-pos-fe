@@ -5,6 +5,7 @@ import { useThemeClasses } from "@/hooks/useThemeClasses";
 import { useMemberStore, useProductStore } from "@/stores";
 import { formatCurrency as $ } from "@/utils";
 import type { ProductPriceTierHistoryEntry } from "@/types";
+import { labelTargetTier } from "@/types";
 import type { ProductPriceTierHistoryRes } from "@/api/products";
 
 /**
@@ -176,13 +177,10 @@ export function TierHistoryModal({ productId, open, onClose }: Props) {
                               <span className={`font-black ${th.acc}`}>{$(Math.round(v.price * v.minQty))}</span>
                               <span className={`text-sm ${th.txf}`}>({$(Math.round(v.price))}/satuan)</span>
                               <span className={`text-sm inline-flex items-center gap-1.5 px-2 py-1 rounded-md ${th.accBg} ${th.acc} font-semibold`}>
-                                {v.targetType === "all_customers" ? (
-                                  <><Users size={14} strokeWidth={2.8} /> Semua customer</>
-                                ) : v.targetType === "all_members" ? (
-                                  <><UsersRound size={14} strokeWidth={2.8} /> Semua member</>
-                                ) : (
-                                  <><UserCheck size={14} strokeWidth={2.8} /> {(v.memberIds || []).length} member</>
-                                )}
+                                {v.targetType === "all_customers" ? <Users size={14} strokeWidth={2.8} />
+                                  : v.targetType === "member_specific" ? <UserCheck size={14} strokeWidth={2.8} />
+                                  : <UsersRound size={14} strokeWidth={2.8} />}
+                                {labelTargetTier(v.targetType, (v.memberIds || []).length)}
                               </span>
                             </div>
                             {v.targetType === "member_specific" && v.memberIds && v.memberIds.length > 0 && (

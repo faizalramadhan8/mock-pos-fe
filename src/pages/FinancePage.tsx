@@ -53,20 +53,25 @@ export function FinancePage() {
     return { from: ymd(r.start), to: ymd(r.end) };
   }, [range, customRange]);
 
-  // Tempat usaha dipegang di sini, bukan di masing-masing tab — supaya Arus
-  // Kas dan Laba Rugi tidak bisa menampilkan tempat yang berbeda tanpa
-  // disadari. Bu Santi sendiri yang minta dua angka itu klop (30 Jun 2026).
-  const [tempat, setTempat] = useState<"store" | "home" | "all">("store");
+  // Keuangan POS = transaksi KASIR saja ("pos"), bukan tempat Bekasi
+  // ("store"). Bedanya penting: "store" ikut memuat penjualan online Bekasi,
+  // dan uang itu tidak pernah lewat laci kasir — Arus Kas jadi tidak bisa
+  // dicocokkan saat closing. Penjualan online punya Keuangannya sendiri di
+  // panel /shop/admin.
+  //
+  // Nilainya tetap dikirim eksplisit ke backend, bukan dikosongkan: parameter
+  // `source` yang kosong berarti GABUNGAN di sisi sana.
+  const SALURAN = "pos" as const;
 
   const [profitLoss, setProfitLoss] = useState<ProfitLossRes | null>(null);
   useEffect(() => {
     if (tab !== "profit-loss" || !from || !to) return;
     let cancelled = false;
-    expenseApi.profitLoss({ from, to, source: tempat === "all" ? "" : tempat })
+    expenseApi.profitLoss({ from, to, source: SALURAN })
       .then(res => { if (!cancelled) setProfitLoss(res.body ?? null); })
       .catch(err => { if (!cancelled) { console.error("profit-loss failed", err); setProfitLoss(null); } });
     return () => { cancelled = true; };
-  }, [tab, from, to, tempat]);
+  }, [tab, from, to]);
 
   if (!isOwner) {
     return (
@@ -160,31 +165,19 @@ export function FinancePage() {
         ))}
       </div>
 
-      {/* Tempat usaha — berlaku untuk kedua tab. */}
-      <div className="flex flex-wrap gap-1.5" role="group" aria-label="Pilih tempat usaha">
-        {([
-          ["store", "Toko Bekasi"],
-          ["home", "Online Rumah"],
-          ["all", "Gabungan"],
-        ] as const).map(([k, label]) => (
-          <button key={k} onClick={() => setTempat(k)} aria-pressed={tempat === k}
-            className={`text-sm font-bold px-3 py-1.5 rounded-xl ${
-              tempat === k
-                ? "text-white bg-gradient-to-r from-cherry-400 to-cherry-500"
-                : `border ${th.bdr} ${th.txm}`
-            }`}>{label}</button>
-        ))}
-      </div>
-      {tempat !== "all" && (
-        <p className={`text-xs leading-relaxed ${th.txm}`}>
-          Pemasukan disaring menurut tempat. <b>Pengeluaran belum</b> — tabel
-          pengeluaran belum punya penanda tempat, jadi yang dikurangkan tetap
-          seluruhnya.
-        </p>
-      )}
+      {/* Angkanya Toko Bekasi saja. Tetap diberi tahu, bukan dibiarkan
+          diam: pengeluaran belum punya penanda tempat, jadi yang dikurangkan
+          masih seluruhnya dan selisihnya bisa terlihat lebih kecil dari
+          semestinya. */}
+      <p className={`text-xs leading-relaxed ${th.txm}`}>
+        Angka di bawah hanya mencakup <b>transaksi kasir</b>. Penjualan online
+        punya laporannya sendiri di panel toko online. Tapi{" "}
+        <b>pengeluaran belum terpisah</b> karena tabel pengeluaran belum punya
+        penanda tempat, jadi yang dikurangkan masih seluruhnya.
+      </p>
 
       {/* Tab content */}
-      {tab === "cashflow" && <CashflowTab tempat={tempat === "all" ? null : tempat} />}
+      {tab === "cashflow" && <CashflowTab saluran={[SALURAN]} />}
       {tab === "profit-loss" && <ProfitLossView pl={profitLoss} th={th} lang={lang} />}
     </div>
   );

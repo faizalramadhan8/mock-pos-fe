@@ -9,6 +9,7 @@ import { productApi } from "@/api";
 import { Pencil, Plus, Search, Tag, Trash2, Users, UserCheck, UsersRound, CalendarClock, History, Settings } from "lucide-react";
 import toast from "react-hot-toast";
 import type { Product, ProductPriceTier } from "@/types";
+import { labelTargetTier } from "@/types";
 
 interface Props {
   canWrite: boolean;
@@ -195,13 +196,10 @@ export function PriceTierCatalog({ canWrite }: Props) {
                         <span className={`font-black ${th.acc} shrink-0`}>{$(Math.round(t.price * t.minQty))}</span>
                         <span className={`text-sm ${th.txf} shrink-0`}>({$(Math.round(t.price))}/satuan)</span>
                         <span className={`text-sm inline-flex items-center gap-1.5 px-2 py-1 rounded-md ${th.accBg} ${th.acc} font-semibold`}>
-                          {t.target === "all_customers" ? (
-                            <><Users size={14} strokeWidth={2.8} /> Semua customer</>
-                          ) : t.target === "all_members" ? (
-                            <><UsersRound size={14} strokeWidth={2.8} /> Semua member</>
-                          ) : (
-                            <><UserCheck size={14} strokeWidth={2.8} /> {(t.members || []).length} member</>
-                          )}
+                          {t.target === "all_customers" ? <Users size={14} strokeWidth={2.8} />
+                            : t.target === "member_specific" ? <UserCheck size={14} strokeWidth={2.8} />
+                            : <UsersRound size={14} strokeWidth={2.8} />}
+                          {labelTargetTier(t.target, (t.members || []).length)}
                         </span>
                         {(() => {
                           const st = statusJadwalTier(t);

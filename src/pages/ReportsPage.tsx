@@ -3,7 +3,7 @@ import { useLangStore, useOrderStore, useProductStore, useExpenseStore, usePurch
 import { useThemeClasses } from "@/hooks/useThemeClasses";
 import { usePageFetch } from "@/hooks/usePageFetch";
 import { useCountUp } from "@/hooks/useCountUp";
-import { formatCurrency as $, salesTotal, filterByPlace, orderPlace } from "@/utils";
+import { formatCurrency as $, filterByChannel } from "@/utils";
 import { exportOrders, exportOrderReport } from "@/utils/export";
 import { getDateRange, type DateRange, type CustomRange } from "@/utils/dateRange";
 import { orderApi, type OrderAggregateResponse } from "@/api/orders";
@@ -43,8 +43,6 @@ export function ReportsPage() {
   const products = useProductStore(s => s.products);
 
   const [tab, setTab] = useState<ReportTab>("products");
-  // Bawaannya Toko Bekasi — sejalan dengan Beranda, Pesanan, dan Keuangan.
-  const [sourceFilter, setSourceFilter] = useState<"all" | "store" | "home">("store");
   const [dateRange, setDateRange] = useState<DateRange>("month");
   const [customRange, setCustomRange] = useState<CustomRange>({ from: "", to: "" });
   const [expandedMember, setExpandedMember] = useState<string | null>(null);
@@ -83,38 +81,14 @@ export function ReportsPage() {
   // (FE-side topProducts/memberStats di-fallback kalau aggregate belum sampai).
   const filteredOrders = useMemo(() => {
     const range = getDateRange(dateRange, customRange);
-    let completed = orders.filter(o => o.status === "completed");
-    // Asal transaksi — order ecom ikut masuk laporan sejak 29 Sep 2026.
-    // Aman digabung karena ecom yang sudah dibayar ikut berstatus
-    // "completed"; yang belum bayar tetap "pending" dan tidak terhitung.
-    if (sourceFilter !== "all") {
-      completed = filterByPlace(completed, sourceFilter);
-    }
+    // Laporan POS = transaksi KASIR saja. Penjualan online punya
+    // laporannya sendiri di panel /shop/admin.
+    let completed = filterByChannel(orders.filter(o => o.status === "completed"), ["pos"]);
     if (!range) return completed;
     return completed.filter(o => {
       const d = new Date(o.createdAt);
       return d >= range.start && d <= range.end;
     });
-  }, [orders, dateRange, customRange, sourceFilter]);
-
-  // Ringkasan per asal — supaya Bu Santi bisa lihat porsi toko vs online
-  // tanpa harus ganti filter bolak-balik. Dihitung dari periode yang sama
-  // tapi mengabaikan sourceFilter (kalau ikut, angkanya jadi tidak berguna).
-  const sourceSplit = useMemo(() => {
-    const range = getDateRange(dateRange, customRange);
-    const inRange = orders.filter(o => {
-      if (o.status !== "completed") return false;
-      if (!range) return true;
-      const d = new Date(o.createdAt);
-      return d >= range.start && d <= range.end;
-    });
-    const acc = { pos: { count: 0, total: 0 }, ecom: { count: 0, total: 0 } };
-    inRange.forEach(o => {
-      const bucket = orderPlace(o) === "home" ? acc.ecom : acc.pos;
-      bucket.count += 1;
-      bucket.total += salesTotal(o);
-    });
-    return acc;
   }, [orders, dateRange, customRange]);
 
   // BE-side aggregate. Dipanggil setiap dateRange/customRange berubah.
@@ -434,48 +408,6 @@ export function ReportsPage() {
       {/* Tab switch — role=tablist + touch target ≥44px */}
       {/* Toko vs Online — Bu Santi 17 Sep 2026: "Paling nanti di kasih tanda
           aja ya. Antara e commerce dan offline." Selalu tampil porsinya,
-          klik kartu untuk memfilter laporan di bawahnya. */}
-      {/* Hanya muncul kalau memang ADA pesanan online di periode ini. Toko
-          online belum jalan (yang ada cuma transaksi uji coba, dihapus
-          30 Sep 2026) — memisah "Toko vs Online" saat online-nya nol cuma
-          menambah kotak berisi Rp 0. Sengaja bukan pakai saklar on/off:
-          begitu pesanan online pertama masuk, kartunya muncul sendiri tanpa
-          perlu ada yang ingat menyalakannya. */}
-      {/* Selalu tampil. Dulu disembunyikan saat belum ada pesanan online —
-          masuk akal waktu bawaannya "Semua". Sekarang bawaannya menyaring
-          ke Toko Bekasi, jadi kartunya WAJIB kelihatan; kalau tidak, Bu
-          Santi mengira angka yang tampil sudah mencakup semuanya. */}
-      {true && (
-        <div className="grid grid-cols-3 gap-2">
-          {([
-            { key: "store" as const, label: lang === "id" ? "Toko Bekasi" : "Bekasi",
-              count: sourceSplit.pos.count, total: sourceSplit.pos.total },
-            { key: "home" as const, label: lang === "id" ? "Online Rumah" : "Home",
-              count: sourceSplit.ecom.count, total: sourceSplit.ecom.total },
-            { key: "all" as const, label: lang === "id" ? "Gabungan" : "All",
-              count: sourceSplit.pos.count + sourceSplit.ecom.count,
-              total: sourceSplit.pos.total + sourceSplit.ecom.total },
-          ]).map(s => {
-            const active = sourceFilter === s.key;
-            return (
-              <button key={s.key} onClick={() => setSourceFilter(s.key)}
-                aria-pressed={active}
-                className={`rounded-2xl border p-3 text-left transition ${
-                  active ? "border-cherry-500 bg-cherry-50 dark:bg-cherry-500/10" : `${th.bdr} ${th.card2}`
-                }`}>
-                <p className={`text-xs font-bold uppercase tracking-wider ${active ? th.acc : th.txf}`}>
-                  {s.label}
-                </p>
-                <p className={`font-display text-base font-black tabular-nums mt-0.5 ${th.tx}`}>
-                  {$(s.total)}
-                </p>
-                <p className={`text-xs ${th.txm}`}>{s.count} transaksi</p>
-              </button>
-            );
-          })}
-        </div>
-      )}
-
       <div role="tablist" aria-label={lang === "id" ? "Pilih laporan" : "Report category"}
         className="flex gap-2 overflow-x-auto scrollbar-hide">
         {([

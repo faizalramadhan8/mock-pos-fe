@@ -7,6 +7,8 @@ export interface MemberRes {
   address?: string;
   member_number?: string;
   points: number;
+  /** 'platinum' | 'gold' | 'silver'. Kosong = belum dikelompokkan. */
+  member_class?: string | null;
   created_at: string;
 }
 
@@ -102,10 +104,13 @@ export const memberApi = {
     return api.get<MemberStatsRes>(`/members/${id}/stats${qs ? '?' + qs : ''}`);
   },
 
-  create: (data: { name: string; phone: string; address?: string; member_number?: string }) =>
+  create: (data: { name: string; phone: string; address?: string; member_number?: string; member_class?: string }) =>
     api.post<MemberRes>('/members/', data),
 
-  update: (id: string, data: { name?: string; phone?: string; address?: string; member_number?: string }) =>
+  update: (id: string, data: { name?: string; phone?: string; address?: string; member_number?: string;
+    /** Kosongkan (string "") untuk melepas kelasnya; hilangkan field-nya
+     *  kalau memang tidak ingin mengubah kelas. */
+    member_class?: string }) =>
     api.put<MemberRes>(`/members/${id}`, data),
 
   delete: (id: string) => api.del(`/members/${id}`),

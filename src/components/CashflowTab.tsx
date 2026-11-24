@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useOrderStore, useExpenseStore, usePurchaseInvoiceStore, useRefundStore, useLangStore, useAuthStore } from "@/stores";
 import { useThemeClasses } from "@/hooks/useThemeClasses";
-import { formatCurrency as $, salesTotal, filterByPlace, type Tempat } from "@/utils";
+import { formatCurrency as $, salesTotal, filterByChannel, type SaluranPesanan } from "@/utils";
 import { cashbookApi } from "@/api/cashbook";
 import { capitalApi } from "@/api/capital";
 import { Modal } from "./Modal";
@@ -60,12 +60,12 @@ interface CapitalEntry {
  *
  * Opening balance per bulan: cashbookApi (manual input owner). Belum di-set → 0.
  */
-export function CashflowTab({ tempat = null }: { tempat?: Tempat | null }) {
+export function CashflowTab({ saluran = null }: { saluran?: SaluranPesanan[] | null }) {
   const th = useThemeClasses();
   const { lang } = useLangStore();
-  // `tempat` dari FinancePage. null = gabungan.
+  // `saluran` dari FinancePage. null = tanpa penyaringan.
   const semuaOrders = useOrderStore(s => s.orders);
-  const orders = useMemo(() => filterByPlace(semuaOrders, tempat ?? null), [semuaOrders, tempat]);
+  const orders = useMemo(() => filterByChannel(semuaOrders, saluran ?? null), [semuaOrders, saluran]);
   const expenses = useExpenseStore(s => s.expenses);
   const invoices = usePurchaseInvoiceStore(s => s.invoices);
   const refunds = useRefundStore(s => s.refunds);

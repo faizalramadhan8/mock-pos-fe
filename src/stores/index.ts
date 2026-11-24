@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import toast from "react-hot-toast";
-import type { User, Product, CartItem, Order, OrderItem, StockMovement, StockBatch, Category, Supplier, BankAccount, Member, Refund, RefundItem, CashSession, AuditEntry, PaymentMethod, PaymentStatus, DiscountType, UnitType, Lang, PageId, AuditAction, PurchaseInvoice, PurchaseInvoiceItem, RedeemableItem, PriceTierTarget } from "@/types";
+import type { User, Product, CartItem, Order, OrderItem, StockMovement, StockBatch, Category, Supplier, BankAccount, Member, Refund, RefundItem, CashSession, AuditEntry, PaymentMethod, PaymentStatus, DiscountType, UnitType, Lang, PageId, AuditAction, PurchaseInvoice, PurchaseInvoiceItem, RedeemableItem, PriceTierTarget, MemberClass } from "@/types";
 import { translations } from "@/i18n";
 import { ROLE_PERMISSIONS } from "@/constants";
 import { genId, tierBerlaku, tierTerbaik } from "@/utils";
@@ -116,6 +116,7 @@ const mapMember = (m: any): Member => ({
   id: m.id, name: m.name, phone: m.phone,
   address: m.address || '', memberNumber: m.member_number || '',
   points: typeof m.points === 'number' ? m.points : 0,
+  memberClass: m.member_class || null,
   createdAt: m.created_at,
 });
 
@@ -395,7 +396,13 @@ export const useProductStore = create<ProductState>((set, get) => ({
 }));
 
 // ─── Cart (persisted, client-only — UNCHANGED) ───
-interface ActiveMember { id: string; name: string; phone: string; points?: number; }
+// memberClass ikut dibawa karena harga tier kelas (Platinum/Gold/Silver)
+// dihitung dari sini. Kalau terlewat, member Platinum yang dipilih kasir
+// tetap ditagih harga biasa dan tidak ada yang memberi tahu.
+interface ActiveMember {
+  id: string; name: string; phone: string; points?: number;
+  memberClass?: MemberClass | null;
+}
 
 interface CartState {
   items: CartItem[];
@@ -1138,11 +1145,16 @@ export const useMemberStore = create<MemberState>((set, get) => ({
         phone: member.phone,
         address: member.address || undefined,
         member_number: member.memberNumber || undefined,
+        member_class: member.memberClass || undefined,
       });
       await get().fetchMembers();
     } catch (e: any) {
-      set(s => ({ members: [member, ...s.members] }));
+      // Sengaja TIDAK menambahkan ke state saat gagal. Versi sebelumnya
+      // melakukannya, jadi member yang gagal tersimpan tetap tampil di layar
+      // dan baru ketahuan hilang setelah halaman dimuat ulang. Aturannya ada
+      // di CLAUDE.md: jangan menampilkan hasil sebelum server menjawab.
       toast.error(e.message);
+      throw e;
     }
   },
   updateMember: async (id, data) => {
@@ -1152,6 +1164,9 @@ export const useMemberStore = create<MemberState>((set, get) => ({
         phone: data.phone,
         address: data.address ?? '',
         member_number: data.memberNumber ?? '',
+        // undefined = jangan diubah, null = lepas kelasnya, nilai = pindah
+        // kelas. Backend membedakan ketiganya lewat pointer.
+        ...(data.memberClass !== undefined ? { member_class: data.memberClass ?? '' } : {}),
       });
       await get().fetchMembers();
     } catch (e: any) {
@@ -1163,8 +1178,10 @@ export const useMemberStore = create<MemberState>((set, get) => ({
       await memberApi.delete(id);
       set(s => ({ members: s.members.filter(m => m.id !== id) }));
     } catch (e: any) {
-      set(s => ({ members: s.members.filter(m => m.id !== id) }));
+      // Tarik ulang dari server, jangan ikut menghapus dari layar: kalau
+      // penghapusannya gagal, membernya masih ada dan harus kelihatan lagi.
       toast.error(e.message);
+      await get().fetchMembers();
     }
   },
 }));

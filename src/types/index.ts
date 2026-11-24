@@ -80,17 +80,67 @@ export interface Product {
   createdAt: string;
 }
 
+/** Kelas member yang ditandai manual oleh Bu Santi. */
+export type MemberClass = "platinum" | "gold" | "silver";
+
+export const MEMBER_CLASSES: { v: MemberClass; label: string; warna: string }[] = [
+  { v: "platinum", label: "Platinum", warna: "#64748B" },
+  { v: "gold", label: "Gold", warna: "#B45309" },
+  { v: "silver", label: "Silver", warna: "#6B7280" },
+];
+
 /**
  * Siapa yang berhak atas harga tier.
  *
  *  all_customers   — siapa saja, termasuk walk-in tanpa kartu member.
  *  all_members     — semua member terdaftar, tapi bukan walk-in.
+ *  class_*         — member berkelas itu saja (Platinum/Gold/Silver).
  *  member_specific — hanya member yang di-whitelist.
  *
  * "all_members" sempat dihapus 20 Jun 2026 (di-rename jadi all_customers) lalu
  * diminta kembali Bu Santi 30 Okt 2026 sebagai pilihan KETIGA, bukan pengganti.
+ *
+ * Target kelas (4 Nov 2026) cocok PERSIS, tanpa urutan bertingkat: member
+ * Platinum tidak otomatis kebagian tier Gold. Kalau satu harga dimaksudkan
+ * untuk dua kelas, buat tiernya dua kali.
  */
-export type PriceTierTarget = "all_customers" | "all_members" | "member_specific";
+export type PriceTierTarget =
+  | "all_customers"
+  | "all_members"
+  | "class_platinum"
+  | "class_gold"
+  | "class_silver"
+  | "member_specific";
+
+/**
+ * Label target tier untuk ditampilkan.
+ *
+ * SATU tempat, dipakai daftar tier, katalog, dan riwayat. Sebelumnya tiap
+ * layar menulis rantai if-nya sendiri yang berakhir di "N member" — jadi
+ * target baru (kelas Platinum/Gold/Silver) muncul sebagai "0 member", salah
+ * tanpa ada yang gagal.
+ */
+export function labelTargetTier(t: PriceTierTarget, jumlahMember = 0): string {
+  switch (t) {
+    case "all_customers": return "Semua customer";
+    case "all_members": return "Semua member";
+    case "class_platinum": return "Platinum";
+    case "class_gold": return "Gold";
+    case "class_silver": return "Silver";
+    case "member_specific": return `${jumlahMember} member`;
+    default: return "Semua customer";
+  }
+}
+
+/** Target tier → kelas member yang dituntutnya. null kalau bukan target kelas. */
+export function kelasDariTarget(t: PriceTierTarget): MemberClass | null {
+  switch (t) {
+    case "class_platinum": return "platinum";
+    case "class_gold": return "gold";
+    case "class_silver": return "silver";
+    default: return null;
+  }
+}
 
 export interface ProductPriceTier {
   id: string;
@@ -203,11 +253,20 @@ export interface Order {
    *   "ecom" — storefront Bekasi (disiapkan, menyusul habis Lebaran)
    *   "home" — storefront toko rumah
    *
-   * Order lama sebelum kolom ini ada bernilai undefined — perlakukan
-   * sebagai POS. Untuk memisahkan TEMPAT (yang dipakai Bu Santi saat
-   * closing) pakai `orderPlace()` / `filterByPlace()` di utils, jangan
-   * membandingkan nilai ini langsung — `ecom` bertempat di Bekasi, bukan
-   * di rumah.
+   * Order lama sebelum kolom ini ada bernilai undefined, perlakukan
+   * sebagai POS. Jangan membandingkan nilai ini langsung; pakai helper di
+   * utils, dan pilih sumbunya dengan sadar:
+   *
+   *   SALURAN — `orderChannel()` / `filterByChannel()`. Lewat mana pesanan
+   *     masuk. Dipakai seluruh POS sejak 24 Nov 2026: Keuangan kasir harus
+   *     cocok dengan laci, dan penjualan online tidak pernah lewat laci.
+   *
+   *   TEMPAT  — `orderPlace()` / `filterByPlace()`. Barangnya dari rak mana.
+   *     `ecom` bertempat di Bekasi, bukan di rumah.
+   *
+   * Keduanya terlihat mirip dan memberi hasil berbeda tepat pada pesanan
+   * `ecom`: masuk di penyaring tempat Bekasi, tidak masuk di penyaring
+   * saluran kasir.
    */
   orderSource?: "pos" | "ecom" | "home";
   /** Ongkos kirim yang ditagihkan ke customer (pesanan online saja; 0 untuk
@@ -372,6 +431,9 @@ export interface Member {
    * per-item di cart. Reset 0 setiap 1 Januari.
    */
   points: number;
+  /** Kelas yang ditandai Bu Santi. Kosong = belum dikelompokkan, dan itu
+   *  keadaan wajar untuk sebagian besar member. */
+  memberClass?: MemberClass | null;
   createdAt: string;
 }
 
