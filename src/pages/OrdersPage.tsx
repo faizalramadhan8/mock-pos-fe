@@ -1,5 +1,5 @@
-import { useState, useMemo } from "react";
-import { useLangStore, useOrderStore, useProductStore, useAuthStore, useMemberStore } from "@/stores";
+import { useState, useMemo, useEffect } from "react";
+import { useLangStore, useOrderStore, useProductStore, useAuthStore, useMemberStore, useNavIntentStore } from "@/stores";
 import { ProductDetailModal } from "@/components/ProductDetailModal";
 import { OrderDetailModal } from "@/components/OrderDetailModal";
 import { MemberStatsModal } from "@/components/MemberStatsModal";
@@ -11,7 +11,7 @@ import { formatCurrency as $, formatTime, formatDate, genId, normalizePhone, sal
 import { getDateRange, type DateRange, type CustomRange } from "@/utils/dateRange";
 import { FileText, Search, Users, Trash2, Plus, Receipt, Pencil, Sparkles, MapPin, AlertCircle } from "lucide-react";
 import type { Member, MemberClass } from "@/types";
-import { MEMBER_CLASSES } from "@/types";
+import { MEMBER_CLASSES, kelasPatokan } from "@/types";
 import toast from "react-hot-toast";
 
 type OrdersTab = "orders" | "members" | "points";
@@ -88,11 +88,33 @@ export function OrdersPage() {
   const emptyMemberForm = { name: "", phone: "", address: "", memberNumber: "" };
   const [newMember, setNewMember] = useState(emptyMemberForm);
   const [editMember, setEditMember] = useState<Member | null>(null);
-  // Pemilih kelas cepat di daftar member. Bu Santi menandai 289 member satu
-  // per satu, jadi jalurnya harus dua ketukan: buka lalu pilih. Sengaja BUKAN
-  // tombol yang berputar tiap diketuk — salah ketuk pada cara itu tidak
+  // Pemilih kelas di Peringkat Poin (tab Poin Member). Bu Santi menandai
+  // member satu per satu, jadi jalurnya dua ketukan: buka lalu pilih. Sengaja
+  // BUKAN tombol yang berputar tiap diketuk: salah ketuk pada cara itu tidak
   // kelihatan dan baru ketahuan dari harga yang salah di kasir.
   const [classPickerFor, setClassPickerFor] = useState<string | null>(null);
+  // Saring Peringkat Poin per kelas. "all" = semua, "none" = tanpa kelas.
+  const [kelasFilter, setKelasFilter] = useState<MemberClass | "none" | "all">("all");
+
+  // Datang dari kartu Kelas Member di Beranda: buka tab yang diminta, dan
+  // kalau membawa kelas, langsung saring ke kelas itu.
+  //
+  // Sengaja di effect, bukan di penginisialisasi useState: niatnya sekali
+  // pakai, dan StrictMode menjalankan penginisialisasi dua kali. Panggilan
+  // pertama akan menghabiskan niatnya dan yang kedua membaca kosong. Pola yang
+  // sama dipakai InventoryPage. Satu render tambahan saat halaman dibuka.
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    const { tab, kelas } = useNavIntentStore.getState().consumeOrdersTab();
+    if (tab === "orders" || tab === "members" || tab === "points") setActiveTab(tab);
+    if (kelas === "platinum" || kelas === "gold" || kelas === "silver" || kelas === "none") {
+      setKelasFilter(kelas);
+      // Member berkelas bisa saja nol poin (mis. sehari setelah reset 1 Juli),
+      // dan saringan bawaan "Punya poin" akan menyembunyikannya.
+      setPointsFilter("all");
+    }
+  }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
   const [confirmDeleteMemberId, setConfirmDeleteMemberId] = useState<string | null>(null);
 
   // Filter by date range
@@ -459,55 +481,19 @@ export function OrdersPage() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
+                      {/* Kelas hanya DITAMPILKAN di sini. Menentukannya pindah ke tab
+                          Poin Member (Bu Santi 26 Nov 2026: "Enaknya di point member,
+                          karna disini terlihat point dan barang yang dibeli"). Satu
+                          tempat saja, supaya tidak ada dua layar yang bisa mengubah
+                          hal yang sama. */}
                       {(() => {
                         const kelas = MEMBER_CLASSES.find(c => c.v === m.memberClass);
-                        const terbuka = classPickerFor === m.id;
+                        if (!kelas) return null;
                         return (
-                          <>
-                            <button
-                              onClick={(e) => { e.stopPropagation(); setClassPickerFor(terbuka ? null : m.id); }}
-                              aria-label={`Kelas member ${m.name}`}
-                              aria-expanded={terbuka}
-                              className={`px-2 py-1 rounded-lg text-xs font-bold border whitespace-nowrap ${
-                                kelas ? "text-white border-transparent" : `${th.bdr} ${th.txf}`
-                              }`}
-                              style={kelas ? { background: kelas.warna } : undefined}>
-                              {kelas ? kelas.label : "Kelas"}
-                            </button>
-                            {terbuka && (
-                              <>
-                                {/* Tirai penutup: ketuk di mana pun menutup pemilihnya,
-                                    tanpa ikut membuka statistik member di baris itu. */}
-                                <div className="fixed inset-0 z-40"
-                                  onClick={(e) => { e.stopPropagation(); setClassPickerFor(null); }} />
-                                <div onClick={(e) => e.stopPropagation()}
-                                  className={`absolute right-4 top-full -mt-1 z-50 rounded-xl border shadow-lg p-1.5 flex flex-col gap-1 ${th.bdr} ${th.card}`}>
-                                  {([{ v: null as MemberClass | null, label: "Tanpa kelas", warna: "" },
-                                     ...MEMBER_CLASSES]).map(opt => {
-                                    const aktif = (m.memberClass ?? null) === opt.v;
-                                    return (
-                                      <button key={opt.label}
-                                        onClick={async (e) => {
-                                          e.stopPropagation();
-                                          setClassPickerFor(null);
-                                          if (aktif) return;
-                                          await updateMemberAction(m.id, { memberClass: opt.v });
-                                        }}
-                                        className={`px-3 py-2 rounded-lg text-xs font-bold text-left whitespace-nowrap ${
-                                          aktif ? "bg-cherry-500 text-white" : `${th.txm} hover:${th.accBg}`
-                                        }`}>
-                                        {opt.warna && (
-                                          <span className="inline-block w-2 h-2 rounded-full mr-1.5 align-middle"
-                                            style={{ background: opt.warna }} />
-                                        )}
-                                        {opt.label}
-                                      </button>
-                                    );
-                                  })}
-                                </div>
-                              </>
-                            )}
-                          </>
+                          <span className="px-2 py-1 rounded-lg text-xs font-bold whitespace-nowrap"
+                            style={{ background: kelas.warna, color: kelas.teks }}>
+                            {kelas.label}
+                          </span>
                         );
                       })()}
                       <p className={`text-xs ${th.txf} hidden sm:block`}>
@@ -549,12 +535,39 @@ export function OrdersPage() {
           m.phone.toLowerCase().includes(q) ||
           (m.memberNumber || "").toLowerCase().includes(q)
         );
+        const perKelas = kelasFilter === "all" ? all
+          : kelasFilter === "none" ? all.filter(m => !m.memberClass)
+          : all.filter(m => m.memberClass === kelasFilter);
         const filtered = pointsFilter === "with_points"
-          ? all.filter(m => (m.points ?? 0) > 0)
-          : all;
+          ? perKelas.filter(m => (m.points ?? 0) > 0)
+          : perKelas;
         const sorted = [...filtered].sort((a, b) => (b.points ?? 0) - (a.points ?? 0));
         const totalPoints = members.reduce((s, m) => s + (m.points ?? 0), 0);
         const withPointsCount = members.filter(m => (m.points ?? 0) > 0).length;
+        // Hitungan dari SEMUA member, bukan hasil pencarian: angka di tombol
+        // saringan harus tetap sama walau kotak cari sedang diisi.
+        const jumlahKelas = {
+          platinum: members.filter(m => m.memberClass === "platinum").length,
+          gold: members.filter(m => m.memberClass === "gold").length,
+          silver: members.filter(m => m.memberClass === "silver").length,
+          none: members.filter(m => !m.memberClass).length,
+        };
+        const judulDaftar = kelasFilter === "all" ? "Peringkat Poin"
+          : kelasFilter === "none" ? "Tanpa Kelas"
+          : MEMBER_CLASSES.find(c => c.v === kelasFilter)?.label ?? "Peringkat Poin";
+
+        const pilihKelas = async (m: Member, v: MemberClass | null) => {
+          setClassPickerFor(null);
+          if ((m.memberClass ?? null) === v) return;
+          try {
+            await updateMemberAction(m.id, { memberClass: v });
+            const k = MEMBER_CLASSES.find(c => c.v === v);
+            toast.success(k ? `${m.name} jadi ${k.label}` : `Kelas ${m.name} dilepas`);
+          } catch {
+            // Galatnya sudah ditampilkan store. Tidak ada yang perlu dibatalkan
+            // di layar: daftar hanya berubah setelah server mengonfirmasi.
+          }
+        };
 
         return (
           <div className="flex flex-col gap-3">
@@ -594,6 +607,37 @@ export function OrdersPage() {
               </div>
             </div>
 
+            {/* Saringan per kelas */}
+            <div className="flex flex-wrap gap-2" role="group" aria-label="Saring per kelas member">
+              {([
+                { v: "all" as const, label: "Semua kelas", n: members.length, warna: "", teks: "" },
+                ...MEMBER_CLASSES.map(c => ({ v: c.v, label: c.label, n: jumlahKelas[c.v], warna: c.warna, teks: c.teks })),
+                { v: "none" as const, label: "Tanpa kelas", n: jumlahKelas.none, warna: "", teks: "" },
+              ]).map(opt => {
+                const aktif = kelasFilter === opt.v;
+                return (
+                  <button key={opt.v}
+                    onClick={() => {
+                      setKelasFilter(opt.v);
+                      // Lihat semua anggota kelas itu, termasuk yang poinnya nol.
+                      if (opt.v !== "all") setPointsFilter("all");
+                    }}
+                    aria-pressed={aktif}
+                    className={`min-h-[40px] px-3.5 rounded-xl text-sm font-bold border inline-flex items-center gap-1.5 ${
+                      aktif && !opt.warna ? "bg-cherry-500 text-white border-transparent"
+                      : aktif ? "border-transparent"
+                      : `${th.bdr} ${th.txm}`
+                    }`}
+                    style={aktif && opt.warna ? { background: opt.warna, color: opt.teks } : undefined}>
+                    {!aktif && opt.warna && (
+                      <span aria-hidden className="w-2.5 h-2.5 rounded-full" style={{ background: opt.warna }} />
+                    )}
+                    {opt.label} ({opt.n})
+                  </button>
+                );
+              })}
+            </div>
+
             {/* List sort by points DESC */}
             {sorted.length === 0 ? (
               <div className={`rounded-3xl border bg-bakery-stripe py-12 text-center ${th.card2} ${th.bdr}`}>
@@ -609,42 +653,123 @@ export function OrdersPage() {
               </div>
             ) : (
               <div className={`rounded-3xl border overflow-hidden ${th.card} ${th.bdr}`}>
-                <div className={`px-5 py-3 border-b flex items-center justify-between ${th.bdr} ${th.elev}`}>
-                  <p className={`text-sm font-extrabold tracking-tight ${th.tx}`}>
-                    Peringkat Poin ({sorted.length})
+                <div className={`px-5 py-3 border-b ${th.bdr} ${th.elev}`}>
+                  <div className="flex items-center justify-between gap-2">
+                    <p className={`text-sm font-extrabold tracking-tight ${th.tx}`}>
+                      {judulDaftar} ({sorted.length})
+                    </p>
+                    <p className={`text-sm ${th.txm}`}>Ketuk nama untuk riwayat poin</p>
+                  </div>
+                  {/* Patokan dari Bu Santi sendiri (26 Nov 2026). Hanya bantuan
+                      saat menandai: kelasnya tetap dia yang menentukan. */}
+                  <p className={`text-xs mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 ${th.txm}`}>
+                    <span className="font-bold">Patokan kelas:</span>
+                    {MEMBER_CLASSES.map(c => (
+                      <span key={c.v} className="inline-flex items-center gap-1">
+                        <span aria-hidden className="w-2.5 h-2.5 rounded-full" style={{ background: c.warna }} />
+                        {c.label} {c.patokan}
+                      </span>
+                    ))}
                   </p>
-                  <p className={`text-sm ${th.txm}`}>Klik untuk lihat riwayat poin</p>
                 </div>
                 {sorted.map((m, idx) => {
                   const points = m.points ?? 0;
-                  return (
+                  const kelas = MEMBER_CLASSES.find(c => c.v === m.memberClass);
+                  const saran = MEMBER_CLASSES.find(c => c.v === kelasPatokan(points));
+                  const terbuka = classPickerFor === m.id;
+                  const bukaRiwayat = () => setStatsMember({ id: m.id, name: m.name, phone: m.phone });
+                  // Dirender di dua tempat (bawah nama di HP, kolom sendiri di
+                  // layar lebar); yang tidak tampil disembunyikan CSS, jadi
+                  // pembaca layar tetap hanya menemukan satu tombol.
+                  const tombolKelas = (
                     <button
-                      key={m.id}
-                      onClick={() => setStatsMember({ id: m.id, name: m.name, phone: m.phone })}
-                      className={`w-full flex items-center gap-3 px-4 py-4 text-left ${idx > 0 ? `border-t ${th.bdrSoft}` : ""} active:opacity-70 transition-opacity min-h-[64px]`}>
-                      <span aria-hidden className={`shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-base font-black ${
-                        idx === 0 ? "text-white bg-gradient-to-br from-cherry-300 to-cherry-500 shadow-sm"
-                        : idx < 3 ? `${th.accBg} ${th.acc}`
-                        : `${th.elev} ${th.txm}`
-                      }`}>
-                        {idx + 1}
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <p className={`text-base font-extrabold truncate ${th.tx}`}>{m.name}</p>
-                        <p className={`text-sm ${th.txm} truncate`}>
-                          {m.phone}
-                          {m.memberNumber ? ` · #${m.memberNumber}` : ""}
-                        </p>
-                      </div>
-                      <div className="text-right shrink-0">
-                        <p className={`font-display text-2xl font-black ${points > 0 ? th.acc : th.txf}`} style={{ fontVariationSettings: '"wght" 900' }}>
-                          {points.toLocaleString("id-ID")}
-                        </p>
-                        <p className={`text-sm font-semibold ${points > 0 ? th.acc : th.txf} -mt-0.5`}>
-                          poin
-                        </p>
-                      </div>
+                      onClick={() => setClassPickerFor(terbuka ? null : m.id)}
+                      aria-expanded={terbuka}
+                      aria-label={`Kelas ${m.name}: ${kelas ? kelas.label : "belum ada"}. Ketuk untuk mengubah`}
+                      className={`min-h-[40px] px-3 rounded-xl text-sm font-bold whitespace-nowrap ${
+                        kelas ? "" : `border border-dashed ${th.bdr} ${th.txf}`
+                      }`}
+                      style={kelas ? { background: kelas.warna, color: kelas.teks } : undefined}>
+                      {kelas ? kelas.label : "Pilih kelas"}
                     </button>
+                  );
+                  return (
+                    <div key={m.id} className={idx > 0 ? `border-t ${th.bdrSoft}` : ""}>
+                      <div className="flex items-center gap-3 px-4 py-3 min-h-[64px]">
+                        <span aria-hidden className={`shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-base font-black ${
+                          idx === 0 ? "text-white bg-gradient-to-br from-cherry-300 to-cherry-500 shadow-sm"
+                          : idx < 3 ? `${th.accBg} ${th.acc}`
+                          : `${th.elev} ${th.txm}`
+                        }`}>
+                          {idx + 1}
+                        </span>
+                        {/* Nama dan poin membuka riwayat; badge kelas punya
+                            tombolnya sendiri supaya dua aksi itu tidak tertukar. */}
+                        <div className="min-w-0 flex-1">
+                          <button onClick={bukaRiwayat}
+                            className="block w-full min-w-0 text-left active:opacity-70 transition-opacity">
+                            <p className={`text-base font-extrabold truncate ${th.tx}`}>{m.name}</p>
+                            <p className={`text-sm ${th.txm} truncate`}>
+                              {m.phone}
+                              {m.memberNumber ? ` · #${m.memberNumber}` : ""}
+                            </p>
+                          </button>
+                          {/* Di HP badge turun ke bawah nama. Satu baris berisi
+                              badge + poin menyisakan tempat untuk tiga huruf
+                              nama saja ("A..."), padahal nama yang dibaca dulu. */}
+                          <div className="sm:hidden mt-1.5">{tombolKelas}</div>
+                        </div>
+                        <div className="hidden sm:block shrink-0">{tombolKelas}</div>
+                        <button onClick={bukaRiwayat} className="text-right shrink-0 w-14 active:opacity-70">
+                          <p className={`font-display text-2xl font-black ${points > 0 ? th.acc : th.txf}`} style={{ fontVariationSettings: '"wght" 900' }}>
+                            {points.toLocaleString("id-ID")}
+                          </p>
+                          <p className={`text-sm font-semibold ${points > 0 ? th.acc : th.txf} -mt-0.5`}>
+                            poin
+                          </p>
+                        </button>
+                      </div>
+
+                      {/* Pemilih terbuka DI DALAM baris, bukan melayang: kotak
+                          daftarnya overflow-hidden, jadi pilihan yang melayang
+                          akan terpotong di baris-baris terbawah. */}
+                      {terbuka && (
+                        <div className="px-4 pb-4">
+                          <div className={`rounded-2xl border p-3 ${th.elev} ${th.bdr}`}>
+                            <p className={`text-sm mb-2.5 ${th.txm}`}>
+                              {saran
+                                ? <>Menurut patokan, {points} poin masuk <strong className={th.tx}>{saran.label}</strong>.</>
+                                : <>{points} poin, belum sampai patokan Silver (5 poin).</>}
+                            </p>
+                            <div className="flex flex-wrap gap-2">
+                              {([{ v: null as MemberClass | null, label: "Tanpa kelas", warna: "", teks: "" }, ...MEMBER_CLASSES]).map(opt => {
+                                const aktif = (m.memberClass ?? null) === opt.v;
+                                return (
+                                  <button key={opt.label}
+                                    onClick={() => pilihKelas(m, opt.v)}
+                                    aria-pressed={aktif}
+                                    className={`min-h-[44px] px-4 rounded-xl text-sm font-bold border ${
+                                      aktif && opt.warna ? "border-transparent ring-2 ring-offset-1 ring-current"
+                                      : aktif ? "bg-cherry-500 text-white border-transparent"
+                                      // Latar kartu, bukan transparan: kotak pemilihnya
+                                      // berlatar th.elev, dan tanpa latar sendiri pilihan
+                                      // yang belum aktif terlihat seperti teks biasa.
+                                      : `${th.card} ${th.bdr} ${th.tx}`
+                                    }`}
+                                    style={aktif && opt.warna ? { background: opt.warna, color: opt.teks } : undefined}>
+                                    {!aktif && opt.warna && (
+                                      <span aria-hidden className="inline-block w-2.5 h-2.5 rounded-full mr-1.5 align-middle"
+                                        style={{ background: opt.warna }} />
+                                    )}
+                                    {opt.label}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   );
                 })}
               </div>
@@ -769,30 +894,6 @@ export function OrdersPage() {
                 className={`w-full px-3.5 py-2.5 text-sm rounded-xl border resize-none ${th.inp}`}
                 placeholder="Alamat lengkap" />
             </div>
-            <div>
-              <p className={`text-xs font-bold mb-1.5 ${th.tx}`}>Kelas Member</p>
-              <div className="flex gap-2 flex-wrap">
-                {([{ v: null, label: "Tanpa kelas" },
-                   ...MEMBER_CLASSES.map(c => ({ v: c.v as MemberClass | null, label: c.label }))]
-                ).map(opt => {
-                  const aktif = (editMember.memberClass ?? null) === opt.v;
-                  return (
-                    <button key={opt.label} type="button"
-                      onClick={() => setEditMember({ ...editMember, memberClass: opt.v })}
-                      aria-pressed={aktif}
-                      className={`px-3 py-2 rounded-xl text-sm font-bold border ${
-                        aktif ? "bg-cherry-500 text-white border-transparent" : `${th.bdr} ${th.txm}`
-                      }`}>
-                      {opt.label}
-                    </button>
-                  );
-                })}
-              </div>
-              <p className={`text-xs mt-1.5 ${th.txf}`}>
-                Dipakai untuk harga grosir khusus kelas. Member tanpa kelas tetap
-                dapat harga Semua Member dan Semua Customer.
-              </p>
-            </div>
             <div className="flex gap-2 mt-2">
               <button onClick={() => setEditMember(null)}
                 className={`flex-1 py-2.5 rounded-xl text-sm font-bold border ${th.bdr} ${th.txm}`}>
@@ -801,13 +902,19 @@ export function OrdersPage() {
               <button
                 onClick={async () => {
                   if (!editMember.name.trim() || !editMember.phone.trim()) return;
-                  await updateMemberAction(editMember.id, {
-                    name: editMember.name.trim(),
-                    phone: editMember.phone.trim(),
-                    address: (editMember.address || "").trim(),
-                    memberNumber: (editMember.memberNumber || "").trim(),
-                    memberClass: editMember.memberClass ?? null,
-                  });
+                  // Kelas TIDAK dikirim: diaturnya di tab Poin Member. Kalau ikut
+                  // dikirim, form yang terbuka sejak sebelum kelasnya diubah akan
+                  // menulis balik kelas lama saat disimpan.
+                  try {
+                    await updateMemberAction(editMember.id, {
+                      name: editMember.name.trim(),
+                      phone: editMember.phone.trim(),
+                      address: (editMember.address || "").trim(),
+                      memberNumber: (editMember.memberNumber || "").trim(),
+                    });
+                  } catch {
+                    return; // galatnya sudah ditampilkan store; form tetap terbuka
+                  }
                   setEditMember(null);
                   toast.success("Member berhasil diperbarui");
                 }}

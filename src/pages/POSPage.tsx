@@ -691,8 +691,8 @@ export function POSPage() {
                 const k = MEMBER_CLASSES.find(c => c.v === activeMember.memberClass);
                 if (!k) return null;
                 return (
-                  <span className="ml-1.5 align-middle text-[10px] font-black px-1.5 py-0.5 rounded text-white"
-                    style={{ background: k.warna }}>{k.label}</span>
+                  <span className="ml-1.5 align-middle text-[10px] font-black px-1.5 py-0.5 rounded"
+                    style={{ background: k.warna, color: k.teks }}>{k.label}</span>
                 );
               })()}
             </p>

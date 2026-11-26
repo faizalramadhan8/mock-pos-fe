@@ -1057,10 +1057,26 @@ interface NavIntentState {
   inventoryTab: string | null;
   set: (intent: { inventoryFilter?: "low" | "out"; inventoryTab?: string }) => void;
   consume: () => { inventoryFilter: "low" | "out" | null; inventoryTab: string | null };
+  /** Tab yang dibuka di halaman Pesanan. Dipisah dari consume() milik Stok
+   *  supaya halaman yang satu tidak menghabiskan niat milik halaman lain. */
+  ordersTab: string | null;
+  /** Kelas yang langsung disaring saat membuka tab Poin Member dari Beranda.
+   *  "none" = member tanpa kelas. */
+  ordersKelas: string | null;
+  setOrdersTab: (tab: string, kelas?: string) => void;
+  consumeOrdersTab: () => { tab: string | null; kelas: string | null };
 }
 export const useNavIntentStore = create<NavIntentState>()((set, get) => ({
   inventoryFilter: null,
   inventoryTab: null,
+  ordersTab: null,
+  ordersKelas: null,
+  setOrdersTab: (tab, kelas) => set({ ordersTab: tab, ordersKelas: kelas ?? null }),
+  consumeOrdersTab: () => {
+    const { ordersTab: tab, ordersKelas: kelas } = get();
+    if (tab !== null || kelas !== null) set({ ordersTab: null, ordersKelas: null });
+    return { tab, kelas };
+  },
   set: (intent) => set({
     inventoryFilter: intent.inventoryFilter ?? null,
     inventoryTab: intent.inventoryTab ?? null,
@@ -1158,19 +1174,28 @@ export const useMemberStore = create<MemberState>((set, get) => ({
     }
   },
   updateMember: async (id, data) => {
+    // HANYA kolom yang dikirim pemanggil yang ikut ke server. undefined =
+    // jangan diubah, string kosong / null = kosongkan.
+    //
+    // Dulu address dan member_number selalu dikirim (`?? ''`). Pemilih kelas
+    // yang cuma membawa memberClass karenanya ikut mengirim alamat dan nomor
+    // member kosong, dan backend menerapkannya: setiap kali Bu Santi memilih
+    // kelas, dua kolom itu terhapus. Backend sekarang juga memakai pointer,
+    // jadi kesalahan yang sama di sini tidak lagi menghapus apa pun.
+    const body: Record<string, string> = {};
+    if (data.name !== undefined) body.name = data.name;
+    if (data.phone !== undefined) body.phone = data.phone;
+    if (data.address !== undefined) body.address = data.address ?? '';
+    if (data.memberNumber !== undefined) body.member_number = data.memberNumber ?? '';
+    if (data.memberClass !== undefined) body.member_class = data.memberClass ?? '';
     try {
-      await memberApi.update(id, {
-        name: data.name,
-        phone: data.phone,
-        address: data.address ?? '',
-        member_number: data.memberNumber ?? '',
-        // undefined = jangan diubah, null = lepas kelasnya, nilai = pindah
-        // kelas. Backend membedakan ketiganya lewat pointer.
-        ...(data.memberClass !== undefined ? { member_class: data.memberClass ?? '' } : {}),
-      });
+      await memberApi.update(id, body);
       await get().fetchMembers();
     } catch (e: any) {
+      // Dilempar ulang supaya pemanggil tidak menampilkan "berhasil" untuk
+      // penyimpanan yang gagal (aturan yang sama dengan addMember).
       toast.error(e.message);
+      throw e;
     }
   },
   deleteMember: async (id) => {

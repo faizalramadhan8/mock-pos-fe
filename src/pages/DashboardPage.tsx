@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
-import { useAuthStore, useLangStore, useOrderStore, useProductStore, useBatchStore, usePurchaseInvoiceStore, useNavIntentStore } from "@/stores";
+import { useAuthStore, useLangStore, useOrderStore, useProductStore, useBatchStore, usePurchaseInvoiceStore, useNavIntentStore, useMemberStore } from "@/stores";
 import type { PageId } from "@/types";
+import { MEMBER_CLASSES } from "@/types";
 import { ProductDetailModal } from "@/components/ProductDetailModal";
 import { useThemeClasses } from "@/hooks/useThemeClasses";
 import { usePageFetch } from "@/hooks/usePageFetch";
@@ -51,6 +52,9 @@ export function DashboardPage({ onNavigate }: { onNavigate?: (page: PageId) => v
     { key: "batches",  fetch: () => useBatchStore.getState().fetchBatches() },
     // Faktur jatuh tempo untuk kartu "Perlu Perhatian" + lonceng notifikasi.
     { key: "invoices-due", fetch: () => usePurchaseInvoiceStore.getState().fetchDueSoonInvoices() },
+    // Kartu Kelas Member. Kunci "members" sama dengan halaman Pesanan, jadi
+    // penarikannya berbagi jeda TTL dan tidak dobel.
+    { key: "members", fetch: () => useMemberStore.getState().fetchMembers() },
   ]);
   const th = useThemeClasses();
   const { t, lang } = useLangStore();
@@ -58,6 +62,7 @@ export function DashboardPage({ onNavigate }: { onNavigate?: (page: PageId) => v
   const users = useAuthStore(s => s.users);
   const orders = useOrderStore(s => s.orders);
   const products = useProductStore(s => s.products);
+  const members = useMemberStore(s => s.members);
   const getExpiringBatches = useBatchStore(s => s.getExpiringBatches);
   const batches = useBatchStore(s => s.batches);
 
@@ -353,6 +358,51 @@ export function DashboardPage({ onNavigate }: { onNavigate?: (page: PageId) => v
                 </p>
               </button>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ─── KELAS MEMBER ───
+          Bu Santi 26 Nov 2026: "Nanti disini ada jumlah berapa customer silver
+          gold dan platinum. Bisa dijadikan barometer untuk menentukan sukses
+          atau tidaknya program yang dilakukan, dan mengukur kinerja team saya."
+
+          Sengaja DI ATAS pemilih tanggal: ini jumlah saat ini, tidak ikut
+          Hari Ini / Bulan Ini. Menaruhnya di bawah pemilih akan membuatnya
+          terbaca seolah berubah per periode.
+
+          Ubin putih dengan garis warna, bukan ubin penuh merah/kuning/biru:
+          tepat di atas kartu ini ada Perlu Perhatian, dan ubin merah penuh
+          di sebelahnya akan terbaca sebagai peringatan, bukan sebagai Platinum. */}
+      {isOwner && (
+        <div className={`rounded-[22px] border p-5 ${th.card} ${th.bdr}`}>
+          <div className="flex items-baseline justify-between gap-2 mb-3">
+            <p className={`text-sm font-bold uppercase tracking-wider ${th.txm}`}>Kelas Member</p>
+            <p className={`text-xs ${th.txf}`}>Jumlah saat ini · ketuk untuk melihat daftarnya</p>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {[
+              ...MEMBER_CLASSES.map(c => ({
+                v: c.v as string, label: c.label, warna: c.warna,
+                n: members.filter(m => m.memberClass === c.v).length,
+              })),
+              { v: "none", label: "Tanpa kelas", warna: "", n: members.filter(m => !m.memberClass).length },
+            ].map(k => (
+              <button key={k.v} type="button"
+                onClick={() => { useNavIntentStore.getState().setOrdersTab("points", k.v); onNavigate?.("orders"); }}
+                className={`relative overflow-hidden rounded-2xl border p-4 pt-5 text-left min-h-[92px] active:opacity-70 ${th.elev} ${th.bdr}`}>
+                <span aria-hidden className="absolute inset-x-0 top-0 h-1.5"
+                  style={{ background: k.warna || "var(--color-ink-300, #CBD5E1)" }} />
+                <p className={`text-sm font-bold flex items-center gap-1.5 ${th.tx}`}>
+                  {k.warna && <span aria-hidden className="w-2.5 h-2.5 rounded-full" style={{ background: k.warna }} />}
+                  {k.label}
+                </p>
+                <p className={`font-display text-3xl font-black mt-1 ${th.tx}`} style={{ fontVariationSettings: '"wght" 900' }}>
+                  {k.n.toLocaleString("id-ID")}
+                </p>
+                <p className={`text-xs ${th.txf}`}>member</p>
+              </button>
+            ))}
           </div>
         </div>
       )}

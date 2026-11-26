@@ -80,14 +80,35 @@ export interface Product {
   createdAt: string;
 }
 
-/** Kelas member yang ditandai manual oleh Bu Santi. */
+/**
+ * Kelas member, ditandai MANUAL oleh Bu Santi dari layar Poin Member.
+ *
+ * Bu Santi 26 Nov 2026 memberi patokan berdasarkan poin (Silver 5–9, Gold
+ * 10–19, Platinum 20 ke atas), tapi yang menentukan tetap dia sendiri.
+ * Patokannya ditampilkan sebagai bantuan, kelasnya TIDAK berubah sendiri
+ * saat poin naik atau direset. Jangan menghitungnya otomatis tanpa memintanya
+ * dulu: dia menilai juga siapa yang berpotensi jadi reseller, bukan cuma poin.
+ */
 export type MemberClass = "platinum" | "gold" | "silver";
 
-export const MEMBER_CLASSES: { v: MemberClass; label: string; warna: string }[] = [
-  { v: "platinum", label: "Platinum", warna: "#64748B" },
-  { v: "gold", label: "Gold", warna: "#B45309" },
-  { v: "silver", label: "Silver", warna: "#6B7280" },
+/**
+ * Warna permintaan Bu Santi: Platinum merah, Gold kuning, Silver biru.
+ * `teks` dipisah karena tulisan putih di atas kuning tidak terbaca.
+ * `minPoin` hanya untuk patokan yang ditampilkan, tidak menentukan apa pun.
+ */
+export const MEMBER_CLASSES: {
+  v: MemberClass; label: string; warna: string; teks: string; patokan: string; minPoin: number;
+}[] = [
+  { v: "platinum", label: "Platinum", warna: "#DC2626", teks: "#FFFFFF", patokan: "20+ poin", minPoin: 20 },
+  { v: "gold", label: "Gold", warna: "#FACC15", teks: "#422006", patokan: "10–19 poin", minPoin: 10 },
+  { v: "silver", label: "Silver", warna: "#2563EB", teks: "#FFFFFF", patokan: "5–9 poin", minPoin: 5 },
 ];
+
+/** Kelas yang SESUAI patokan Bu Santi untuk sejumlah poin. Hanya saran. */
+export function kelasPatokan(poin: number): MemberClass | null {
+  for (const k of MEMBER_CLASSES) if (poin >= k.minPoin) return k.v;
+  return null;
+}
 
 /**
  * Siapa yang berhak atas harga tier.
@@ -428,7 +449,7 @@ export interface Member {
   /**
    * Loyalty point balance (1 point = Rp 1). Earned per kelipatan tepat
    * Rp 100.000 cash actual (= 1.000 poin per kelipatan). Bisa ditebus
-   * per-item di cart. Reset 0 setiap 1 Januari.
+   * per-item di cart. Reset 0 setiap 1 Januari dan 1 Juli.
    */
   points: number;
   /** Kelas yang ditandai Bu Santi. Kosong = belum dikelompokkan, dan itu
