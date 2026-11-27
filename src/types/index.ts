@@ -449,7 +449,7 @@ export interface Member {
   /**
    * Loyalty point balance (1 point = Rp 1). Earned per kelipatan tepat
    * Rp 100.000 cash actual (= 1.000 poin per kelipatan). Bisa ditebus
-   * per-item di cart. Reset 0 setiap 1 Januari dan 1 Juli.
+   * per-item di cart. Reset 0 setiap 1 Januari.
    */
   points: number;
   /** Kelas yang ditandai Bu Santi. Kosong = belum dikelompokkan, dan itu

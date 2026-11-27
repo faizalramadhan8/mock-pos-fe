@@ -109,7 +109,7 @@ export function OrdersPage() {
     if (tab === "orders" || tab === "members" || tab === "points") setActiveTab(tab);
     if (kelas === "platinum" || kelas === "gold" || kelas === "silver" || kelas === "none") {
       setKelasFilter(kelas);
-      // Member berkelas bisa saja nol poin (mis. sehari setelah reset 1 Juli),
+      // Member berkelas bisa saja nol poin (mis. sehari setelah reset 1 Januari),
       // dan saringan bawaan "Punya poin" akan menyembunyikannya.
       setPointsFilter("all");
     }
