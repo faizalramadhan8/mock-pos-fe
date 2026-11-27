@@ -16,7 +16,7 @@ import { calcItemDiscount } from "@/utils/calc";
 import { orderApi } from "@/api";
 import Barcode from "react-barcode";
 import type { PaymentMethod, UnitType, DiscountType, Product, Order, Member } from "@/types";
-import { MEMBER_CLASSES } from "@/types";
+import { MEMBER_CLASSES, kelasMember } from "@/types";
 import toast from "react-hot-toast";
 import {
   Search, ScanLine, ShoppingBag, Minus, Plus, Trash2, ImagePlus, X, UserPlus, Tag, Percent, Wallet, FileText, Printer, Barcode as BarcodeIcon, Clock, Send, AlertCircle, Eye, EyeOff, Gift, Sparkles, TrendingDown, Bookmark, List, Rows3, Copy,
@@ -688,7 +688,7 @@ export function POSPage() {
               {/* Kelasnya ikut tampil supaya kasir tahu kenapa harganya beda
                   dari member lain, tanpa harus membuka daftar member. */}
               {(() => {
-                const k = MEMBER_CLASSES.find(c => c.v === activeMember.memberClass);
+                const k = MEMBER_CLASSES.find(c => c.v === kelasMember(activeMember));
                 if (!k) return null;
                 return (
                   <span className="ml-1.5 align-middle text-[10px] font-black px-1.5 py-0.5 rounded"

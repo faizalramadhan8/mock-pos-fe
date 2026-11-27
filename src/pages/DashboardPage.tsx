@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { useAuthStore, useLangStore, useOrderStore, useProductStore, useBatchStore, usePurchaseInvoiceStore, useNavIntentStore, useMemberStore } from "@/stores";
 import type { PageId } from "@/types";
-import { MEMBER_CLASSES } from "@/types";
+import { MEMBER_CLASSES, kelasMember } from "@/types";
 import { ProductDetailModal } from "@/components/ProductDetailModal";
 import { useThemeClasses } from "@/hooks/useThemeClasses";
 import { usePageFetch } from "@/hooks/usePageFetch";
@@ -384,9 +384,9 @@ export function DashboardPage({ onNavigate }: { onNavigate?: (page: PageId) => v
             {[
               ...MEMBER_CLASSES.map(c => ({
                 v: c.v as string, label: c.label, warna: c.warna,
-                n: members.filter(m => m.memberClass === c.v).length,
+                n: members.filter(m => kelasMember(m) === c.v).length,
               })),
-              { v: "none", label: "Tanpa kelas", warna: "", n: members.filter(m => !m.memberClass).length },
+              { v: "none", label: "Tanpa kelas", warna: "", n: members.filter(m => !kelasMember(m)).length },
             ].map(k => (
               <button key={k.v} type="button"
                 onClick={() => { useNavIntentStore.getState().setOrdersTab("points", k.v); onNavigate?.("orders"); }}

@@ -81,20 +81,27 @@ export interface Product {
 }
 
 /**
- * Kelas member, ditandai MANUAL oleh Bu Santi dari layar Poin Member.
+ * Kelas member: OTOMATIS dari poin, bisa DIKUNCI manual oleh Bu Santi.
  *
- * Bu Santi 26 Nov 2026 memberi patokan berdasarkan poin (Silver 5–9, Gold
- * 10–19, Platinum 20 ke atas), tapi yang menentukan tetap dia sendiri.
- * Patokannya ditampilkan sebagai bantuan, kelasnya TIDAK berubah sendiri
- * saat poin naik atau direset. Jangan menghitungnya otomatis tanpa memintanya
- * dulu: dia menilai juga siapa yang berpotensi jadi reseller, bukan cuma poin.
+ * Patokan Bu Santi 26 Nov 2026: Silver 5–9, Gold 10–19, Platinum 20 ke atas.
+ * Kelas mengikuti saldo poin dengan sendirinya. Bu Santi bisa menguncinya ke
+ * kelas tertentu dari tab Poin Member (mis. calon reseller yang poinnya belum
+ * cukup); kunci itu disimpan di `members.member_class`.
+ *
+ *   member_class NULL      → otomatis, ikut poin (`kelasPatokan`)
+ *   member_class terisi    → dikunci manual, poin tidak berpengaruh
+ *
+ * Aturan DAPAT poin (Rp 100rb = 1 poin) tidak berubah sama sekali.
+ *
+ * Baca kelas SELALU lewat `kelasMember()`, jangan `m.memberClass` langsung:
+ * itu cuma kuncinya, dan member otomatis akan terbaca "tanpa kelas".
  */
 export type MemberClass = "platinum" | "gold" | "silver";
 
 /**
  * Warna permintaan Bu Santi: Platinum merah, Gold kuning, Silver biru.
  * `teks` dipisah karena tulisan putih di atas kuning tidak terbaca.
- * `minPoin` hanya untuk patokan yang ditampilkan, tidak menentukan apa pun.
+ * `minPoin` menentukan kelas otomatis (lihat `kelasPatokan`).
  */
 export const MEMBER_CLASSES: {
   v: MemberClass; label: string; warna: string; teks: string; patokan: string; minPoin: number;
@@ -104,10 +111,22 @@ export const MEMBER_CLASSES: {
   { v: "silver", label: "Silver", warna: "#2563EB", teks: "#FFFFFF", patokan: "5–9 poin", minPoin: 5 },
 ];
 
-/** Kelas yang SESUAI patokan Bu Santi untuk sejumlah poin. Hanya saran. */
+/** Kelas menurut patokan poin Bu Santi. Dipakai untuk member yang tidak dikunci. */
 export function kelasPatokan(poin: number): MemberClass | null {
   for (const k of MEMBER_CLASSES) if (poin >= k.minPoin) return k.v;
   return null;
+}
+
+/**
+ * Kelas yang BERLAKU untuk member: kunci manual kalau ada, kalau tidak dari
+ * poin. Satu-satunya tempat yang menjawab "member ini kelas apa" — harga tier
+ * kelas, badge, saringan, dan hitungan di Beranda semuanya lewat sini.
+ */
+export function kelasMember(
+  m: { memberClass?: MemberClass | null; points?: number } | null | undefined
+): MemberClass | null {
+  if (!m) return null;
+  return m.memberClass ?? kelasPatokan(m.points ?? 0);
 }
 
 /**

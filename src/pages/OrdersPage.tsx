@@ -9,9 +9,9 @@ import { useDebounce } from "@/hooks/useDebounce";
 import { usePageFetch } from "@/hooks/usePageFetch";
 import { formatCurrency as $, formatTime, formatDate, genId, normalizePhone, salesTotal, filterByChannel } from "@/utils";
 import { getDateRange, type DateRange, type CustomRange } from "@/utils/dateRange";
-import { FileText, Search, Users, Trash2, Plus, Receipt, Pencil, Sparkles, MapPin, AlertCircle } from "lucide-react";
+import { FileText, Search, Users, Trash2, Plus, Receipt, Pencil, Sparkles, MapPin, AlertCircle, Lock } from "lucide-react";
 import type { Member, MemberClass } from "@/types";
-import { MEMBER_CLASSES, kelasPatokan } from "@/types";
+import { MEMBER_CLASSES, kelasPatokan, kelasMember } from "@/types";
 import toast from "react-hot-toast";
 
 type OrdersTab = "orders" | "members" | "points";
@@ -487,7 +487,7 @@ export function OrdersPage() {
                           tempat saja, supaya tidak ada dua layar yang bisa mengubah
                           hal yang sama. */}
                       {(() => {
-                        const kelas = MEMBER_CLASSES.find(c => c.v === m.memberClass);
+                        const kelas = MEMBER_CLASSES.find(c => c.v === kelasMember(m));
                         if (!kelas) return null;
                         return (
                           <span className="px-2 py-1 rounded-lg text-xs font-bold whitespace-nowrap"
@@ -536,8 +536,8 @@ export function OrdersPage() {
           (m.memberNumber || "").toLowerCase().includes(q)
         );
         const perKelas = kelasFilter === "all" ? all
-          : kelasFilter === "none" ? all.filter(m => !m.memberClass)
-          : all.filter(m => m.memberClass === kelasFilter);
+          : kelasFilter === "none" ? all.filter(m => !kelasMember(m))
+          : all.filter(m => kelasMember(m) === kelasFilter);
         const filtered = pointsFilter === "with_points"
           ? perKelas.filter(m => (m.points ?? 0) > 0)
           : perKelas;
@@ -547,10 +547,10 @@ export function OrdersPage() {
         // Hitungan dari SEMUA member, bukan hasil pencarian: angka di tombol
         // saringan harus tetap sama walau kotak cari sedang diisi.
         const jumlahKelas = {
-          platinum: members.filter(m => m.memberClass === "platinum").length,
-          gold: members.filter(m => m.memberClass === "gold").length,
-          silver: members.filter(m => m.memberClass === "silver").length,
-          none: members.filter(m => !m.memberClass).length,
+          platinum: members.filter(m => kelasMember(m) === "platinum").length,
+          gold: members.filter(m => kelasMember(m) === "gold").length,
+          silver: members.filter(m => kelasMember(m) === "silver").length,
+          none: members.filter(m => !kelasMember(m)).length,
         };
         const judulDaftar = kelasFilter === "all" ? "Peringkat Poin"
           : kelasFilter === "none" ? "Tanpa Kelas"
@@ -562,7 +562,10 @@ export function OrdersPage() {
           try {
             await updateMemberAction(m.id, { memberClass: v });
             const k = MEMBER_CLASSES.find(c => c.v === v);
-            toast.success(k ? `${m.name} jadi ${k.label}` : `Kelas ${m.name} dilepas`);
+            const otomatis = MEMBER_CLASSES.find(c => c.v === kelasPatokan(m.points ?? 0));
+            toast.success(k
+              ? `${m.name} dikunci ${k.label}`
+              : `${m.name} ikut poin lagi${otomatis ? ` (${otomatis.label})` : " (belum ada kelas)"}`);
           } catch {
             // Galatnya sudah ditampilkan store. Tidak ada yang perlu dibatalkan
             // di layar: daftar hanya berubah setelah server mengonfirmasi.
@@ -660,10 +663,10 @@ export function OrdersPage() {
                     </p>
                     <p className={`text-sm ${th.txm}`}>Ketuk nama untuk riwayat poin</p>
                   </div>
-                  {/* Patokan dari Bu Santi sendiri (26 Nov 2026). Hanya bantuan
-                      saat menandai: kelasnya tetap dia yang menentukan. */}
+                  {/* Patokan dari Bu Santi sendiri (26 Nov 2026). Kelas ikut
+                      poin dengan sendirinya, kecuali yang dia kunci manual. */}
                   <p className={`text-xs mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 ${th.txm}`}>
-                    <span className="font-bold">Patokan kelas:</span>
+                    <span className="font-bold">Kelas otomatis:</span>
                     {MEMBER_CLASSES.map(c => (
                       <span key={c.v} className="inline-flex items-center gap-1">
                         <span aria-hidden className="w-2.5 h-2.5 rounded-full" style={{ background: c.warna }} />
@@ -674,8 +677,9 @@ export function OrdersPage() {
                 </div>
                 {sorted.map((m, idx) => {
                   const points = m.points ?? 0;
-                  const kelas = MEMBER_CLASSES.find(c => c.v === m.memberClass);
-                  const saran = MEMBER_CLASSES.find(c => c.v === kelasPatokan(points));
+                  const kelas = MEMBER_CLASSES.find(c => c.v === kelasMember(m));
+                  const dariPoin = MEMBER_CLASSES.find(c => c.v === kelasPatokan(points));
+                  const dikunci = !!m.memberClass;
                   const terbuka = classPickerFor === m.id;
                   const bukaRiwayat = () => setStatsMember({ id: m.id, name: m.name, phone: m.phone });
                   // Dirender di dua tempat (bawah nama di HP, kolom sendiri di
@@ -685,12 +689,16 @@ export function OrdersPage() {
                     <button
                       onClick={() => setClassPickerFor(terbuka ? null : m.id)}
                       aria-expanded={terbuka}
-                      aria-label={`Kelas ${m.name}: ${kelas ? kelas.label : "belum ada"}. Ketuk untuk mengubah`}
-                      className={`min-h-[40px] px-3 rounded-xl text-sm font-bold whitespace-nowrap ${
+                      aria-label={`Kelas ${m.name}: ${kelas ? kelas.label : "belum ada"}${dikunci ? ", dikunci manual" : ", ikut poin"}. Ketuk untuk mengubah`}
+                      className={`min-h-[40px] px-3 rounded-xl text-sm font-bold whitespace-nowrap inline-flex items-center gap-1 ${
                         kelas ? "" : `border border-dashed ${th.bdr} ${th.txf}`
                       }`}
                       style={kelas ? { background: kelas.warna, color: kelas.teks } : undefined}>
-                      {kelas ? kelas.label : "Pilih kelas"}
+                      {/* Gembok membedakan kelas yang dikunci dari yang ikut poin.
+                          Tanpa itu, member yang dikunci Silver lalu poinnya naik
+                          ke 25 terlihat seperti kesalahan sistem. */}
+                      {dikunci && <Lock size={13} aria-hidden />}
+                      {kelas ? kelas.label : "Belum ada"}
                     </button>
                   );
                   return (
@@ -737,12 +745,16 @@ export function OrdersPage() {
                         <div className="px-4 pb-4">
                           <div className={`rounded-2xl border p-3 ${th.elev} ${th.bdr}`}>
                             <p className={`text-sm mb-2.5 ${th.txm}`}>
-                              {saran
-                                ? <>Menurut patokan, {points} poin masuk <strong className={th.tx}>{saran.label}</strong>.</>
-                                : <>{points} poin, belum sampai patokan Silver (5 poin).</>}
+                              {dariPoin
+                                ? <>Dari poin: {points} poin = <strong className={th.tx}>{dariPoin.label}</strong>.</>
+                                : <>Dari poin: {points} poin, belum sampai Silver (5 poin).</>}
+                              {" "}
+                              {dikunci
+                                ? <>Sekarang <strong className={th.tx}>dikunci {kelas?.label}</strong>, poin tidak berpengaruh.</>
+                                : <>Pilih kelas untuk menguncinya.</>}
                             </p>
                             <div className="flex flex-wrap gap-2">
-                              {([{ v: null as MemberClass | null, label: "Tanpa kelas", warna: "", teks: "" }, ...MEMBER_CLASSES]).map(opt => {
+                              {([{ v: null as MemberClass | null, label: "Ikut poin", warna: "", teks: "" }, ...MEMBER_CLASSES]).map(opt => {
                                 const aktif = (m.memberClass ?? null) === opt.v;
                                 return (
                                   <button key={opt.label}

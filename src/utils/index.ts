@@ -1,7 +1,7 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 import type { Order, Product, PaymentTerms, ProductPriceTier, MemberClass } from "@/types";
-import { kelasDariTarget } from "@/types";
+import { kelasDariTarget, kelasMember } from "@/types";
 import JsBarcode from "jsbarcode";
 import { useSettingsStore } from "@/stores";
 
@@ -523,7 +523,7 @@ export const LABEL_TEMPAT: Record<string, string> = {
  */
 export function tierBerlaku(
   t: ProductPriceTier,
-  member: { id: string; memberClass?: MemberClass | null } | null,
+  member: { id: string; memberClass?: MemberClass | null; points?: number } | null,
   qtySatuan: number | null,
   nowMs: number = Date.now()
 ): boolean {
@@ -538,10 +538,11 @@ export function tierBerlaku(
   if (t.target === "member_specific") {
     return (t.members || []).some(m => m.id === member.id);
   }
-  // Target kelas: cocok PERSIS. Member tanpa kelas tidak pernah cocok, dan
-  // Platinum tidak ikut kebagian tier Gold. Lihat PriceTierTarget di types.
+  // Target kelas: cocok PERSIS dengan kelas yang berlaku (kunci manual atau
+  // dari poin). Member tanpa kelas tidak pernah cocok, dan Platinum tidak ikut
+  // kebagian tier Gold. Lihat PriceTierTarget di types.
   const kelas = kelasDariTarget(t.target);
-  if (kelas) return member.memberClass === kelas;
+  if (kelas) return kelasMember(member) === kelas;
   return false;
 }
 
